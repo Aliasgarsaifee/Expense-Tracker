@@ -10,8 +10,7 @@ import {
   type Expense,
   type PaymentMethod,
 } from '../db'
-import { categoryEmoji } from '../lib/categoryMeta'
-import { monthLabel, monthOf, todayISO } from '../lib/dates'
+import { monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
 import {
   filterExpenses,
   formatTotals,
@@ -26,6 +25,7 @@ import { groupEmoji } from '../lib/paymentMeta'
 function dayLabel(iso: string): string {
   const today = todayISO()
   if (iso === today) return 'Today'
+  if (iso === yesterdayISO()) return 'Yesterday'
   const d = new Date(iso + 'T00:00:00')
   const sameYear = iso.slice(0, 4) === today.slice(0, 4)
   return d.toLocaleDateString('en-IN', {
@@ -118,8 +118,9 @@ export function HistoryScreen() {
     () => new Map((categories ?? []).map((c: Category) => [c.label, c.emoji])),
     [categories],
   )
+  // 🧾 covers labels with no category record (e.g. from an edited backup).
   const emojiFor = (category: string) =>
-    categoryEmojiByLabel.get(category) ?? categoryEmoji(category)
+    categoryEmojiByLabel.get(category) ?? '🧾'
 
   // Archived cards stay filterable while old entries still point at them —
   // that is exactly the statement one still needs to reconcile.

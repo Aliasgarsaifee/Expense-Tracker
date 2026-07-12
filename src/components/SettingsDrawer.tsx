@@ -16,7 +16,7 @@ import {
   type Category,
   type PaymentMethod,
 } from '../db'
-import { runAutoBackupIfDue } from '../lib/autoBackup'
+import { runAutoBackupIfDue, writePreImportSnapshot } from '../lib/autoBackup'
 import { backupToJson, expensesToCsv, importBackup, parseBackupJson } from '../lib/backup'
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
@@ -202,6 +202,13 @@ function DrawerBody({
         `Import ${data.expenses.length} expenses, ${data.paymentMethods.length} payment methods, and ${data.categories.length} categories? Entries with matching ids will be overwritten.`,
       )
       if (!ok) return
+      // Safety copy of the current ledger next to the daily snapshots. The
+      // import itself is a user-confirmed merge, so a failed copy only logs.
+      try {
+        await writePreImportSnapshot()
+      } catch (err) {
+        console.error('pre-import snapshot failed', err)
+      }
       const counts = await importBackup(data)
       window.alert(
         `Imported ${counts.expenses} expenses, ${counts.paymentMethods} payment methods, and ${counts.categories} categories.`,
@@ -451,6 +458,7 @@ function DrawerBody({
             lives only on this phone — in the app’s own database — and never leaves
             it unless you export.
           </p>
+          <p className="drawer-note">v{__APP_VERSION__}</p>
         </section>
 
         <AddMethodSheet

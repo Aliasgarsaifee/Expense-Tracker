@@ -11,7 +11,10 @@ const CSV_HEADER = 'spentOn,amount,currency,category,paymentMethod,note,id,creat
 
 function csvField(value: string | number | undefined): string {
   if (value === undefined) return ''
-  const s = String(value)
+  let s = String(value)
+  // A leading =, +, - or @ executes as a formula when the CSV opens in a
+  // spreadsheet; a leading apostrophe renders it as inert text instead.
+  if (/^[=+\-@]/.test(s)) s = `'${s}`
   return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s
 }
 

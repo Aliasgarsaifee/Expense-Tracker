@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { CURRENCIES, filterCurrencies } from '../lib/currencies'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 
 interface Props {
   open: boolean
@@ -25,25 +26,7 @@ export function CurrencySheet({ open, selected, onSelect, onClose }: Props) {
     listRef.current?.scrollTo(0, 0)
   }, [query])
 
-  // On iOS the software keyboard overlays the WKWebView without shrinking the
-  // layout viewport (or dvh), hiding the bottom of this bottom-anchored sheet.
-  // Track the occluded height via visualViewport and pad the sheet by it so
-  // the list's scrollport always ends above the keyboard.
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!open || !vv) return
-    const update = () => {
-      const hidden = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-      sheetRef.current?.style.setProperty('--kb', `${hidden}px`)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [open])
+  useKeyboardInset(sheetRef, open)
 
   if (!open) return null
 

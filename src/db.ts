@@ -181,6 +181,12 @@ export async function updateExpense(
   id: string,
   changes: Partial<NewExpense>,
 ): Promise<void> {
+  if (
+    changes.amount !== undefined &&
+    (!Number.isFinite(changes.amount) || changes.amount <= 0)
+  ) {
+    throw new Error('Amount must be a positive number')
+  }
   await db.expenses.update(id, changes)
 }
 

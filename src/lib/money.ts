@@ -13,7 +13,3 @@ export function formatMoney(amount: number, currency = 'INR'): string {
     return `${currency} ${amount.toFixed(digits)}`
   }
 }
-
-export function formatINR(amount: number): string {
-  return formatMoney(amount, 'INR')
-}

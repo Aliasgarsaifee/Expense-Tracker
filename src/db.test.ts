@@ -128,6 +128,23 @@ describe('updateExpense', () => {
     await updateExpense('no-such-id', { amount: 999 })
     expect(await listExpenses()).toEqual([created])
   })
+
+  it('rejects a zero, negative, or non-finite amount like addExpense does', async () => {
+    const created = await addExpense({ amount: 50, category: 'Food', spentOn: '2026-07-03' })
+    await expect(updateExpense(created.id, { amount: 0 })).rejects.toThrow(/positive/)
+    await expect(updateExpense(created.id, { amount: -5 })).rejects.toThrow(/positive/)
+    await expect(updateExpense(created.id, { amount: NaN })).rejects.toThrow(/positive/)
+    const [stored] = await listExpenses()
+    expect(stored.amount).toBe(50)
+  })
+
+  it('still updates other fields when no amount is given', async () => {
+    const created = await addExpense({ amount: 50, category: 'Food', spentOn: '2026-07-03' })
+    await updateExpense(created.id, { note: 'chai' })
+    const [stored] = await listExpenses()
+    expect(stored.note).toBe('chai')
+    expect(stored.amount).toBe(50)
+  })
 })
 
 describe('deleteExpense', () => {

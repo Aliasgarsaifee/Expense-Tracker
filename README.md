@@ -20,6 +20,8 @@ your own with an emoji), date, and a free-text note.
   payment group (a group with several cards opens a picker; last-used
   remembered), category chips with inline "+" to add one, a friendly
   "12 July 2026" date field, note. New cards can be added inline too.
+  Each save confirms with a toast (plus a haptic tick on the phone) that
+  offers a few seconds of **Undo**.
 - **History** — month pager or all-time view with sticky month sections;
   filter by payment method, search notes/categories/amounts. Built for
   reconciling against card/UPI statements: pick a month + a card, compare.
@@ -72,6 +74,9 @@ the last 7 (only files with that exact prefix are ever pruned — anything you
 place there yourself is never touched). Because `Info.plist` sets
 `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace`, that folder is
 visible in the iOS **Files app → On My iPhone → Expense Tracker → Backups**.
+Importing a backup first drops a `pre-import-YYYY-MM-DD.json` safety copy into
+the same folder (never auto-pruned), so a wrong-file import is always
+reversible.
 
 True iCloud sync (CloudKit / an iCloud Drive container) requires a **paid**
 Apple Developer account — it is not available to free personal teams. The $0

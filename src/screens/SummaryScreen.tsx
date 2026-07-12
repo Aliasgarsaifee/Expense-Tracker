@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
 import { CategoryChart } from '../components/CategoryChart'
 import { MonthPager } from '../components/MonthPager'
-import { listExpensesForMonth, listPaymentMethods, type PaymentMethod } from '../db'
+import { db, listExpensesForMonth, listPaymentMethods, type PaymentMethod } from '../db'
 import { currencySymbol } from '../lib/currencies'
 import { addMonths, monthLabel, monthOf, todayISO } from '../lib/dates'
 import { formatMoney } from '../lib/money'
@@ -33,6 +33,13 @@ export function SummaryScreen() {
     [month],
   )
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
+  // ‹ › should reach any month that actually has data, even future-dated —
+  // otherwise a fat-fingered date is visible in History but unreachable here.
+  const newest = useLiveQuery(() => db.expenses.orderBy('spentOn').last())
+  const maxMonth = useMemo(() => {
+    const newestMonth = newest ? monthOf(newest.spentOn) : currentMonth
+    return newestMonth > currentMonth ? newestMonth : currentMonth
+  }, [newest, currentMonth])
 
   const buckets = useMemo(() => splitByCurrency(expenses ?? []), [expenses])
   // Follow the data: if the picked currency vanished with a month switch,
@@ -78,7 +85,7 @@ export function SummaryScreen() {
       <MonthPager
         month={month}
         onChange={(m) => m && setMonth(m)}
-        maxMonth={currentMonth}
+        maxMonth={maxMonth}
       />
 
       {buckets.length > 1 && (

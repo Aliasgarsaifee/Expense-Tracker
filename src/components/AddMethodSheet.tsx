@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { addPaymentMethod, PAYMENT_GROUPS, type PaymentMethod } from '../db'
 import { groupEmoji } from '../lib/paymentMeta'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 
 const CUSTOM = '__custom__'
 
@@ -16,6 +17,15 @@ interface Props {
 // group picker and from Settings, so a new method never interrupts logging
 // an expense for long.
 export function AddMethodSheet({ open, presetGroup, onCreated, onClose }: Props) {
+  if (!open) return null
+  return (
+    <SheetBody presetGroup={presetGroup} onCreated={onCreated} onClose={onClose} />
+  )
+}
+
+// Mounted fresh on every open: presetGroup lands in state each time it is
+// shown, and a name typed on a cancelled visit never leaks into the next one.
+function SheetBody({ presetGroup, onCreated, onClose }: Omit<Props, 'open'>) {
   const initialChip =
     presetGroup && PAYMENT_GROUPS.includes(presetGroup as (typeof PAYMENT_GROUPS)[number])
       ? presetGroup
@@ -29,8 +39,8 @@ export function AddMethodSheet({ open, presetGroup, onCreated, onClose }: Props)
   const [label, setLabel] = useState('')
   const inFlight = useRef(false)
   const [saving, setSaving] = useState(false)
-
-  if (!open) return null
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useKeyboardInset(sheetRef)
 
   const group = groupChip === CUSTOM ? customGroup : groupChip
 
@@ -41,7 +51,6 @@ export function AddMethodSheet({ open, presetGroup, onCreated, onClose }: Props)
     setSaving(true)
     try {
       const created = await addPaymentMethod({ label, group })
-      setLabel('')
       onCreated(created)
       onClose()
     } catch (err) {
@@ -55,6 +64,7 @@ export function AddMethodSheet({ open, presetGroup, onCreated, onClose }: Props)
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div
+        ref={sheetRef}
         className="sheet"
         role="dialog"
         aria-modal="true"

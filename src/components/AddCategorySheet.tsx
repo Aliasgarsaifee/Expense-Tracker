@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { addCategory, type Category } from '../db'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 
 // A tap-palette of common spend emojis, so most new categories need no
 // keyboard at all; a free-text field covers anything else.
@@ -16,12 +17,19 @@ interface Props {
 }
 
 export function AddCategorySheet({ open, onCreated, onClose }: Props) {
+  if (!open) return null
+  return <SheetBody onCreated={onCreated} onClose={onClose} />
+}
+
+// Mounted fresh on every open, so a half-typed name or picked emoji from a
+// cancelled visit never leaks into the next one.
+function SheetBody({ onCreated, onClose }: Omit<Props, 'open'>) {
   const [label, setLabel] = useState('')
   const [emoji, setEmoji] = useState(PALETTE[0])
   const inFlight = useRef(false)
   const [saving, setSaving] = useState(false)
-
-  if (!open) return null
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useKeyboardInset(sheetRef)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -30,8 +38,6 @@ export function AddCategorySheet({ open, onCreated, onClose }: Props) {
     setSaving(true)
     try {
       const created = await addCategory({ label, emoji })
-      setLabel('')
-      setEmoji(PALETTE[0])
       onCreated(created)
       onClose()
     } catch (err) {
@@ -45,6 +51,7 @@ export function AddCategorySheet({ open, onCreated, onClose }: Props) {
   return (
     <div className="sheet-scrim" onClick={onClose}>
       <div
+        ref={sheetRef}
         className="sheet"
         role="dialog"
         aria-modal="true"

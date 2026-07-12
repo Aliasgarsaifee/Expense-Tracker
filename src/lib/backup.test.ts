@@ -106,6 +106,15 @@ describe('expensesToCsv', () => {
     const csv = expensesToCsv([{ ...e2, note: 'line1\nline2' }], labels)
     expect(csv).toContain('"line1\nline2"')
   })
+
+  // A leading =, +, - or @ would otherwise execute as a formula when the
+  // CSV opens in Excel/Numbers/Sheets.
+  it('neutralises spreadsheet formula injection in text fields', () => {
+    const csv = expensesToCsv([{ ...e2, note: '=SUM(A1:A9)' }], labels)
+    expect(csv.split('\r\n')[1]).toContain("'=SUM(A1:A9)")
+    const plus = expensesToCsv([{ ...e2, category: '+Rent' }], labels)
+    expect(plus.split('\r\n')[1]).toContain("'+Rent")
+  })
 })
 
 describe('backupToJson / parseBackupJson', () => {

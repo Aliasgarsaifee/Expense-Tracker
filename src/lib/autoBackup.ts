@@ -7,9 +7,40 @@ import { getPref, PREFS, setPref } from './prefs'
 
 const KEEP = 7
 // The app's own snapshots carry an "auto-backup-" prefix so the pruner can
-// never delete a file the user placed here themselves (their manual exports
-// are named "expense-backup-...").
+// never delete a file the user placed here themselves (manual exports are
+// named "expense-backup-...", pre-import safety copies "pre-import-...").
 const SNAP_RE = /^auto-backup-\d{4}-\d{2}-\d{2}\.json$/
+
+// Full-ledger JSON, or null when there is nothing worth writing.
+async function currentBackupJson(): Promise<string | null> {
+  const expenses = await db.expenses.toArray()
+  if (expenses.length === 0) return null
+  return backupToJson({
+    expenses,
+    paymentMethods: await listPaymentMethods({ includeArchived: true }),
+    categories: await listCategories({ includeArchived: true }),
+  })
+}
+
+async function writeBackupFile(name: string, json: string): Promise<void> {
+  await Filesystem.writeFile({
+    path: `Backups/${name}`,
+    data: json,
+    directory: Directory.Documents,
+    encoding: Encoding.UTF8,
+    recursive: true,
+  })
+}
+
+// Safety copy taken just before an import merges foreign data in. The name
+// sits outside SNAP_RE so the pruner never rotates it away; one per day is
+// enough (a second same-day import overwrites the same file).
+export async function writePreImportSnapshot(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return
+  const json = await currentBackupJson()
+  if (json === null) return
+  await writeBackupFile(`pre-import-${todayISO()}.json`, json)
+}
 
 // Daily safety net: a JSON snapshot lands in the app's Documents folder,
 // which Info.plist exposes to the iOS Files app ("On My iPhone"). True
@@ -21,22 +52,11 @@ export async function runAutoBackupIfDue(): Promise<void> {
   const today = todayISO()
   if (getPref(PREFS.lastAutoBackup, '') === today) return
 
-  const expenses = await db.expenses.toArray()
-  if (expenses.length === 0) return // never rotate real snapshots out for empties
+  const json = await currentBackupJson()
+  if (json === null) return // never rotate real snapshots out for empties
 
-  const json = backupToJson({
-    expenses,
-    paymentMethods: await listPaymentMethods({ includeArchived: true }),
-    categories: await listCategories({ includeArchived: true }),
-  })
   const todayName = `auto-backup-${today}.json`
-  await Filesystem.writeFile({
-    path: `Backups/${todayName}`,
-    data: json,
-    directory: Directory.Documents,
-    encoding: Encoding.UTF8,
-    recursive: true,
-  })
+  await writeBackupFile(todayName, json)
   setPref(PREFS.lastAutoBackup, today)
 
   const { files } = await Filesystem.readdir({

@@ -1,26 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { formatINR, formatMoney } from './money'
+import { formatMoney } from './money'
 
-describe('formatINR', () => {
-  it('formats whole rupees without decimals', () => {
-    expect(formatINR(450)).toBe('₹450')
+describe('formatMoney', () => {
+  it('defaults to INR and formats whole rupees without decimals', () => {
+    expect(formatMoney(450)).toBe('₹450')
   })
 
   it('formats fractional amounts with two decimals', () => {
-    expect(formatINR(0.5)).toBe('₹0.50')
+    expect(formatMoney(0.5)).toBe('₹0.50')
   })
 
   it('uses Indian digit grouping', () => {
-    expect(formatINR(123456.5)).toBe('₹1,23,456.50')
-    expect(formatINR(10000000)).toBe('₹1,00,00,000')
-  })
-})
-
-describe('formatMoney', () => {
-  it('defaults to INR and matches formatINR output', () => {
-    expect(formatMoney(450)).toBe('₹450')
-    expect(formatMoney(0.5)).toBe('₹0.50')
     expect(formatMoney(123456.5, 'INR')).toBe('₹1,23,456.50')
+    expect(formatMoney(10000000)).toBe('₹1,00,00,000')
   })
 
   it('formats whole USD without decimals, keeping lakh grouping', () => {
