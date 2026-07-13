@@ -25,3 +25,7 @@ dist-ssr
 
 # Local session notes (remember plugin)
 .remember/
+
+# Skill-eval artifacts and agent worktrees (keep skills themselves tracked)
+.claude/skills/*-workspace/
+.claude/worktrees/

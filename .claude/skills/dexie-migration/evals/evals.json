@@ -1,0 +1,47 @@
+{
+  "skill_name": "dexie-migration",
+  "evals": [
+    {
+      "id": 0,
+      "name": "reimbursable-field",
+      "prompt": "I sometimes pay for things that friends or the office pay me back for later. I want to be able to mark an expense as reimbursable, and later mark it as settled once I'm paid back. Old entries should just behave as normal non-reimbursable expenses. Build this into the app's data layer (schema + any supporting logic + tests) — leave the UI for a later PR.",
+      "expected_output": "A version(4) migration appended (v1-v3 blocks untouched), optional field(s) on Expense handled everywhere, upgrade-path + fresh-install tests, backup import tolerating old files, all gates green.",
+      "files": [],
+      "expectations": [
+        "Appends version(4): existing version(1–3) blocks are byte-for-byte untouched in the diff",
+        "Upgrade-path test exists: builds a pre-change db, reopens via createDb(name), asserts old rows behave as plain non-reimbursable expenses",
+        "New Expense field(s) are optional; old rows lacking them are handled (no non-optional type, no crash on undefined)",
+        "Backups without the new field still import (parser tolerates absence) and the new field round-trips export→import; tests cover it",
+        "All three gates pass in the final logs: npm test, npm run lint, npm run build"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "builtin-travel-category",
+      "prompt": "Add 'Travel' as a built-in category with the ✈️ emoji. It needs to appear for existing users of the app after they update, not just on fresh installs, and it should behave exactly like the other built-in categories (undeletable, merges cleanly when importing a backup from another install).",
+      "expected_output": "Travel added to DEFAULT_CATEGORIES with a stable cat-* id AND delivered to existing installs via a new appended version block; both paths produce identical category sets; label-clash edge handled; gates green.",
+      "files": [],
+      "expectations": [
+        "Existing installs gain Travel through a newly appended version block with an upgrade(), not merely an edit to DEFAULT_CATEGORIES",
+        "Fresh installs seed Travel too, and fresh-install and upgraded databases end with identical category sets (seed test updated to 9)",
+        "Travel uses a stable cat-* id with the epoch-stepped createdAt convention so picker order and cross-install backup merging stay stable",
+        "Upgrade handles a database where the user already created a 'Travel' category: no duplicate label, no crashed upgrade; a test covers this",
+        "The delete guard treats Travel as built-in (cannot be deleted)",
+        "All three gates pass: npm test, npm run lint, npm run build"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "currency-index",
+      "prompt": "Filtering history by currency does a full scan today. Add an IndexedDB index on the expense's currency and a listExpensesByCurrency(currency) function in the data layer (with tests) so we can query by currency efficiently.",
+      "expected_output": "A new version block adding the currency index (existing blocks untouched), an upgrade-path test proving data survives, and a tested listExpensesByCurrency using where('currency') with newest-first sort; gates green.",
+      "files": [],
+      "expectations": [
+        "Appends a new version block adding the currency index; existing version blocks untouched",
+        "Upgrade-path test: a pre-change db with data reopens through createDb and the data is intact and queryable via the new index",
+        "listExpensesByCurrency queries via where('currency') (uses the index) and sorts newest-first like the other list functions; tested",
+        "All three gates pass: npm test, npm run lint, npm run build"
+      ]
+    }
+  ]
+}
