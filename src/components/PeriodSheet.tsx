@@ -59,21 +59,9 @@ export function PeriodSheet({ period, maxAnchor, focusCustom, onApply, onClose }
   // The now-shortcut speaks the active granularity; all/custom fall back to the
   // month (the default granularity).
   const nowKind =
-    period.kind === 'day'
-      ? 'day'
-      : period.kind === 'week'
-        ? 'week'
-        : period.kind === 'year'
-          ? 'year'
-          : 'month'
+    period.kind === 'day' ? 'day' : period.kind === 'year' ? 'year' : 'month'
   const nowLabel =
-    nowKind === 'day'
-      ? 'Today'
-      : nowKind === 'week'
-        ? 'This week'
-        : nowKind === 'year'
-          ? 'This year'
-          : 'This month'
+    nowKind === 'day' ? 'Today' : nowKind === 'year' ? 'This year' : 'This month'
 
   function applyCustom() {
     if (!from || !to) return

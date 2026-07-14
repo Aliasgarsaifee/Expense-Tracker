@@ -18,6 +18,7 @@ import type { HistoryJump } from '../lib/history'
 import { formatMoney } from '../lib/money'
 import { groupEmoji } from '../lib/paymentMeta'
 import {
+  addDays,
   changeKind,
   comparisonLabel,
   comparisonSlice,
@@ -46,7 +47,6 @@ import {
 
 const GRANULARITIES = [
   { kind: 'day', label: 'Day' },
-  { kind: 'week', label: 'Week' },
   { kind: 'month', label: 'Month' },
   { kind: 'year', label: 'Year' },
   { kind: 'all', label: 'All' },
@@ -216,13 +216,14 @@ export function SummaryScreen({
   // the busiest-month tile), everything else as an inclusive range.
   function bucketJump(key: string): HistoryJump {
     if (!bounds || trendUnitOf === 'day') return { from: key, to: key }
-    const b = periodBounds(
+    // A week bucket key is its Monday; weeks are no longer a Period, so the
+    // bounds are spelled out here rather than via periodBounds.
+    const b =
       trendUnitOf === 'week'
-        ? { kind: 'week', start: key }
-        : trendUnitOf === 'month'
-          ? { kind: 'month', month: key }
-          : { kind: 'year', year: key },
-    )!
+        ? { from: key, to: addDays(key, 6) }
+        : periodBounds(
+            trendUnitOf === 'month' ? { kind: 'month', month: key } : { kind: 'year', year: key },
+          )!
     if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
       return { month: key }
     }
@@ -238,7 +239,7 @@ export function SummaryScreen({
     setPeriod(p)
     if (p.kind !== 'custom') setPref(PREFS.summaryPeriod, p.kind)
   }
-  function selectKind(kind: 'day' | 'week' | 'month' | 'year' | 'all') {
+  function selectKind(kind: 'day' | 'month' | 'year' | 'all') {
     applyPeriod(changeKind(period, kind, today))
   }
   function openSheet(focusCustom: boolean) {

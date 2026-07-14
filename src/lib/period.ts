@@ -7,7 +7,6 @@ import { addMonths, localISO, monthLabel, monthOf } from './dates'
 // screen, not a per-kind branch.
 export type Period =
   | { kind: 'day'; date: string } // ISO date
-  | { kind: 'week'; start: string } // ISO date of its Monday
   | { kind: 'month'; month: string } // 'YYYY-MM'
   | { kind: 'year'; year: string } // 'YYYY'
   | { kind: 'all' }
@@ -47,8 +46,6 @@ export function periodBounds(p: Period): Bounds | null {
   switch (p.kind) {
     case 'day':
       return { from: p.date, to: p.date }
-    case 'week':
-      return { from: p.start, to: addDays(p.start, 6) }
     case 'month': {
       const [y, m] = p.month.split('-').map(Number)
       const lastDay = new Date(y, m, 0).getDate() // day 0 of next month
@@ -74,8 +71,6 @@ export function shiftPeriod(p: Period, dir: 1 | -1): Period {
   switch (p.kind) {
     case 'day':
       return { kind: 'day', date: addDays(p.date, dir) }
-    case 'week':
-      return { kind: 'week', start: addDays(p.start, dir * 7) }
     case 'month':
       return { kind: 'month', month: addMonths(p.month, dir) }
     case 'year':
@@ -119,13 +114,6 @@ export function periodLabel(p: Period, today: string): string {
       if (p.date === today) return 'Today'
       if (p.date === addDays(today, -1)) return 'Yesterday'
       return shortDay(p.date, true)
-    case 'week': {
-      const thisWeek = weekStartOf(today)
-      if (p.start === thisWeek) return 'This week'
-      if (p.start === addDays(thisWeek, -7)) return 'Last week'
-      const b = periodBounds(p)!
-      return rangeLabel(b.from, b.to)
-    }
     case 'month':
       return monthLabel(p.month)
     case 'year':
@@ -143,8 +131,6 @@ export function emptyPeriodPhrase(p: Period, containsToday: boolean): string {
   switch (p.kind) {
     case 'day':
       return containsToday ? 'today' : 'that day'
-    case 'week':
-      return containsToday ? 'this week' : 'that week'
     case 'month':
       return containsToday ? 'this month' : 'that month'
     case 'year':
@@ -162,8 +148,6 @@ export function comparisonLabel(p: Period): string | null {
   switch (p.kind) {
     case 'day':
       return `vs ${shortDay(addDays(p.date, -1), false)}`
-    case 'week':
-      return 'vs last week'
     case 'month': {
       const [y, m] = addMonths(p.month, -1).split('-').map(Number)
       const name = new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long' })
@@ -202,13 +186,12 @@ export function comparisonSlice(
 }
 
 // Restore a persisted granularity anchored at "now". A stale custom range is
-// never persisted, so it lands on this month.
+// never persisted — and 'week' (a granularity removed after v1.3.0) may still
+// be stored on older installs — so both land on this month.
 export function initialPeriod(kind: string, today: string): Period {
   switch (kind) {
     case 'day':
       return { kind: 'day', date: today }
-    case 'week':
-      return { kind: 'week', start: weekStartOf(today) }
     case 'year':
       return { kind: 'year', year: today.slice(0, 4) }
     case 'all':
@@ -223,7 +206,7 @@ export function initialPeriod(kind: string, today: string): Period {
 // year lands on 2024, not this year.
 export function changeKind(
   p: Period,
-  kind: 'day' | 'week' | 'month' | 'year' | 'all',
+  kind: 'day' | 'month' | 'year' | 'all',
   today: string,
 ): Period {
   if (kind === 'all') return { kind: 'all' }
@@ -232,8 +215,6 @@ export function changeKind(
   switch (kind) {
     case 'day':
       return { kind: 'day', date: anchor }
-    case 'week':
-      return { kind: 'week', start: weekStartOf(anchor) }
     case 'month':
       return { kind: 'month', month: monthOf(anchor) }
     case 'year':

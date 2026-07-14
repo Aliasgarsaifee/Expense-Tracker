@@ -42,12 +42,6 @@ describe('periodBounds', () => {
       to: '2026-06-30',
     })
   })
-  it('spans a week across a month edge', () => {
-    expect(periodBounds({ kind: 'week', start: '2026-06-29' })).toEqual({
-      from: '2026-06-29',
-      to: '2026-07-05',
-    })
-  })
   it('spans a whole year', () => {
     expect(periodBounds({ kind: 'year', year: '2026' })).toEqual({
       from: '2026-01-01',
@@ -82,12 +76,6 @@ describe('shiftPeriod', () => {
       month: '2025-12',
     })
   })
-  it('steps a week across a year edge', () => {
-    expect(shiftPeriod({ kind: 'week', start: '2025-12-29' }, 1)).toEqual({
-      kind: 'week',
-      start: '2026-01-05',
-    })
-  })
   it('steps a year', () => {
     expect(shiftPeriod({ kind: 'year', year: '2026' }, -1)).toEqual({
       kind: 'year',
@@ -119,15 +107,6 @@ describe('shiftPeriod', () => {
 })
 
 describe('periodLabel', () => {
-  it('names the current and previous weeks', () => {
-    expect(periodLabel({ kind: 'week', start: '2026-07-13' }, TODAY)).toBe('This week')
-    expect(periodLabel({ kind: 'week', start: '2026-07-06' }, TODAY)).toBe('Last week')
-  })
-  it('ranges an older cross-month week, year once at the end', () => {
-    expect(periodLabel({ kind: 'week', start: '2026-06-29' }, TODAY)).toBe(
-      '29 Jun – 5 Jul 2026',
-    )
-  })
   it('names a month and a year plainly', () => {
     expect(periodLabel({ kind: 'month', month: '2026-07' }, TODAY)).toBe('July 2026')
     expect(periodLabel({ kind: 'year', year: '2025' }, TODAY)).toBe('2025')
@@ -151,9 +130,7 @@ describe('periodLabel', () => {
 })
 
 describe('emptyPeriodPhrase', () => {
-  it('says this/that for the current vs a past week or month', () => {
-    expect(emptyPeriodPhrase({ kind: 'week', start: '2026-07-13' }, true)).toBe('this week')
-    expect(emptyPeriodPhrase({ kind: 'week', start: '2026-07-13' }, false)).toBe('that week')
+  it('says this/that for the current vs a past month', () => {
     expect(emptyPeriodPhrase({ kind: 'month', month: '2026-07' }, true)).toBe('this month')
     expect(emptyPeriodPhrase({ kind: 'month', month: '2026-07' }, false)).toBe('that month')
   })
@@ -172,7 +149,6 @@ describe('emptyPeriodPhrase', () => {
 
 describe('comparisonLabel', () => {
   it('speaks the previous period per kind', () => {
-    expect(comparisonLabel({ kind: 'week', start: '2026-07-13' })).toBe('vs last week')
     expect(comparisonLabel({ kind: 'month', month: '2026-07' })).toBe('vs June')
     expect(comparisonLabel({ kind: 'year', year: '2026' })).toBe('vs 2025')
     expect(comparisonLabel({ kind: 'custom', from: '2026-07-01', to: '2026-07-10' })).toBe(
@@ -190,11 +166,6 @@ describe('comparisonSlice', () => {
     // July viewed on the 14th → June 1–14, flagged as a to-date comparison.
     expect(comparisonSlice({ kind: 'month', month: '2026-07' }, TODAY)).toEqual({
       bounds: { from: '2026-06-01', to: '2026-06-14' },
-      toDate: true,
-    })
-    // This week on its Tuesday → last week's Monday–Tuesday.
-    expect(comparisonSlice({ kind: 'week', start: '2026-07-13' }, TODAY)).toEqual({
-      bounds: { from: '2026-07-06', to: '2026-07-07' },
       toDate: true,
     })
     // 2026 has elapsed 195 days → the first 195 days of 2025.
@@ -265,7 +236,9 @@ describe('daysBetween / elapsedDays', () => {
 
 describe('initialPeriod / changeKind', () => {
   it('restores persisted kinds anchored at today, falling back to month', () => {
-    expect(initialPeriod('week', TODAY)).toEqual({ kind: 'week', start: '2026-07-13' })
+    // 'week' is a live localStorage value on ≤ v1.3.0 installs; the
+    // granularity is gone, so it must restore as the month default.
+    expect(initialPeriod('week', TODAY)).toEqual({ kind: 'month', month: '2026-07' })
     expect(initialPeriod('year', TODAY)).toEqual({ kind: 'year', year: '2026' })
     expect(initialPeriod('all', TODAY)).toEqual({ kind: 'all' })
     expect(initialPeriod('custom', TODAY)).toEqual({ kind: 'month', month: '2026-07' })
@@ -273,9 +246,9 @@ describe('initialPeriod / changeKind', () => {
     expect(initialPeriod('day', TODAY)).toEqual({ kind: 'day', date: '2026-07-14' })
   })
   it('re-anchors on today when the period contains it, else on the period start', () => {
-    expect(changeKind({ kind: 'month', month: '2026-07' }, 'week', TODAY)).toEqual({
-      kind: 'week',
-      start: '2026-07-13',
+    expect(changeKind({ kind: 'year', year: '2026' }, 'month', TODAY)).toEqual({
+      kind: 'month',
+      month: '2026-07',
     })
     expect(changeKind({ kind: 'month', month: '2024-03' }, 'year', TODAY)).toEqual({
       kind: 'year',
