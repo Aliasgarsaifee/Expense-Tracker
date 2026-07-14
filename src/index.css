@@ -928,11 +928,10 @@ button {
   white-space: nowrap;
 }
 
-/* Full-bleed scrollports: these standalone rows scroll under main's 20px
-   gutters so chips clip at the screen edge, not 20px early — at 375pt the
-   period row and a two-chip drill (+ Clear all) then fit outright. */
-.filter-row,
-.period-row {
+/* Full-bleed scrollport: the standalone filter row scrolls under main's 20px
+   gutters so chips clip at the screen edge, not 20px early — a two-chip
+   drill (+ Clear all) then fits outright at 375pt. */
+.filter-row {
   margin-inline: -20px;
   padding-inline: 20px;
 }
@@ -1005,11 +1004,6 @@ button {
 }
 
 /* ——— summary period sheet ——— */
-
-/* Granularity switch under the Summary pager (full-bleed, see .filter-row). */
-.period-row {
-  margin-bottom: 6px;
-}
 
 /* The sheet itself stops scrolling: head + shortcuts pin above, the Apply
    footer pins below, and only the month list scrolls between them — one

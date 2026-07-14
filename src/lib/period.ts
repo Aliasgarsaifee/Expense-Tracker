@@ -201,27 +201,6 @@ export function initialPeriod(kind: string, today: string): Period {
   }
 }
 
-// Switch granularity, re-anchoring on today when the current period still
-// contains it, otherwise on the period's start — so widening March 2024 to a
-// year lands on 2024, not this year.
-export function changeKind(
-  p: Period,
-  kind: 'day' | 'month' | 'year' | 'all',
-  today: string,
-): Period {
-  if (kind === 'all') return { kind: 'all' }
-  const b = periodBounds(p)
-  const anchor = b ? (today >= b.from && today <= b.to ? today : b.from) : today
-  switch (kind) {
-    case 'day':
-      return { kind: 'day', date: anchor }
-    case 'month':
-      return { kind: 'month', month: monthOf(anchor) }
-    case 'year':
-      return { kind: 'year', year: anchor.slice(0, 4) }
-  }
-}
-
 // Trend-chart bucket grain, widening with the span so bar counts stay legible:
 // ≤ 6 weeks per day, ≤ 26 weeks per week, ≤ ~2 years per month, longer per
 // year. Weeks bridge the gap where days are too many and months too few (a

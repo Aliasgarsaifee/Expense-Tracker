@@ -19,7 +19,6 @@ import { formatMoney } from '../lib/money'
 import { groupEmoji } from '../lib/paymentMeta'
 import {
   addDays,
-  changeKind,
   comparisonLabel,
   comparisonSlice,
   daysBetween,
@@ -44,13 +43,6 @@ import {
   summarize,
   trendBuckets,
 } from '../lib/summarize'
-
-const GRANULARITIES = [
-  { kind: 'day', label: 'Day' },
-  { kind: 'month', label: 'Month' },
-  { kind: 'year', label: 'Year' },
-  { kind: 'all', label: 'All' },
-] as const
 
 // A month averages ≈ 30.44 days; the year/all "a month" figure is approximate
 // by design, and the tile says so.
@@ -238,9 +230,6 @@ export function SummaryScreen({
     setPeriod(p)
     if (p.kind !== 'custom') setPref(PREFS.summaryPeriod, p.kind)
   }
-  function selectKind(kind: 'day' | 'month' | 'year' | 'all') {
-    applyPeriod(changeKind(period, kind, today))
-  }
   function openSheet() {
     setSheetOpen(true)
   }
@@ -262,28 +251,6 @@ export function SummaryScreen({
         prevDisabled={period.kind === 'all'}
         nextDisabled={nextDisabled}
       />
-
-      <div className="chip-row period-row" role="group" aria-label="Summary period">
-        {GRANULARITIES.map((g) => (
-          <button
-            key={g.kind}
-            type="button"
-            className="chip"
-            aria-pressed={period.kind === g.kind}
-            onClick={() => selectKind(g.kind)}
-          >
-            {g.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={period.kind === 'custom'}
-          onClick={openSheet}
-        >
-          Custom
-        </button>
-      </div>
 
       {buckets.length > 1 && (
         <div className="chip-row currency-row" role="group" aria-label="Currency">

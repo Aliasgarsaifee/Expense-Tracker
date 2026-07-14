@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   bucketKeyOf,
   bucketKeysBetween,
-  changeKind,
   comparisonLabel,
   comparisonSlice,
   daysBetween,
@@ -234,7 +233,7 @@ describe('daysBetween / elapsedDays', () => {
   })
 })
 
-describe('initialPeriod / changeKind', () => {
+describe('initialPeriod', () => {
   it('restores persisted kinds anchored at today, falling back to month', () => {
     // 'week' is a live localStorage value on ≤ v1.3.0 installs; the
     // granularity is gone, so it must restore as the month default.
@@ -244,31 +243,6 @@ describe('initialPeriod / changeKind', () => {
     expect(initialPeriod('custom', TODAY)).toEqual({ kind: 'month', month: '2026-07' })
     expect(initialPeriod('month', TODAY)).toEqual({ kind: 'month', month: '2026-07' })
     expect(initialPeriod('day', TODAY)).toEqual({ kind: 'day', date: '2026-07-14' })
-  })
-  it('re-anchors on today when the period contains it, else on the period start', () => {
-    expect(changeKind({ kind: 'year', year: '2026' }, 'month', TODAY)).toEqual({
-      kind: 'month',
-      month: '2026-07',
-    })
-    expect(changeKind({ kind: 'month', month: '2024-03' }, 'year', TODAY)).toEqual({
-      kind: 'year',
-      year: '2024',
-    })
-    expect(changeKind({ kind: 'year', year: '2026' }, 'all', TODAY)).toEqual({ kind: 'all' })
-  })
-  it('re-anchors to a day: today if in view, else the period start', () => {
-    expect(changeKind({ kind: 'month', month: '2026-07' }, 'day', TODAY)).toEqual({
-      kind: 'day',
-      date: '2026-07-14',
-    })
-    expect(changeKind({ kind: 'month', month: '2024-03' }, 'day', TODAY)).toEqual({
-      kind: 'day',
-      date: '2024-03-01',
-    })
-    expect(changeKind({ kind: 'all' }, 'day', TODAY)).toEqual({
-      kind: 'day',
-      date: '2026-07-14',
-    })
   })
 })
 
