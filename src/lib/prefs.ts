@@ -7,6 +7,7 @@ export const PREFS = {
   autoBackup: 'autoBackupEnabled',
   lastAutoBackup: 'lastAutoBackupDate',
   summaryPeriod: 'summaryPeriodKind', // day|month|year|all ('week' from ≤ v1.3.0 restores as month); custom is never persisted
+  historySort: 'historySort', // newest|oldest|largest|smallest (view pref; unknown → newest)
 } as const
 
 const PREFIX = 'et-pref:'

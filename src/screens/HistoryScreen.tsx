@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EditSheet } from '../components/EditSheet'
 import { FilterSheet } from '../components/FilterSheet'
 import { Pager } from '../components/Pager'
+import { SortSheet } from '../components/SortSheet'
 import {
   listCategories,
   listExpenses,
@@ -17,12 +18,16 @@ import {
   formatTotals,
   groupByDay,
   groupByMonth,
+  isGroupedSort,
+  sortExpenses,
   type DayGroup,
   type HistoryJump,
+  type HistorySort,
   type MoneyByCurrency,
 } from '../lib/history'
 import { formatMoney } from '../lib/money'
 import { groupEmoji, type MethodSelection } from '../lib/paymentMeta'
+import { getPref, PREFS, setPref } from '../lib/prefs'
 
 function dayLabel(iso: string): string {
   const today = todayISO()
@@ -49,18 +54,32 @@ function shortDate(iso: string): string {
   })
 }
 
+const SORTS: HistorySort[] = ['newest', 'oldest', 'largest', 'smallest']
+const SORT_WORD: Record<HistorySort, string> = {
+  newest: 'Newest',
+  oldest: 'Oldest',
+  largest: 'Largest',
+  smallest: 'Smallest',
+}
+function readSort(): HistorySort {
+  const v = getPref(PREFS.historySort, 'newest')
+  return SORTS.includes(v as HistorySort) ? (v as HistorySort) : 'newest'
+}
+
 function EntryRow({
   expense,
   emoji,
   methodLabel,
+  date,
   onEdit,
 }: {
   expense: Expense
   emoji: string
   methodLabel?: string
+  date?: string
   onEdit: (e: Expense) => void
 }) {
-  const sub = [expense.note ? expense.category : null, methodLabel]
+  const sub = [date, expense.note ? expense.category : null, methodLabel]
     .filter(Boolean)
     .join(' · ')
   return (
@@ -124,6 +143,8 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
   const [from, setFrom] = useState<string | null>(null)
   const [to, setTo] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [sort, setSortState] = useState<HistorySort>(readSort)
+  const [sortOpen, setSortOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Expense | null>(null)
 
@@ -239,13 +260,15 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
     return newest > current ? newest : current
   }, [expenses])
 
+  const grouped = isGroupedSort(sort)
+  const sorted = useMemo(() => sortExpenses(filtered, sort), [filtered, sort])
   const dayGroups = useMemo(
-    () => (month === null ? [] : groupByDay(filtered)),
-    [filtered, month],
+    () => (month === null || !grouped ? [] : groupByDay(sorted)),
+    [sorted, month, grouped],
   )
   const monthGroups = useMemo(
-    () => (month === null ? groupByMonth(filtered) : []),
-    [filtered, month],
+    () => (month === null && grouped ? groupByMonth(sorted) : []),
+    [sorted, month, grouped],
   )
 
   // The pager and the date range both slice time — the last one touched wins,
@@ -260,6 +283,10 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
     setFrom(nextFrom)
     setTo(nextTo)
     if (nextFrom !== null || nextTo !== null) setMonth(null)
+  }
+  function changeSort(next: HistorySort) {
+    setSortState(next)
+    setPref(PREFS.historySort, next)
   }
   function clearFilters() {
     setSelection({ methodIds: [], groups: [] })
@@ -323,6 +350,18 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
               onClick={() => setSheetOpen(true)}
             >
               Filters{activeChipCount > 0 ? ` · ${activeChipCount}` : ''}
+              <span className="chip-caret" aria-hidden="true">
+                ▾
+              </span>
+            </button>
+            <button
+              type="button"
+              className="chip"
+              aria-haspopup="dialog"
+              aria-label={`Sort: ${SORT_WORD[sort]} first — change`}
+              onClick={() => setSortOpen(true)}
+            >
+              Sort · {SORT_WORD[sort]}
               <span className="chip-caret" aria-hidden="true">
                 ▾
               </span>
@@ -469,6 +508,19 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
             </button>
           )}
         </div>
+      ) : !grouped ? (
+        <ul className="entries">
+          {sorted.map((e) => (
+            <EntryRow
+              key={e.id}
+              expense={e}
+              emoji={emojiFor(e.category)}
+              methodLabel={e.paymentMethodId ? labels.get(e.paymentMethodId) : undefined}
+              date={shortDate(e.spentOn)}
+              onEdit={setEditing}
+            />
+          ))}
+        </ul>
       ) : month === null ? (
         monthGroups.map((g) => (
           <section key={g.month} className="month-group">
@@ -519,6 +571,12 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
         onRangeChange={applyRange}
         onClearAll={clearFilters}
         onClose={() => setSheetOpen(false)}
+      />
+      <SortSheet
+        open={sortOpen}
+        sort={sort}
+        onSortChange={changeSort}
+        onClose={() => setSortOpen(false)}
       />
       <EditSheet expense={editing} onClose={() => setEditing(null)} />
     </div>

@@ -1019,6 +1019,57 @@ button {
   margin-bottom: 6px;
 }
 
+/* ——— sort sheet ——— */
+.sort-options {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.sort-option {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--chip);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  color: var(--ink);
+  text-align: left;
+}
+
+.sort-option[aria-checked='true'] {
+  background: color-mix(in srgb, var(--accent) 18%, var(--chip));
+  border-color: var(--accent);
+}
+
+.sort-option:active {
+  background: color-mix(in srgb, var(--accent) 24%, var(--chip));
+}
+
+.sort-option-text {
+  display: grid;
+}
+
+.sort-option-label {
+  font-weight: 700;
+}
+
+.sort-option-hint {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.sort-option-check {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 /* ——— summary period sheet ——— */
 
 /* The sheet itself stops scrolling: head + shortcuts pin above, the Apply
