@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { addMonths, monthGrid, monthLabel, monthOf, todayISO, yesterdayISO } from './dates'
+import {
+  addMonths,
+  monthGrid,
+  monthLabel,
+  monthName,
+  monthOf,
+  todayISO,
+  yesterdayISO,
+} from './dates'
 
 describe('monthOf', () => {
   it('extracts the YYYY-MM month from an ISO date', () => {
@@ -24,6 +32,12 @@ describe('monthLabel', () => {
   })
 })
 
+describe('monthName', () => {
+  it('renders the bare long month name', () => {
+    expect(monthName('2026-07')).toBe('July')
+  })
+})
+
 describe('todayISO', () => {
   it('returns a local YYYY-MM-DD date', () => {
     const today = todayISO()
@@ -37,47 +51,22 @@ describe('todayISO', () => {
 
 describe('monthGrid', () => {
   it('lays out July 2026 Monday-first (the 1st is a Wednesday)', () => {
-    const weeks = monthGrid('2026-07')
-    expect(weeks).toHaveLength(5)
-    expect(weeks[0]).toEqual([
-      null,
-      null,
-      '2026-07-01',
-      '2026-07-02',
-      '2026-07-03',
-      '2026-07-04',
-      '2026-07-05',
-    ])
-    expect(weeks[4]).toEqual([
-      '2026-07-27',
-      '2026-07-28',
-      '2026-07-29',
-      '2026-07-30',
-      '2026-07-31',
-      null,
-      null,
-    ])
+    const cells = monthGrid('2026-07')
+    expect(cells.slice(0, 3)).toEqual([null, null, '2026-07-01'])
+    expect(cells).toHaveLength(33) // 2 leading blanks + 31 days, ragged tail
+    expect(cells.at(-1)).toBe('2026-07-31')
   })
 
   it('starts flush when the 1st is a Monday (June 2026)', () => {
-    const weeks = monthGrid('2026-06')
-    expect(weeks[0][0]).toBe('2026-06-01')
-    expect(weeks[4]).toEqual(['2026-06-29', '2026-06-30', null, null, null, null, null])
+    const cells = monthGrid('2026-06')
+    expect(cells[0]).toBe('2026-06-01')
+    expect(cells).toHaveLength(30)
   })
 
   it('covers leap February 2024 (the 1st is a Thursday, 29 days)', () => {
-    const weeks = monthGrid('2024-02')
-    expect(weeks[0]).toEqual([
-      null,
-      null,
-      null,
-      '2024-02-01',
-      '2024-02-02',
-      '2024-02-03',
-      '2024-02-04',
-    ])
-    expect(weeks.at(-1)!.filter(Boolean).at(-1)).toBe('2024-02-29')
-    expect(weeks.every((w) => w.length === 7)).toBe(true)
+    const cells = monthGrid('2024-02')
+    expect(cells.slice(0, 4)).toEqual([null, null, null, '2024-02-01'])
+    expect(cells.at(-1)).toBe('2024-02-29')
   })
 })
 

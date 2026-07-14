@@ -18,7 +18,7 @@ import type { HistoryJump } from '../lib/history'
 import { formatMoney } from '../lib/money'
 import { groupEmoji } from '../lib/paymentMeta'
 import {
-  addDays,
+  bucketBounds,
   comparisonLabel,
   comparisonSlice,
   daysBetween,
@@ -206,15 +206,8 @@ export function SummaryScreen({
   // whole in-period month jumps as a month (History's monthly-pager mode, like
   // the busiest-month tile), everything else as an inclusive range.
   function bucketJump(key: string): HistoryJump {
-    if (!bounds || trendUnitOf === 'day') return { from: key, to: key }
-    // A week bucket key is its Monday; weeks are no longer a Period, so the
-    // bounds are spelled out here rather than via periodBounds.
-    const b =
-      trendUnitOf === 'week'
-        ? { from: key, to: addDays(key, 6) }
-        : periodBounds(
-            trendUnitOf === 'month' ? { kind: 'month', month: key } : { kind: 'year', year: key },
-          )!
+    if (!bounds) return { from: key, to: key }
+    const b = bucketBounds(key, trendUnitOf)
     if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
       return { month: key }
     }

@@ -16,6 +16,12 @@ export function monthLabel(month: string): string {
   })
 }
 
+// "July" — the bare long month name; monthLabel is the with-year sibling.
+export function monthName(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long' })
+}
+
 // "12 July 2026" — the human-readable form used on the Add/Edit date field.
 export function formatDateLong(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
@@ -60,9 +66,10 @@ export function yesterdayISO(): string {
   return localISO(d)
 }
 
-// Calendar layout of a 'YYYY-MM' month: Monday-first weeks of 7, null-padded
-// at both ends. Monday matches weekStartOf's convention in lib/period.
-export function monthGrid(month: string): (string | null)[][] {
+// Cells of a 'YYYY-MM' month for a 7-column Monday-first grid: leading nulls
+// align the 1st to its weekday (Monday matches weekStartOf in lib/period);
+// the tail stays ragged — a CSS grid row just ends short.
+export function monthGrid(month: string): (string | null)[] {
   const [y, m] = month.split('-').map(Number)
   const daysInMonth = new Date(y, m, 0).getDate() // day 0 of the next month
   const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7 // Sun=0…Sat=6 → Mon=0…Sun=6
@@ -70,8 +77,5 @@ export function monthGrid(month: string): (string | null)[][] {
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push(`${month}-${String(d).padStart(2, '0')}`)
   }
-  while (cells.length % 7 !== 0) cells.push(null)
-  const weeks: (string | null)[][] = []
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
-  return weeks
+  return cells
 }

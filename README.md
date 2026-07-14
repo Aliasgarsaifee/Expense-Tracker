@@ -27,12 +27,14 @@ date, and a free-text note.
   categories, and a date range (OR within each dimension, AND across), plus
   note/amount search — every active filter shows as a dismissible chip. Built
   for reconciling against card/UPI statements: pick a month + a card, compare.
-- **Summary** — totals per currency for any period: week, month, year, all
-  time, or a custom range, stepped with ‹ › or picked from a jump sheet (month
-  grid with data dots, year headers, custom range). Stat tiles adapt to the
-  period (daily average, on-pace projection, vs the previous period, biggest
-  spend, busiest day/month), an "over time" trend chart, and a category chart
-  and by-payment breakdown that tap through to the matching History slice.
+- **Summary** — totals per currency for any window: a day, a month, a year,
+  all time, or any range, stepped with ‹ › or picked on a calendar jump sheet
+  (tap a day, tap two days for a range, tap a month name or year header;
+  data-dotted days, Today/This month/This year/All time shortcuts). Stat
+  tiles adapt to the window (daily average, on-pace projection, vs the
+  previous period, biggest spend, busiest day/month), an "over time" trend
+  chart, and a category chart and by-payment breakdown that tap through to
+  the matching History slice.
 - **Settings drawer** (☰) — a collapsible group tree of payment methods and
   categories (rename / archive / delete-if-unused, rename your custom groups;
   tap any row to jump to its History), plus default currency,
@@ -125,14 +127,22 @@ no App Store involved.
 
 ## App icon & splash
 
-Source art is in `assets/` (SVG → PNG via sharp). The ₹ in the icon and
-splashes is the actual Fraunces glyph (opsz 72 / wght 750 / SOFT 60 / WONK 1)
-outlined to a path — Fraunces is SIL OFL licensed, which permits this. No font
-needs to be installed to re-render. To regenerate after editing:
+Source art is in `assets/` (SVG → PNG via sharp). The mark is a "pocket
+ledger": a butter card tucked into a matcha-green pocket on warm matcha paper,
+with a faint paper grain. Light and dark variants exist — `icon.svg` /
+`icon-dark.svg` (1024²) and `splash.svg` / `splash-dark.svg` (2732²). iOS picks
+the dark icon and splash automatically in dark mode; the dark app icon is wired
+into `AppIcon.appiconset` as an iOS-18 luminosity variant. To regenerate after
+editing:
 
 ```bash
 npx sharp-cli -i assets/icon.svg -o assets/icon.png
+npx sharp-cli -i assets/icon-dark.svg -o assets/icon-dark.png
 npx sharp-cli -i assets/splash.svg -o assets/splash.png
 npx sharp-cli -i assets/splash-dark.svg -o assets/splash-dark.png
 npx @capacitor/assets generate --ios --assetPath assets
+# capacitor-assets writes only the light app icon and resets Contents.json,
+# so re-apply the dark home-screen icon afterwards:
+cp assets/icon-dark.png ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-Dark-1024.png
+# then re-add the { "luminosity": "dark" } image entry to that Contents.json
 ```

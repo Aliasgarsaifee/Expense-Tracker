@@ -1,17 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../db'
-import { addMonths, formatDateLong, monthGrid, monthOf, todayISO } from '../lib/dates'
-import { periodBounds, periodLabel, type Period } from '../lib/period'
+import {
+  addMonths,
+  formatDateLong,
+  monthGrid,
+  monthLabel,
+  monthName,
+  monthOf,
+  todayISO,
+} from '../lib/dates'
+import { initialPeriod, periodBounds, periodLabel, type Period } from '../lib/period'
 
 // Monday-first, matching monthGrid and weekStartOf.
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-
-// "July" — the year lives on the year header above, so month heads stay short.
-function monthName(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long' })
-}
 
 interface Props {
   period: Period
@@ -40,7 +42,8 @@ export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
   const months = useMemo(() => {
     // Newest first, down to the oldest entry (this month on a fresh install)
     // — the direction History and the old year list already scroll.
-    let oldest = monthOf(today) < newestMonth ? monthOf(today) : newestMonth
+    // maxAnchor >= today by contract, so newestMonth never caps this.
+    let oldest = monthOf(today)
     for (const d of dateSet) {
       const m = monthOf(d)
       if (m < oldest) oldest = m
@@ -85,25 +88,25 @@ export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
     setSel((s) => (s && s.b === null && d !== s.a ? { a: s.a, b: d } : { a: d, b: null }))
   }
 
-  const thisMonth = monthOf(today)
-  const thisYear = today.slice(0, 4)
+  // initialPeriod is the one source of "anchor a granularity at now"; the
+  // shortcuts borrow it rather than re-deriving this month/year by hand.
   const shortcuts: { label: string; p: Period; on: boolean }[] = [
     {
       label: 'Today',
-      p: { kind: 'day', date: today },
+      p: initialPeriod('day', today),
       on: period.kind === 'day' && period.date === today,
     },
     {
       label: 'This month',
-      p: { kind: 'month', month: thisMonth },
-      on: period.kind === 'month' && period.month === thisMonth,
+      p: initialPeriod('month', today),
+      on: period.kind === 'month' && period.month === monthOf(today),
     },
     {
       label: 'This year',
-      p: { kind: 'year', year: thisYear },
-      on: period.kind === 'year' && period.year === thisYear,
+      p: initialPeriod('year', today),
+      on: period.kind === 'year' && period.year === today.slice(0, 4),
     },
-    { label: 'All time', p: { kind: 'all' }, on: period.kind === 'all' },
+    { label: 'All time', p: initialPeriod('all', today), on: period.kind === 'all' },
   ]
 
   return (
@@ -140,6 +143,8 @@ export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
         <div className="cal-scroll">
           {months.map((m, i) => {
             const year = m.slice(0, 4)
+            const name = monthName(m)
+            const label = monthLabel(m) // "July 2026" — canonical accessible name
             return (
               <Fragment key={m}>
                 {(i === 0 || months[i - 1].slice(0, 4) !== year) && (
@@ -154,48 +159,46 @@ export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
                   </button>
                 )}
                 <div className="cal-month" id={`cal-${m}`}>
+                  {/* The visible head is just "July" (the year header carries the
+                     year); the accessible name keeps both so year-twins stay
+                     distinguishable to a screen reader. */}
                   <button
                     type="button"
                     className="cal-month-head"
+                    aria-label={label}
                     aria-pressed={period.kind === 'month' && period.month === m}
                     onClick={() => onApply({ kind: 'month', month: m })}
                   >
-                    {monthName(m)}
+                    {name}
                   </button>
                   <div className="cal-weekdays" aria-hidden="true">
                     {WEEKDAYS.map((w, wi) => (
                       <span key={wi}>{w}</span>
                     ))}
                   </div>
-                  <div
-                    className="cal-grid"
-                    role="group"
-                    aria-label={`Days in ${monthName(m)} ${year}`}
-                  >
-                    {monthGrid(m)
-                      .flat()
-                      .map((d, di) =>
-                        d === null ? (
-                          <span key={`${m}-pad-${di}`} aria-hidden="true" />
-                        ) : (
-                          <button
-                            key={d}
-                            type="button"
-                            className={
-                              hl && hl.from < d && d < hl.to
-                                ? 'cal-day cal-in-range'
-                                : 'cal-day'
-                            }
-                            aria-pressed={hl !== null && (d === hl.from || d === hl.to)}
-                            aria-label={formatDateLong(d)}
-                            disabled={d > maxAnchor}
-                            onClick={() => tapDay(d)}
-                          >
-                            {Number(d.slice(8))}
-                            {dateSet.has(d) && <span className="pm-dot" aria-hidden="true" />}
-                          </button>
-                        ),
-                      )}
+                  <div className="cal-grid" role="group" aria-label={`Days in ${label}`}>
+                    {monthGrid(m).map((d, di) =>
+                      d === null ? (
+                        <span key={`${m}-pad-${di}`} aria-hidden="true" />
+                      ) : (
+                        <button
+                          key={d}
+                          type="button"
+                          className={
+                            hl && hl.from < d && d < hl.to
+                              ? 'cal-day cal-in-range'
+                              : 'cal-day'
+                          }
+                          aria-pressed={hl !== null && (d === hl.from || d === hl.to)}
+                          aria-label={formatDateLong(d)}
+                          disabled={d > maxAnchor}
+                          onClick={() => tapDay(d)}
+                        >
+                          {Number(d.slice(8))}
+                          {dateSet.has(d) && <span className="pm-dot" aria-hidden="true" />}
+                        </button>
+                      ),
+                    )}
                   </div>
                 </div>
               </Fragment>

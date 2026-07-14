@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bucketBounds,
   bucketKeyOf,
   bucketKeysBetween,
   comparisonLabel,
@@ -265,6 +266,15 @@ describe('bucketKeyOf', () => {
     expect(bucketKeyOf('2026-07-13', 'week')).toBe('2026-07-13') // Monday keeps itself
     expect(bucketKeyOf('2026-07-02', 'month')).toBe('2026-07')
     expect(bucketKeyOf('2026-07-02', 'year')).toBe('2026')
+  })
+})
+
+describe('bucketBounds', () => {
+  it('spans a day, a Monday week, a month, and a year', () => {
+    expect(bucketBounds('2026-07-02', 'day')).toEqual({ from: '2026-07-02', to: '2026-07-02' })
+    expect(bucketBounds('2026-06-29', 'week')).toEqual({ from: '2026-06-29', to: '2026-07-05' })
+    expect(bucketBounds('2024-02', 'month')).toEqual({ from: '2024-02-01', to: '2024-02-29' })
+    expect(bucketBounds('2026', 'year')).toEqual({ from: '2026-01-01', to: '2026-12-31' })
   })
 })
 

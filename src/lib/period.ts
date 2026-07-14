@@ -1,4 +1,4 @@
-import { addMonths, localISO, monthLabel, monthOf } from './dates'
+import { addMonths, localISO, monthLabel, monthName, monthOf } from './dates'
 
 // The unit a Summary view aggregates over. A day is the finest grain: a single
 // day still aggregates (total, by-category, by-payment, vs the previous day),
@@ -148,11 +148,8 @@ export function comparisonLabel(p: Period): string | null {
   switch (p.kind) {
     case 'day':
       return `vs ${shortDay(addDays(p.date, -1), false)}`
-    case 'month': {
-      const [y, m] = addMonths(p.month, -1).split('-').map(Number)
-      const name = new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long' })
-      return `vs ${name}`
-    }
+    case 'month':
+      return `vs ${monthName(addMonths(p.month, -1))}`
     case 'year':
       return `vs ${Number(p.year) - 1}`
     case 'custom':
@@ -227,6 +224,21 @@ export function bucketKeyOf(iso: string, unit: TrendUnit): string {
       return iso.slice(0, 7)
     case 'year':
       return iso.slice(0, 4)
+  }
+}
+
+// The span a bucket key covers — bucketKeyOf's inverse. Must agree with
+// bucketKeysBetween's stride (a week bucket is its Monday + 6 days).
+export function bucketBounds(key: string, unit: TrendUnit): Bounds {
+  switch (unit) {
+    case 'day':
+      return { from: key, to: key }
+    case 'week':
+      return { from: key, to: addDays(key, 6) }
+    case 'month':
+      return periodBounds({ kind: 'month', month: key })!
+    case 'year':
+      return { from: `${key}-01-01`, to: `${key}-12-31` }
   }
 }
 
