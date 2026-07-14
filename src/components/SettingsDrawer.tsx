@@ -8,11 +8,12 @@ import {
   listCategories,
   listExpenses,
   listPaymentMethods,
+  PAYMENT_GROUPS,
   renameCategory,
+  renameGroup,
   renamePaymentMethod,
   setCategoryArchived,
   setPaymentMethodArchived,
-  UPI_METHOD_ID,
   type Category,
   type PaymentMethod,
 } from '../db'
@@ -21,7 +22,8 @@ import { backupToJson, expensesToCsv, importBackup, parseBackupJson } from '../l
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
 import { exportTextFile } from '../lib/exportFile'
-import { groupEmoji } from '../lib/paymentMeta'
+import type { HistoryJump } from '../lib/history'
+import { bucketize, groupEmoji } from '../lib/paymentMeta'
 import { getPref, PREFS, setPref } from '../lib/prefs'
 import { AddCategorySheet } from './AddCategorySheet'
 import { AddMethodSheet } from './AddMethodSheet'
@@ -31,26 +33,157 @@ interface Props {
   open: boolean
   onClose: () => void
   onDefaultCurrencyChange?: (code: string) => void
+  onJumpToHistory: (jump: HistoryJump) => void
 }
 
-export function SettingsDrawer({ open, onClose, onDefaultCurrencyChange }: Props) {
+export function SettingsDrawer({ open, ...body }: Props) {
   if (!open) return null
-  return <DrawerBody onClose={onClose} onDefaultCurrencyChange={onDefaultCurrencyChange} />
+  return <DrawerBody {...body} />
 }
 
-// Mounted fresh on every open so prefs are re-read from storage.
+// Header row of a collapsible section. The rename pencil (custom method
+// groups only) sits beside the toggle, not inside it — buttons cannot nest.
+function GroupToggle({
+  emoji,
+  label,
+  count,
+  expanded,
+  onToggle,
+  onRename,
+}: {
+  emoji: string
+  label: string
+  count: number
+  expanded: boolean
+  onToggle: () => void
+  onRename?: () => void
+}) {
+  return (
+    <div className="group-head">
+      <button
+        type="button"
+        className="group-toggle"
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        <span className="method-emoji" aria-hidden="true">
+          {emoji}
+        </span>
+        <span className="group-label">{label}</span>
+        <span className="group-count">{count}</span>
+        <span className="group-caret" aria-hidden="true">
+          {expanded ? '▾' : '▸'}
+        </span>
+      </button>
+      {onRename && (
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`Rename the ${label} group`}
+          onClick={onRename}
+        >
+          ✎
+        </button>
+      )}
+    </div>
+  )
+}
+
+// One row of the settings tree: the label area jumps to History, the icon
+// cluster edits. Method and category rows share this shape exactly; methods
+// skip the emoji because their group header already carries it.
+function ItemRow({
+  emoji,
+  label,
+  count,
+  archived,
+  builtIn,
+  onView,
+  onRename,
+  onToggleArchived,
+  onDelete,
+}: {
+  emoji?: string
+  label: string
+  count: number
+  archived: boolean
+  builtIn: boolean
+  onView: () => void
+  onRename: () => void
+  onToggleArchived: () => void
+  onDelete: () => void
+}) {
+  const sub = [
+    count > 0 ? (count === 1 ? '1 entry' : `${count} entries`) : null,
+    archived ? 'archived' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <li className={archived ? 'method-row archived' : 'method-row'}>
+      {emoji && (
+        <span className="method-emoji" aria-hidden="true">
+          {emoji}
+        </span>
+      )}
+      <button
+        type="button"
+        className="method-view"
+        aria-label={`View ${label} in History`}
+        onClick={onView}
+      >
+        <span className="method-label">{label}</span>
+        {sub && <span className="method-sub">{sub}</span>}
+      </button>
+      <span className="method-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`Rename ${label}`}
+          onClick={onRename}
+        >
+          ✎
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={archived ? `Restore ${label}` : `Archive ${label}`}
+          onClick={onToggleArchived}
+        >
+          {archived ? '↩' : '⤓'}
+        </button>
+        {!builtIn && (
+          <button
+            type="button"
+            className="icon-btn danger"
+            aria-label={`Delete ${label}`}
+            onClick={onDelete}
+          >
+            ✕
+          </button>
+        )}
+      </span>
+    </li>
+  )
+}
+
+// Mounted fresh on every open so prefs are re-read from storage and the
+// group tree starts collapsed.
 function DrawerBody({
   onClose,
   onDefaultCurrencyChange,
-}: {
-  onClose: () => void
-  onDefaultCurrencyChange?: (code: string) => void
-}) {
+  onJumpToHistory,
+}: Omit<Props, 'open'>) {
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
   const expenses = useLiveQuery(listExpenses)
   const [addingMethod, setAddingMethod] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
+  // Collapsed by default: post-import the flat list ran ~21 methods deep and
+  // buried Preferences/Backup. The drawer body remounts per open, so every
+  // visit starts folded.
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set())
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [pickingCurrency, setPickingCurrency] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [autoBackup, setAutoBackup] = useState(() => getPref(PREFS.autoBackup, true))
@@ -61,6 +194,17 @@ function DrawerBody({
     getPref(PREFS.defaultCurrency, 'INR'),
   )
   const fileInput = useRef<HTMLInputElement>(null)
+
+  const methodBuckets = useMemo(() => bucketize(methods ?? []), [methods])
+
+  function toggleGroup(group: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      return next
+    })
+  }
 
   const methodUsage = useMemo(() => {
     const counts = new Map<string, number>()
@@ -85,6 +229,25 @@ function DrawerBody({
     if (label === null) return
     try {
       await renamePaymentMethod(method.id, label)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Could not rename it.')
+    }
+  }
+
+  async function renameGroupPrompt(group: string) {
+    const name = window.prompt('Rename group', group)
+    if (name === null) return
+    try {
+      await renameGroup(group, name)
+      // Keep the renamed group expanded if it was: the open-set is keyed by
+      // name, and losing the expansion mid-edit reads as the group vanishing.
+      setOpenGroups((prev) => {
+        if (!prev.has(group)) return prev
+        const next = new Set(prev)
+        next.delete(group)
+        next.add(name.trim())
+        return next
+      })
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not rename it.')
     }
@@ -259,53 +422,38 @@ function DrawerBody({
         <section className="drawer-section">
           <h3 className="drawer-title">Payment methods</h3>
           <ul className="method-list">
-            {(methods ?? []).map((m) => {
-              const count = methodUsage.get(m.id) ?? 0
-              const sub = [
-                m.group,
-                count > 0 ? (count === 1 ? '1 entry' : `${count} entries`) : null,
-                m.archived ? 'archived' : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-              const builtIn = m.id === CASH_METHOD_ID || m.id === UPI_METHOD_ID
+            {methodBuckets.map(({ group, members }) => {
+              const expanded = openGroups.has(group)
+              const builtInGroup = (PAYMENT_GROUPS as readonly string[]).includes(group)
               return (
-                <li key={m.id} className={m.archived ? 'method-row archived' : 'method-row'}>
-                  <span className="method-emoji" aria-hidden="true">
-                    {groupEmoji(m.group)}
-                  </span>
-                  <span className="method-text">
-                    <span className="method-label">{m.label}</span>
-                    {sub && <span className="method-sub">{sub}</span>}
-                  </span>
-                  <span className="method-actions">
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={`Rename ${m.label}`}
-                      onClick={() => void renameMethod(m)}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={m.archived ? `Restore ${m.label}` : `Archive ${m.label}`}
-                      onClick={() => void toggleMethodArchived(m)}
-                    >
-                      {m.archived ? '↩' : '⤓'}
-                    </button>
-                    {!builtIn && (
-                      <button
-                        type="button"
-                        className="icon-btn danger"
-                        aria-label={`Delete ${m.label}`}
-                        onClick={() => void removeMethod(m)}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </span>
+                <li key={group}>
+                  <GroupToggle
+                    emoji={groupEmoji(group)}
+                    label={group}
+                    count={members.length}
+                    expanded={expanded}
+                    onToggle={() => toggleGroup(group)}
+                    onRename={
+                      builtInGroup ? undefined : () => void renameGroupPrompt(group)
+                    }
+                  />
+                  {expanded && (
+                    <ul className="method-list group-members">
+                      {members.map((m) => (
+                        <ItemRow
+                          key={m.id}
+                          label={m.label}
+                          count={methodUsage.get(m.id) ?? 0}
+                          archived={!!m.archived}
+                          builtIn={m.id === CASH_METHOD_ID}
+                          onView={() => onJumpToHistory({ paymentMethodId: m.id })}
+                          onRename={() => void renameMethod(m)}
+                          onToggleArchived={() => void toggleMethodArchived(m)}
+                          onDelete={() => void removeMethod(m)}
+                        />
+                      ))}
+                    </ul>
+                  )}
                 </li>
               )
             })}
@@ -318,57 +466,31 @@ function DrawerBody({
 
         <section className="drawer-section">
           <h3 className="drawer-title">Categories</h3>
-          <ul className="method-list">
-            {(categories ?? []).map((c) => {
-              const count = categoryUsage.get(c.label) ?? 0
-              const builtIn = isBuiltinCategoryId(c.id)
-              const sub = [
-                count > 0 ? (count === 1 ? '1 entry' : `${count} entries`) : null,
-                c.archived ? 'archived' : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-              return (
-                <li key={c.id} className={c.archived ? 'method-row archived' : 'method-row'}>
-                  <span className="method-emoji" aria-hidden="true">
-                    {c.emoji}
-                  </span>
-                  <span className="method-text">
-                    <span className="method-label">{c.label}</span>
-                    {sub && <span className="method-sub">{sub}</span>}
-                  </span>
-                  <span className="method-actions">
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={`Rename ${c.label}`}
-                      onClick={() => void renameCat(c)}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={c.archived ? `Restore ${c.label}` : `Archive ${c.label}`}
-                      onClick={() => void toggleCatArchived(c)}
-                    >
-                      {c.archived ? '↩' : '⤓'}
-                    </button>
-                    {!builtIn && (
-                      <button
-                        type="button"
-                        className="icon-btn danger"
-                        aria-label={`Delete ${c.label}`}
-                        onClick={() => void removeCat(c)}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+          <GroupToggle
+            emoji="🏷️"
+            label="All categories"
+            count={(categories ?? []).length}
+            expanded={categoriesOpen}
+            onToggle={() => setCategoriesOpen((v) => !v)}
+          />
+          {categoriesOpen && (
+            <ul className="method-list group-members">
+              {(categories ?? []).map((c) => (
+                <ItemRow
+                  key={c.id}
+                  emoji={c.emoji}
+                  label={c.label}
+                  count={categoryUsage.get(c.label) ?? 0}
+                  archived={!!c.archived}
+                  builtIn={isBuiltinCategoryId(c.id)}
+                  onView={() => onJumpToHistory({ category: c.label })}
+                  onRename={() => void renameCat(c)}
+                  onToggleArchived={() => void toggleCatArchived(c)}
+                  onDelete={() => void removeCat(c)}
+                />
+              ))}
+            </ul>
+          )}
           <button type="button" className="btn-ghost" onClick={() => setAddingCategory(true)}>
             <span>Add category</span>
             <span aria-hidden="true">+</span>
@@ -463,12 +585,14 @@ function DrawerBody({
 
         <AddMethodSheet
           open={addingMethod}
-          onCreated={() => {}}
+          // Expand the new method's group: a row born folded away reads as a
+          // failed add.
+          onCreated={(m) => setOpenGroups((prev) => new Set(prev).add(m.group))}
           onClose={() => setAddingMethod(false)}
         />
         <AddCategorySheet
           open={addingCategory}
-          onCreated={() => {}}
+          onCreated={() => setCategoriesOpen(true)}
           onClose={() => setAddingCategory(false)}
         />
         <CurrencySheet

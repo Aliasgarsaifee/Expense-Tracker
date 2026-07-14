@@ -20,8 +20,8 @@ expense-tracker/
 │   ├── main.tsx                # bootstrap: bundled fonts, ErrorBoundary, storage.persist()
 │   ├── App.tsx                 # shell: tab bar + settings drawer; all 3 screens stay mounted
 │   ├── index.css               # the entire design system: tokens, dark theme, all component styles
-│   ├── db.ts                   # Dexie schema (v3) + migrations + every persistence/domain op
-│   ├── db.test.ts              # includes fresh-install seed and v1→v3 upgrade-path tests
+│   ├── db.ts                   # Dexie schema (v4) + migrations + every persistence/domain op
+│   ├── db.test.ts              # includes fresh-install seed and v1→v4 upgrade-path tests
 │   ├── screens/                # AddScreen, HistoryScreen, SummaryScreen
 │   ├── components/             # shared UI: ExpenseForm, sheets, pickers, chart, drawer
 │   ├── lib/                    # helpers; pure ones have co-located *.test.ts
@@ -113,19 +113,23 @@ Dependency direction is one-way: `screens/components → db.ts + lib/ → Dexie/
   anything touching category identity must preserve that.
 - `paymentMethodId` may be absent (pre-v2 entries). Always handle undefined.
 - Archive, don't delete: methods/categories referenced by entries can only be
-  archived. Built-ins (`pm-cash`, `pm-upi`, `cat-*`) are undeletable; their
-  stable ids exist so backups from different installs merge instead of
-  duplicating. Never change a seeded id.
+  archived. Built-ins (`pm-cash`, `cat-*`) are undeletable; stable seeded ids
+  exist so backups from different installs merge instead of duplicating.
+  Never change or reuse a seeded id — `pm-upi` stopped being seeded in v4
+  (UPI is a group, not an instrument), but its id stays reserved: pre-v4
+  backups may resurrect it as an ordinary, deletable-when-unreferenced method.
 
 ### Migrations (the most dangerous code in the repo)
 
-Version blocks in `createDb()` are **append-only** — phones in the wild are on
-v1/v2/v3. A schema change means: add `version(4)` with an `upgrade()` for
-existing installs, keep the `populate` seed in sync for fresh installs, and
-test **both paths** (db.test.ts shows the pattern: build an old-shape db via
-`createDb(name)`, close, reopen upgraded). Precedent worth copying: the v3
-migration *folded* `kind`/`cardType` into one `group` field rather than
-carrying both — migrations may simplify, never just accrete.
+Version blocks in `createDb()` are **append-only** — phones in the wild can
+be on any version ever shipped (v1–v4). A schema change means: add the next
+`version(N)` with an `upgrade()` for existing installs, keep the `populate`
+seed in sync for fresh installs, and test **both paths** (db.test.ts shows
+the pattern: build an old-shape db via `createDb(name)`, close, reopen
+upgraded). Precedents worth copying: the v3 migration *folded*
+`kind`/`cardType` into one `group` field rather than carrying both, and v4
+*removed* the seeded generic UPI method (delete-if-unreferenced,
+archive-if-referenced) — migrations may simplify, never just accrete.
 
 ### The backup contract
 

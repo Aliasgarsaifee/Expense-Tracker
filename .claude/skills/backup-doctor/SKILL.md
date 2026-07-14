@@ -58,8 +58,9 @@ first bad record. Loop: fix, re-parse, until clean. Common repairs:
 - Same **label**, different id (methods/categories from another install) →
   the local record survives; incoming expenses are **rewritten** to point at
   it (`paymentMethodId` remapped, `category` label relabeled).
-- Built-in seeds (`pm-cash`, `pm-upi`, `cat-*`) share ids across installs by
-  design, so they merge cleanly. Never rename ids in a backup file.
+- Built-in seeds (`pm-cash`, `cat-*`, plus the retired `pm-upi` in pre-v4
+  files) share ids across installs by design, so they merge cleanly. Never
+  rename ids in a backup file.
 
 ## Safety rails
 

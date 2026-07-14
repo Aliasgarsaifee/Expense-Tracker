@@ -29,3 +29,6 @@ dist-ssr
 # Skill-eval artifacts and agent worktrees (keep skills themselves tracked)
 .claude/skills/*-workspace/
 .claude/worktrees/
+
+# Personal financial data: old notes exports + one-off import tooling
+old_expenses/

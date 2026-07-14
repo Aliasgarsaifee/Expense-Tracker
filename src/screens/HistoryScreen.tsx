@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EditSheet } from '../components/EditSheet'
+import { FilterSheet } from '../components/FilterSheet'
 import { MonthPager } from '../components/MonthPager'
 import {
   listCategories,
@@ -17,10 +18,11 @@ import {
   groupByDay,
   groupByMonth,
   type DayGroup,
+  type HistoryJump,
   type MoneyByCurrency,
 } from '../lib/history'
 import { formatMoney } from '../lib/money'
-import { groupEmoji } from '../lib/paymentMeta'
+import { groupEmoji, type MethodSelection } from '../lib/paymentMeta'
 
 function dayLabel(iso: string): string {
   const today = todayISO()
@@ -32,6 +34,17 @@ function dayLabel(iso: string): string {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  })
+}
+
+// Compact chip date ("12 Jun"), plus the year once it isn't the current one —
+// the ledger reaches back to 2023.
+function shortDate(iso: string): string {
+  const sameYear = iso.slice(0, 4) === todayISO().slice(0, 4)
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
     ...(sameYear ? {} : { year: 'numeric' }),
   })
 }
@@ -101,14 +114,35 @@ function DaySection({
   )
 }
 
-export function HistoryScreen() {
+export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
   const expenses = useLiveQuery(listExpenses)
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
   const [month, setMonth] = useState<string | null>(monthOf(todayISO()))
-  const [methodFilter, setMethodFilter] = useState<string | null>(null)
+  const [selection, setSelection] = useState<MethodSelection>({ methodIds: [], groups: [] })
+  const [catFilters, setCatFilters] = useState<string[]>([])
+  const [from, setFrom] = useState<string | null>(null)
+  const [to, setTo] = useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Expense | null>(null)
+
+  // A settings-row tap resets the whole view to that method/category: All
+  // time, no search, nothing else filtered — the ledger slice for one thing.
+  // App sends a fresh object per tap, so re-tapping the same row re-applies.
+  useEffect(() => {
+    if (!jump) return
+    setMonth(null)
+    setQuery('')
+    setSelection({
+      methodIds: jump.paymentMethodId ? [jump.paymentMethodId] : [],
+      groups: [],
+    })
+    setCatFilters(jump.category ? [jump.category] : [])
+    setFrom(null)
+    setTo(null)
+    setSheetOpen(false)
+  }, [jump])
 
   const labels = useMemo(
     () => new Map((methods ?? []).map((m: PaymentMethod) => [m.id, m.label])),
@@ -133,27 +167,60 @@ export function HistoryScreen() {
       (methods ?? []).filter((m: PaymentMethod) => !m.archived || referencedIds.has(m.id)),
     [methods, referencedIds],
   )
+  // The same rule for categories: archived ones stay filterable while entries
+  // still carry their label.
+  const referencedCategories = useMemo(
+    () => new Set((expenses ?? []).map((e) => e.category)),
+    [expenses],
+  )
+  const visibleCategories = useMemo(
+    () =>
+      (categories ?? []).filter(
+        (c: Category) => !c.archived || referencedCategories.has(c.label),
+      ),
+    [categories, referencedCategories],
+  )
 
-  // A filtered-on method can vanish from the chip row (deleted, or an
-  // archived method whose last referencing entry was removed). Drop the
-  // filter so it can't dangle as an invisible active filter.
-  if (
-    expenses !== undefined &&
-    methods !== undefined &&
-    methodFilter !== null &&
-    !filterChips.some((m: PaymentMethod) => m.id === methodFilter)
-  ) {
-    setMethodFilter(null)
+  // A filtered-on method, group, or category can vanish (deleted, or archived
+  // with its last referencing entry removed). Prune so nothing dangles as an
+  // invisible active filter.
+  if (expenses !== undefined && methods !== undefined) {
+    const ids = selection.methodIds.filter((id) =>
+      filterChips.some((m: PaymentMethod) => m.id === id),
+    )
+    const groups = selection.groups.filter((g) =>
+      filterChips.some((m: PaymentMethod) => m.group === g),
+    )
+    if (ids.length !== selection.methodIds.length || groups.length !== selection.groups.length) {
+      setSelection({ methodIds: ids, groups })
+    }
   }
+  if (expenses !== undefined && categories !== undefined) {
+    const cats = catFilters.filter((l) =>
+      visibleCategories.some((c: Category) => c.label === l),
+    )
+    if (cats.length !== catFilters.length) setCatFilters(cats)
+  }
+
+  // Whole-group picks resolve to member ids here, at render, so a method
+  // added to a selected group later is included automatically.
+  const effectiveMethodIds = useMemo(() => {
+    const ids = new Set(selection.methodIds)
+    for (const m of filterChips) if (selection.groups.includes(m.group)) ids.add(m.id)
+    return [...ids]
+  }, [selection, filterChips])
 
   const filtered = useMemo(
     () =>
       filterExpenses(expenses ?? [], {
         month,
-        paymentMethodId: methodFilter,
+        paymentMethodIds: effectiveMethodIds,
+        categories: catFilters,
+        from,
+        to,
         query,
       }),
-    [expenses, month, methodFilter, query],
+    [expenses, month, effectiveMethodIds, catFilters, from, to, query],
   )
 
   const totals = useMemo(() => {
@@ -178,11 +245,45 @@ export function HistoryScreen() {
     [filtered, month],
   )
 
+  // The pager and the date range both slice time — the last one touched wins,
+  // so they never silently intersect to an empty list.
+  function changeMonth(next: string | null) {
+    setFrom(null)
+    setTo(null)
+    setMonth(next)
+  }
+  function applyRange(nextFrom: string | null, nextTo: string | null) {
+    if (nextFrom && nextTo && nextFrom > nextTo) [nextFrom, nextTo] = [nextTo, nextFrom]
+    setFrom(nextFrom)
+    setTo(nextTo)
+    if (nextFrom !== null || nextTo !== null) setMonth(null)
+  }
+  function clearFilters() {
+    setSelection({ methodIds: [], groups: [] })
+    setCatFilters([])
+    setFrom(null)
+    setTo(null)
+  }
+
   if (expenses === undefined) return null // first IndexedDB read, avoid a flash
 
   const hasAnything = expenses.length > 0
   const hasMatches = filtered.length > 0
-  const filtersActive = methodFilter !== null || query.trim() !== ''
+  const rangeActive = from !== null || to !== null
+  const activeChipCount =
+    selection.groups.length +
+    selection.methodIds.length +
+    catFilters.length +
+    (rangeActive ? 1 : 0)
+  const filtersActive = activeChipCount > 0 || query.trim() !== ''
+  const rangeChipLabel =
+    from && to
+      ? `${shortDate(from)} – ${shortDate(to)}`
+      : from
+        ? `from ${shortDate(from)}`
+        : to
+          ? `until ${shortDate(to)}`
+          : ''
 
   return (
     <div className="screen">
@@ -191,31 +292,107 @@ export function HistoryScreen() {
         <h1 className="sr-only">History</h1>
       </header>
 
-      <MonthPager month={month} onChange={setMonth} allowAll maxMonth={maxMonth} />
+      <MonthPager month={month} onChange={changeMonth} allowAll maxMonth={maxMonth} />
 
       {hasAnything && (
         <>
-          <div className="chip-row filter-row" role="group" aria-label="Payment method filter">
+          <div className="chip-row filter-row">
             <button
               type="button"
               className="chip"
-              aria-pressed={methodFilter === null}
-              onClick={() => setMethodFilter(null)}
+              aria-pressed={activeChipCount > 0}
+              aria-haspopup="dialog"
+              onClick={() => setSheetOpen(true)}
             >
-              All
+              Filters{activeChipCount > 0 ? ` · ${activeChipCount}` : ''}
+              <span className="chip-caret" aria-hidden="true">
+                ▾
+              </span>
             </button>
-            {filterChips.map((m: PaymentMethod) => (
-              <button
-                key={m.id}
-                type="button"
-                className="chip"
-                aria-pressed={methodFilter === m.id}
-                onClick={() => setMethodFilter(methodFilter === m.id ? null : m.id)}
-              >
-                <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
-              </button>
-            ))}
           </div>
+
+          {activeChipCount > 0 && (
+            <div className="chip-row filter-row" role="group" aria-label="Active filters">
+              {selection.groups.map((g) => (
+                <button
+                  key={`group-${g}`}
+                  type="button"
+                  className="chip"
+                  aria-pressed="true"
+                  aria-label={`Clear ${g} filter`}
+                  onClick={() =>
+                    setSelection({
+                      methodIds: selection.methodIds,
+                      groups: selection.groups.filter((x) => x !== g),
+                    })
+                  }
+                >
+                  <span aria-hidden="true">{groupEmoji(g)}</span> {g}
+                  <span className="chip-caret" aria-hidden="true">
+                    ✕
+                  </span>
+                </button>
+              ))}
+              {selection.methodIds.map((id) => {
+                const m = (methods ?? []).find((x: PaymentMethod) => x.id === id)
+                if (!m) return null
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className="chip"
+                    aria-pressed="true"
+                    aria-label={`Clear ${m.label} filter`}
+                    onClick={() =>
+                      setSelection({
+                        groups: selection.groups,
+                        methodIds: selection.methodIds.filter((x) => x !== id),
+                      })
+                    }
+                  >
+                    <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
+                    <span className="chip-caret" aria-hidden="true">
+                      ✕
+                    </span>
+                  </button>
+                )
+              })}
+              {catFilters.map((label) => (
+                <button
+                  key={`cat-${label}`}
+                  type="button"
+                  className="chip"
+                  aria-pressed="true"
+                  aria-label={`Clear ${label} filter`}
+                  onClick={() => setCatFilters(catFilters.filter((l) => l !== label))}
+                >
+                  <span aria-hidden="true">{emojiFor(label)}</span> {label}
+                  <span className="chip-caret" aria-hidden="true">
+                    ✕
+                  </span>
+                </button>
+              ))}
+              {rangeActive && (
+                <button
+                  type="button"
+                  className="chip"
+                  aria-pressed="true"
+                  aria-label="Clear date range filter"
+                  onClick={() => applyRange(null, null)}
+                >
+                  <span aria-hidden="true">📅</span> {rangeChipLabel}
+                  <span className="chip-caret" aria-hidden="true">
+                    ✕
+                  </span>
+                </button>
+              )}
+              {activeChipCount >= 2 && (
+                <button type="button" className="btn-text" onClick={clearFilters}>
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="search-field">
             <span aria-hidden="true">🔎</span>
@@ -266,7 +443,7 @@ export function HistoryScreen() {
               type="button"
               className="btn-text clear-filters"
               onClick={() => {
-                setMethodFilter(null)
+                clearFilters()
                 setQuery('')
               }}
             >
@@ -311,6 +488,20 @@ export function HistoryScreen() {
         </p>
       )}
 
+      <FilterSheet
+        open={sheetOpen}
+        methods={filterChips}
+        categories={visibleCategories}
+        selection={selection}
+        onSelectionChange={setSelection}
+        catFilters={catFilters}
+        onCatFiltersChange={setCatFilters}
+        from={from}
+        to={to}
+        onRangeChange={applyRange}
+        onClearAll={clearFilters}
+        onClose={() => setSheetOpen(false)}
+      />
       <EditSheet expense={editing} onClose={() => setEditing(null)} />
     </div>
   )

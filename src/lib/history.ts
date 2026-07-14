@@ -20,15 +20,32 @@ export interface MonthGroup {
 
 export interface HistoryFilter {
   month?: string | null
-  paymentMethodId?: string | null
+  paymentMethodIds?: readonly string[] | null // OR within; empty/null = all
+  categories?: readonly string[] | null       // OR within; empty/null = all
+  from?: string | null // inclusive ISO date bound
+  to?: string | null   // inclusive ISO date bound
   query?: string
 }
 
+// A settings-row tap: App hands this to HistoryScreen, which resets its view
+// to show everything for the tapped method or category (a set-of-one).
+export interface HistoryJump {
+  paymentMethodId?: string | null
+  category?: string | null
+}
+
+// Dimensions AND together; the id/label arrays OR within their dimension.
+// Date bounds compare lexicographically — ISO dates make that chronological.
 export function filterExpenses(expenses: Expense[], f: HistoryFilter): Expense[] {
   const q = f.query?.trim().toLowerCase() ?? ''
+  const methodIds = f.paymentMethodIds?.length ? new Set(f.paymentMethodIds) : null
+  const categories = f.categories?.length ? new Set(f.categories) : null
   return expenses.filter((e) => {
     if (f.month && !e.spentOn.startsWith(`${f.month}-`)) return false
-    if (f.paymentMethodId && e.paymentMethodId !== f.paymentMethodId) return false
+    if (methodIds && (!e.paymentMethodId || !methodIds.has(e.paymentMethodId))) return false
+    if (categories && !categories.has(e.category)) return false
+    if (f.from && e.spentOn < f.from) return false
+    if (f.to && e.spentOn > f.to) return false
     if (q) {
       const haystacks = [e.note ?? '', e.category, String(e.amount)]
       if (!haystacks.some((h) => h.toLowerCase().includes(q))) return false

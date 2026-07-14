@@ -32,9 +32,28 @@ export const PAYMENT_GROUPS = ['Cash', 'UPI', 'Credit card', 'Debit card'] as co
 
 // Stable ids so backups from different installs merge instead of duplicating.
 export const CASH_METHOD_ID = 'pm-cash'
+// Was a seeded generic method until v4 folded it away — UPI is a group, not
+// an instrument. The id lives on in pre-v4 backups (import may resurrect it)
+// and in the v2 seed below; never reuse it for anything else.
 export const UPI_METHOD_ID = 'pm-upi'
 
+// Fresh installs seed Cash alone: every other group starts empty and fills
+// with the owner's real instruments (GPay, HDFC Regalia...), so no group
+// carries a redundant generic entry the way UPI once did.
 export const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: CASH_METHOD_ID,
+    label: 'Cash',
+    group: 'Cash',
+    createdAt: '1970-01-01T00:00:00.000Z',
+  },
+]
+
+// Frozen copy of what the v2 upgrade seeded, generic UPI included. Devices
+// arriving from v1 must replay that history exactly (append-only versions,
+// so this list must never track later edits to DEFAULT_PAYMENT_METHODS);
+// v4 then folds the generic away for them like it does for everyone else.
+const V2_SEED_PAYMENT_METHODS: PaymentMethod[] = [
   {
     id: CASH_METHOD_ID,
     label: 'Cash',
@@ -104,7 +123,7 @@ export function createDb(name = 'ExpenseTrackerDB'): ExpenseDb {
         .modify((e: Expense) => {
           if (!e.currency) e.currency = 'INR'
         })
-      await tx.table('paymentMethods').bulkAdd(DEFAULT_PAYMENT_METHODS)
+      await tx.table('paymentMethods').bulkAdd(V2_SEED_PAYMENT_METHODS)
     })
   database
     .version(3)
@@ -134,6 +153,30 @@ export function createDb(name = 'ExpenseTrackerDB'): ExpenseDb {
           delete m.cardType
         })
       await tx.table('categories').bulkAdd(DEFAULT_CATEGORIES)
+    })
+  database
+    .version(4)
+    .stores({
+      expenses: 'id, spentOn, category, createdAt, paymentMethodId',
+      paymentMethods: 'id, createdAt',
+      categories: 'id, createdAt',
+    })
+    .upgrade(async (tx) => {
+      // UPI is a group, not an instrument: the seeded generic "UPI" method
+      // only crowded the picker next to real UPI apps. Fold it away — delete
+      // when nothing references it, archive (never delete) when history does.
+      // A renamed or already-archived one is the owner's own method: leave it.
+      const upi = (await tx.table('paymentMethods').get(UPI_METHOD_ID)) as
+        | PaymentMethod
+        | undefined
+      if (!upi || upi.label !== 'UPI' || upi.archived) return
+      const used = await tx
+        .table('expenses')
+        .where('paymentMethodId')
+        .equals(UPI_METHOD_ID)
+        .count()
+      if (used === 0) await tx.table('paymentMethods').delete(UPI_METHOD_ID)
+      else await tx.table('paymentMethods').update(UPI_METHOD_ID, { archived: true })
     })
   // Fresh installs skip upgrade(); seed the defaults here instead.
   database.on('populate', (tx) => {
@@ -245,6 +288,26 @@ export async function renamePaymentMethod(id: string, label: string): Promise<vo
   await db.paymentMethods.update(id, { label: trimmed })
 }
 
+// Groups are just strings on methods (expenses never store one), so a group
+// rename is a single bulk re-bucket — no cascade exists by construction.
+// Renaming onto an existing name merges the two buckets, which is the useful
+// behavior and never loses data. The built-in names stay fixed: they are the
+// picker's vocabulary (rank, emoji, add-chips), and renaming one would leave
+// the vocabulary offering the old name next to the new bucket.
+export async function renameGroup(from: string, to: string): Promise<void> {
+  const trimmed = to.trim()
+  if (trimmed === '') throw new Error('The group cannot be empty')
+  if ((PAYMENT_GROUPS as readonly string[]).includes(from)) {
+    throw new Error(`${from} is a built-in group and cannot be renamed`)
+  }
+  if (trimmed === from) return
+  await db.paymentMethods
+    .filter((m) => m.group === from)
+    .modify((m) => {
+      m.group = trimmed
+    })
+}
+
 export async function setPaymentMethodArchived(
   id: string,
   archived: boolean,
@@ -253,8 +316,8 @@ export async function setPaymentMethodArchived(
 }
 
 export async function deletePaymentMethod(id: string): Promise<void> {
-  if (id === CASH_METHOD_ID || id === UPI_METHOD_ID) {
-    throw new Error('Cash and UPI are built-in and cannot be deleted')
+  if (id === CASH_METHOD_ID) {
+    throw new Error('Cash is built-in and cannot be deleted')
   }
   const used = await db.expenses.where('paymentMethodId').equals(id).count()
   if (used > 0) {

@@ -26,7 +26,17 @@ describe('filterExpenses', () => {
   it('returns everything when the filter has no criteria', () => {
     const rows = [exp(), exp({ spentOn: '2026-06-01' })]
     expect(filterExpenses(rows, {})).toEqual(rows)
-    expect(filterExpenses(rows, { month: null, paymentMethodId: null, query: '' })).toEqual(rows)
+    expect(
+      filterExpenses(rows, {
+        month: null,
+        paymentMethodIds: null,
+        categories: null,
+        from: null,
+        to: null,
+        query: '',
+      }),
+    ).toEqual(rows)
+    expect(filterExpenses(rows, { paymentMethodIds: [], categories: [] })).toEqual(rows)
     expect(filterExpenses(rows, { query: '   ' })).toEqual(rows)
   })
 
@@ -40,13 +50,84 @@ describe('filterExpenses', () => {
     ])
   })
 
-  it('matches paymentMethodId exactly, excluding entries without one', () => {
+  it('matches any of the given paymentMethodIds (OR within the dimension)', () => {
     const cash = exp({ paymentMethodId: CASH_METHOD_ID })
     const upi = exp({ paymentMethodId: UPI_METHOD_ID })
-    const none = exp()
+    const card = exp({ paymentMethodId: 'pm-card' })
     expect(
-      filterExpenses([cash, upi, none], { paymentMethodId: CASH_METHOD_ID }),
-    ).toEqual([cash])
+      filterExpenses([cash, upi, card], {
+        paymentMethodIds: [CASH_METHOD_ID, UPI_METHOD_ID],
+      }),
+    ).toEqual([cash, upi])
+  })
+
+  it('never matches entries without a paymentMethodId against a method filter', () => {
+    const cash = exp({ paymentMethodId: CASH_METHOD_ID })
+    const none = exp()
+    expect(filterExpenses([cash, none], { paymentMethodIds: [CASH_METHOD_ID] })).toEqual([
+      cash,
+    ])
+  })
+
+  it('matches any of the given category labels, exactly', () => {
+    const food = exp({ category: 'Food' })
+    const foodCourt = exp({ category: 'Food court' })
+    const rent = exp({ category: 'Rent' })
+    expect(filterExpenses([food, foodCourt, rent], { categories: ['Food'] })).toEqual([
+      food,
+    ])
+    expect(
+      filterExpenses([food, foodCourt, rent], { categories: ['Food', 'Rent'] }),
+    ).toEqual([food, rent])
+  })
+
+  it('treats from/to as inclusive ISO date bounds', () => {
+    const before = exp({ spentOn: '2026-07-01' })
+    const onFrom = exp({ spentOn: '2026-07-02' })
+    const inside = exp({ spentOn: '2026-07-10' })
+    const onTo = exp({ spentOn: '2026-07-20' })
+    const after = exp({ spentOn: '2026-07-21' })
+    const rows = [before, onFrom, inside, onTo, after]
+    expect(filterExpenses(rows, { from: '2026-07-02', to: '2026-07-20' })).toEqual([
+      onFrom,
+      inside,
+      onTo,
+    ])
+  })
+
+  it('supports open-ended ranges (only from, or only to)', () => {
+    const june = exp({ spentOn: '2026-06-15' })
+    const july = exp({ spentOn: '2026-07-15' })
+    expect(filterExpenses([june, july], { from: '2026-07-01' })).toEqual([july])
+    expect(filterExpenses([june, july], { to: '2026-06-30' })).toEqual([june])
+  })
+
+  it('matches nothing for an inverted range (the swap is a UI rule)', () => {
+    const row = exp({ spentOn: '2026-07-10' })
+    expect(filterExpenses([row], { from: '2026-07-20', to: '2026-07-01' })).toEqual([])
+  })
+
+  it('composes categories with methods, month, and query', () => {
+    const hit = exp({
+      spentOn: '2026-07-12',
+      category: 'Food',
+      paymentMethodId: CASH_METHOD_ID,
+      note: 'chai',
+    })
+    const wrongCategory = exp({
+      spentOn: '2026-07-12',
+      category: 'Rent',
+      paymentMethodId: CASH_METHOD_ID,
+      note: 'chai',
+    })
+    expect(
+      filterExpenses([hit, wrongCategory], {
+        month: '2026-07',
+        paymentMethodIds: [CASH_METHOD_ID],
+        categories: ['Food'],
+        query: 'chai',
+      }),
+    ).toEqual([hit])
   })
 
   it('matches the query against the note, case-insensitively', () => {
@@ -81,15 +162,16 @@ describe('filterExpenses', () => {
     expect(filterExpenses([noteless], { query: 'zzz' })).toEqual([])
   })
 
-  it('combines criteria with AND', () => {
+  it('combines criteria with AND across dimensions', () => {
     const hit = exp({ spentOn: '2026-07-12', paymentMethodId: CASH_METHOD_ID, note: 'chai' })
-    const wrongMonth = exp({ spentOn: '2026-06-12', paymentMethodId: CASH_METHOD_ID, note: 'chai' })
+    const wrongRange = exp({ spentOn: '2026-06-12', paymentMethodId: CASH_METHOD_ID, note: 'chai' })
     const wrongMethod = exp({ spentOn: '2026-07-12', paymentMethodId: UPI_METHOD_ID, note: 'chai' })
     const wrongQuery = exp({ spentOn: '2026-07-12', paymentMethodId: CASH_METHOD_ID, note: 'rent' })
     expect(
-      filterExpenses([hit, wrongMonth, wrongMethod, wrongQuery], {
-        month: '2026-07',
-        paymentMethodId: CASH_METHOD_ID,
+      filterExpenses([hit, wrongRange, wrongMethod, wrongQuery], {
+        from: '2026-07-01',
+        to: '2026-07-31',
+        paymentMethodIds: [CASH_METHOD_ID],
         query: 'chai',
       }),
     ).toEqual([hit])

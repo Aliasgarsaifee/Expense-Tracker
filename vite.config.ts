@@ -6,6 +6,11 @@ import pkg from './package.json' with { type: 'json' }
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Honour an assigned PORT so parallel tool sessions can each run a dev
+    // server; defaults to Vite's usual 5173 otherwise.
+    port: Number(process.env.PORT) || 5173,
+  },
   define: {
     // Shown in Settings → About; package.json is the single source of truth.
     __APP_VERSION__: JSON.stringify(pkg.version),

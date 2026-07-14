@@ -1,6 +1,7 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState, type FormEvent } from 'react'
-import { addPaymentMethod, PAYMENT_GROUPS, type PaymentMethod } from '../db'
-import { groupEmoji } from '../lib/paymentMeta'
+import { addPaymentMethod, listPaymentMethods, type PaymentMethod } from '../db'
+import { groupChoices, groupEmoji } from '../lib/paymentMeta'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
 
 const CUSTOM = '__custom__'
@@ -16,18 +17,30 @@ interface Props {
 // One sheet for "I got a new card / wallet". Reachable from the Add form's
 // group picker and from Settings, so a new method never interrupts logging
 // an expense for long.
-export function AddMethodSheet({ open, presetGroup, onCreated, onClose }: Props) {
+export function AddMethodSheet({ open, ...rest }: Props) {
   if (!open) return null
-  return (
-    <SheetBody presetGroup={presetGroup} onCreated={onCreated} onClose={onClose} />
-  )
+  return <SheetLoader {...rest} />
+}
+
+// Group chips come from live data (custom groups stay offered once created);
+// wait out the millisecond first read so presetGroup resolves against the
+// real choices exactly once, at SheetBody's mount.
+function SheetLoader(props: Omit<Props, 'open'>) {
+  const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
+  if (!methods) return null
+  return <SheetBody choices={groupChoices(methods)} {...props} />
 }
 
 // Mounted fresh on every open: presetGroup lands in state each time it is
 // shown, and a name typed on a cancelled visit never leaks into the next one.
-function SheetBody({ presetGroup, onCreated, onClose }: Omit<Props, 'open'>) {
+function SheetBody({
+  choices,
+  presetGroup,
+  onCreated,
+  onClose,
+}: Omit<Props, 'open'> & { choices: string[] }) {
   const initialChip =
-    presetGroup && PAYMENT_GROUPS.includes(presetGroup as (typeof PAYMENT_GROUPS)[number])
+    presetGroup && choices.includes(presetGroup)
       ? presetGroup
       : presetGroup
         ? CUSTOM
@@ -82,7 +95,7 @@ function SheetBody({ presetGroup, onCreated, onClose }: Omit<Props, 'open'>) {
           <div className="field">
             <span>Type</span>
             <div className="chip-grid" role="group" aria-label="Payment type">
-              {PAYMENT_GROUPS.map((g) => (
+              {choices.map((g) => (
                 <button
                   key={g}
                   type="button"

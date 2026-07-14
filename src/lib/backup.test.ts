@@ -6,6 +6,7 @@ import {
   DEFAULT_CATEGORIES,
   DEFAULT_PAYMENT_METHODS,
   listExpenses,
+  UPI_METHOD_ID,
   type Category,
   type Expense,
   type PaymentMethod,
@@ -288,7 +289,7 @@ describe('importBackup', () => {
     expect(all.find((e) => e.id === e1.id)?.note).toBe(e1.note)
 
     const methods = await db.paymentMethods.toArray()
-    expect(methods).toHaveLength(3) // relabelled Cash, UPI, imported card
+    expect(methods).toHaveLength(2) // relabelled Cash, imported card
     expect(methods.find((m) => m.id === CASH_METHOD_ID)?.label).toBe('Wallet Cash')
     expect(await db.categories.count()).toBe(9)
   })
@@ -303,8 +304,31 @@ describe('importBackup', () => {
     await importBackup(data)
 
     expect(await db.expenses.count()).toBe(2)
-    expect(await db.paymentMethods.count()).toBe(3)
+    expect(await db.paymentMethods.count()).toBe(2) // seeded Cash + imported card
     expect(await db.categories.count()).toBe(9)
+  })
+
+  it('resurrects the generic UPI method from a pre-v4 backup, losslessly', async () => {
+    // v4 folded pm-upi out of fresh installs, but import stays a faithful
+    // merge: a backup whose entries were paid with the generic UPI must land
+    // intact, not be second-guessed by the migration's opinion.
+    await importBackup({
+      expenses: [{ ...e2, paymentMethodId: UPI_METHOD_ID }],
+      paymentMethods: [
+        {
+          id: UPI_METHOD_ID,
+          label: 'UPI',
+          group: 'UPI',
+          createdAt: '1970-01-01T00:00:01.000Z',
+        },
+      ],
+      categories: [],
+    })
+
+    const upi = await db.paymentMethods.get(UPI_METHOD_ID)
+    expect(upi?.label).toBe('UPI')
+    expect(upi?.archived).toBeFalsy()
+    expect((await db.expenses.get(e2.id))?.paymentMethodId).toBe(UPI_METHOD_ID)
   })
 
   it('merges an incoming method with a new id onto an existing same-label method', async () => {

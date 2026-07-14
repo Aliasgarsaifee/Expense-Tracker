@@ -1,22 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { PaymentMethod } from '../db'
-import { groupEmoji } from '../lib/paymentMeta'
-
-interface GroupBucket {
-  group: string
-  members: PaymentMethod[]
-}
-
-function bucketize(methods: PaymentMethod[]): GroupBucket[] {
-  // methods arrive group-rank sorted, so equal groups are contiguous.
-  const out: GroupBucket[] = []
-  for (const m of methods) {
-    const last = out[out.length - 1]
-    if (last?.group === m.group) last.members.push(m)
-    else out.push({ group: m.group, members: [m] })
-  }
-  return out
-}
+import { bucketize, groupEmoji } from '../lib/paymentMeta'
 
 interface Props {
   methods: PaymentMethod[]

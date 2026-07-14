@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { runAutoBackupIfDue } from './lib/autoBackup'
+import type { HistoryJump } from './lib/history'
 import { getPref, PREFS } from './lib/prefs'
 import { AddScreen } from './screens/AddScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
@@ -53,6 +54,16 @@ type Tab = (typeof TABS)[number]['id']
 export default function App() {
   const [tab, setTab] = useState<Tab>('add')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [historyJump, setHistoryJump] = useState<HistoryJump | null>(null)
+
+  // A settings row was tapped: close the drawer, land on History, filter to
+  // it. A fresh object per tap means re-tapping the same row re-applies even
+  // if the user changed filters in between (identity is the event).
+  function jumpToHistory(jump: HistoryJump) {
+    setHistoryJump({ ...jump })
+    setTab('history')
+    setSettingsOpen(false)
+  }
   // Remounting AddScreen on this key re-reads the default-currency pref, so a
   // change in Settings takes effect immediately (not just next cold start).
   const [defaultCurrency, setDefaultCurrency] = useState(() =>
@@ -89,7 +100,7 @@ export default function App() {
           <AddScreen key={defaultCurrency} />
         </section>
         <section hidden={tab !== 'history'}>
-          <HistoryScreen />
+          <HistoryScreen jump={historyJump} />
         </section>
         <section hidden={tab !== 'summary'}>
           <SummaryScreen />
@@ -112,6 +123,7 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onDefaultCurrencyChange={setDefaultCurrency}
+        onJumpToHistory={jumpToHistory}
       />
     </div>
   )

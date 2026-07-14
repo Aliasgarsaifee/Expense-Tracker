@@ -16,7 +16,9 @@ import {
   listExpenses,
   listExpensesForMonth,
   listPaymentMethods,
+  PAYMENT_GROUPS,
   renameCategory,
+  renameGroup,
   renamePaymentMethod,
   setCategoryArchived,
   setPaymentMethodArchived,
@@ -177,14 +179,12 @@ describe('listExpensesForMonth', () => {
 })
 
 describe('seeding', () => {
-  it('seeds Cash, UPI, and the 8 categories on a fresh database', async () => {
+  it('seeds Cash alone plus the 8 categories on a fresh database — UPI is a group, not a method', async () => {
     const name = `SeedTest-${crypto.randomUUID()}`
     const fresh = createDb(name)
     try {
       const methods = await fresh.paymentMethods.toArray()
-      expect(methods.map((m) => m.id).sort()).toEqual(
-        [CASH_METHOD_ID, UPI_METHOD_ID].sort(),
-      )
+      expect(methods.map((m) => m.id)).toEqual([CASH_METHOD_ID])
       expect(methods.find((m) => m.id === CASH_METHOD_ID)?.group).toBe('Cash')
       const categories = await fresh.categories.toArray()
       expect(categories).toHaveLength(8)
@@ -216,8 +216,9 @@ describe('migrations', () => {
       const rows = await upgraded.expenses.toArray()
       expect(rows).toHaveLength(1)
       expect(rows[0].currency).toBe('INR')
+      // v2 seeded the generic UPI method; v4 folds it away again (unused).
       const methods = await upgraded.paymentMethods.toArray()
-      expect(methods.map((m) => m.group).sort()).toEqual(['Cash', 'UPI'])
+      expect(methods.map((m) => m.group)).toEqual(['Cash'])
       expect(await upgraded.categories.count()).toBe(8)
     } finally {
       upgraded.close()
@@ -235,7 +236,9 @@ describe('migrations', () => {
     })
     await legacy.table('paymentMethods').bulkAdd([
       { id: 'pm-cash', label: 'Cash', kind: 'cash', createdAt: '1970-01-01T00:00:00.000Z' },
-      { id: 'pm-upi', label: 'UPI', kind: 'upi', createdAt: '1970-01-01T00:00:01.000Z' },
+      // Renamed by the owner back in v2: no longer the untouched seed, so v4
+      // must keep it even though nothing references it.
+      { id: 'pm-upi', label: 'My UPI', kind: 'upi', createdAt: '1970-01-01T00:00:01.000Z' },
       { id: 'c1', label: 'HDFC Credit', kind: 'card', cardType: 'credit', createdAt: '2026-07-01T00:00:00.000Z' },
       { id: 'c2', label: 'SBI Debit', kind: 'card', cardType: 'debit', createdAt: '2026-07-02T00:00:00.000Z' },
     ])
@@ -246,12 +249,99 @@ describe('migrations', () => {
       const byId = new Map((await upgraded.paymentMethods.toArray()).map((m) => [m.id, m]))
       expect(byId.get('pm-cash')?.group).toBe('Cash')
       expect(byId.get('pm-upi')?.group).toBe('UPI')
+      expect(byId.get('pm-upi')?.archived).toBeFalsy()
       expect(byId.get('c1')?.group).toBe('Credit card')
       expect(byId.get('c2')?.group).toBe('Debit card')
       const raw = byId.get('c1') as unknown as Record<string, unknown>
       expect('kind' in raw).toBe(false)
       expect('cardType' in raw).toBe(false)
       expect(await upgraded.categories.count()).toBe(8)
+    } finally {
+      upgraded.close()
+      await Dexie.delete(name)
+    }
+  })
+
+  // v3-shaped database, the version every phone in the wild is on today.
+  function buildV3Db(name: string): Dexie {
+    const legacy = new Dexie(name)
+    legacy.version(1).stores({ expenses: 'id, spentOn, category, createdAt' })
+    legacy.version(2).stores({
+      expenses: 'id, spentOn, category, createdAt, paymentMethodId',
+      paymentMethods: 'id, createdAt',
+    })
+    legacy.version(3).stores({
+      expenses: 'id, spentOn, category, createdAt, paymentMethodId',
+      paymentMethods: 'id, createdAt',
+      categories: 'id, createdAt',
+    })
+    return legacy
+  }
+
+  const seededCash = {
+    id: 'pm-cash',
+    label: 'Cash',
+    group: 'Cash',
+    createdAt: '1970-01-01T00:00:00.000Z',
+  }
+  const seededUpi = {
+    id: 'pm-upi',
+    label: 'UPI',
+    group: 'UPI',
+    createdAt: '1970-01-01T00:00:01.000Z',
+  }
+
+  it('v4 deletes the untouched generic UPI method when no entry references it', async () => {
+    const name = `MigrationV4Unused-${crypto.randomUUID()}`
+    const legacy = buildV3Db(name)
+    await legacy.table('paymentMethods').bulkAdd([
+      seededCash,
+      seededUpi,
+      { id: 'm-sbi', label: 'SBI', group: 'UPI', createdAt: '2026-07-12T00:00:00.000Z' },
+    ])
+    await legacy.table('expenses').add({
+      id: 'e1',
+      amount: 120,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-07-12',
+      createdAt: '2026-07-12T09:00:00.000Z',
+      paymentMethodId: 'm-sbi',
+    })
+    legacy.close()
+
+    const upgraded = createDb(name)
+    try {
+      const ids = (await upgraded.paymentMethods.toArray()).map((m) => m.id).sort()
+      expect(ids).toEqual(['m-sbi', 'pm-cash'])
+      expect(await upgraded.expenses.count()).toBe(1)
+    } finally {
+      upgraded.close()
+      await Dexie.delete(name)
+    }
+  })
+
+  it('v4 archives (never deletes) the generic UPI method while entries reference it', async () => {
+    const name = `MigrationV4Used-${crypto.randomUUID()}`
+    const legacy = buildV3Db(name)
+    await legacy.table('paymentMethods').bulkAdd([seededCash, seededUpi])
+    await legacy.table('expenses').add({
+      id: 'e1',
+      amount: 75,
+      currency: 'INR',
+      category: 'Transport',
+      spentOn: '2026-07-13',
+      createdAt: '2026-07-13T09:00:00.000Z',
+      paymentMethodId: 'pm-upi',
+    })
+    legacy.close()
+
+    const upgraded = createDb(name)
+    try {
+      const upi = await upgraded.paymentMethods.get('pm-upi')
+      expect(upi).toMatchObject({ label: 'UPI', group: 'UPI', archived: true })
+      const entry = await upgraded.expenses.get('e1')
+      expect(entry?.paymentMethodId).toBe('pm-upi')
     } finally {
       upgraded.close()
       await Dexie.delete(name)
@@ -295,10 +385,12 @@ describe('listPaymentMethods', () => {
     const credit = await addPaymentMethod({ label: 'HDFC Credit', group: 'Credit card' })
     await tick()
     const debit = await addPaymentMethod({ label: 'SBI Debit', group: 'Debit card' })
+    await tick()
+    const upi = await addPaymentMethod({ label: 'GPay', group: 'UPI' })
     const all = await listPaymentMethods()
     expect(all.map((m) => m.id)).toEqual([
       CASH_METHOD_ID,
-      UPI_METHOD_ID,
+      upi.id,
       credit.id,
       debit.id,
       wallet.id,
@@ -334,6 +426,55 @@ describe('renamePaymentMethod', () => {
   })
 })
 
+describe('renameGroup', () => {
+  it('re-buckets every method in the group and leaves other groups untouched', async () => {
+    const gpay = await addPaymentMethod({ label: 'GPay', group: 'Wallet' })
+    const paytm = await addPaymentMethod({ label: 'Paytm', group: 'Wallet' })
+    const card = await addPaymentMethod({ label: 'HDFC', group: 'Credit card' })
+
+    await renameGroup('Wallet', 'Wallets')
+
+    const byId = new Map((await listPaymentMethods()).map((m) => [m.id, m]))
+    expect(byId.get(gpay.id)?.group).toBe('Wallets')
+    expect(byId.get(paytm.id)?.group).toBe('Wallets')
+    expect(byId.get(card.id)?.group).toBe('Credit card')
+  })
+
+  it('trims the new name and rejects an empty one', async () => {
+    const gpay = await addPaymentMethod({ label: 'GPay', group: 'Wallet' })
+    await renameGroup('Wallet', '  Wallets  ')
+    expect(
+      (await listPaymentMethods()).find((m) => m.id === gpay.id)?.group,
+    ).toBe('Wallets')
+    await expect(renameGroup('Wallets', '   ')).rejects.toThrow(/group/i)
+  })
+
+  it('refuses to rename the built-in groups', async () => {
+    for (const g of PAYMENT_GROUPS) {
+      await expect(renameGroup(g, 'Anything')).rejects.toThrow(/built-in/i)
+    }
+  })
+
+  it('merges into an existing group when renamed to its name', async () => {
+    const gpay = await addPaymentMethod({ label: 'GPay', group: 'Wallet' })
+    const sbi = await addPaymentMethod({ label: 'SBI', group: 'UPI' })
+
+    await renameGroup('Wallet', 'UPI')
+
+    const methods = await listPaymentMethods()
+    expect(methods.find((m) => m.id === gpay.id)?.group).toBe('UPI')
+    expect(methods.find((m) => m.id === sbi.id)?.group).toBe('UPI')
+  })
+
+  it('is a no-op when the name is unchanged', async () => {
+    const gpay = await addPaymentMethod({ label: 'GPay', group: 'Wallet' })
+    await renameGroup('Wallet', 'Wallet')
+    expect(
+      (await listPaymentMethods()).find((m) => m.id === gpay.id)?.group,
+    ).toBe('Wallet')
+  })
+})
+
 describe('deletePaymentMethod', () => {
   it('removes an unused custom method', async () => {
     const card = await addPaymentMethod({ label: 'Unused Card', group: 'Debit card' })
@@ -354,9 +495,20 @@ describe('deletePaymentMethod', () => {
     await expect(deletePaymentMethod(card.id)).rejects.toThrow(/entr/i)
   })
 
-  it('refuses to delete the built-in Cash and UPI methods', async () => {
+  it('refuses to delete built-in Cash, but a UPI method resurrected by an old backup is an ordinary method', async () => {
     await expect(deletePaymentMethod(CASH_METHOD_ID)).rejects.toThrow(/built-in/i)
-    await expect(deletePaymentMethod(UPI_METHOD_ID)).rejects.toThrow(/built-in/i)
+    // An import of a pre-v4 backup can bring pm-upi back; unreferenced, it
+    // must be deletable like any other method now.
+    await db.paymentMethods.add({
+      id: UPI_METHOD_ID,
+      label: 'UPI',
+      group: 'UPI',
+      createdAt: '1970-01-01T00:00:01.000Z',
+    })
+    await deletePaymentMethod(UPI_METHOD_ID)
+    expect(
+      (await listPaymentMethods({ includeArchived: true })).map((m) => m.id),
+    ).not.toContain(UPI_METHOD_ID)
   })
 })
 

@@ -1,6 +1,6 @@
 ---
 name: dexie-migration
-description: The schema-change ritual for src/db.ts (Dexie over IndexedDB). Use whenever a change adds, removes, renames, or re-types ANYTHING persisted — a field on Expense/PaymentMethod/Category, a new table or index, seeded defaults, or a request like "store X" / "remember Y per expense". Even a one-line schema tweak goes through this ritual; phones in the wild hold irreplaceable v1/v2/v3 data and a migration runs exactly once per device.
+description: The schema-change ritual for src/db.ts (Dexie over IndexedDB). Use whenever a change adds, removes, renames, or re-types ANYTHING persisted — a field on Expense/PaymentMethod/Category, a new table or index, seeded defaults, or a request like "store X" / "remember Y per expense". Even a one-line schema tweak goes through this ritual; phones in the wild hold irreplaceable data on every version ever shipped and a migration runs exactly once per device.
 ---
 
 # Dexie migration ritual
