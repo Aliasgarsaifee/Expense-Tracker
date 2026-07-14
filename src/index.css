@@ -10,10 +10,10 @@
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
    heat cells (--ink on color-mix(--accent, --bg), levels 1–4 = 12/24/38/46%;
    level 4 lowered from an even 12/24/38/54 ramp — 54% failed dark AA):
-   light ink #23231c on L1 #d8dcce (11.33) · L2 #c5ccbc (9.59) ·
-     L3 #afbaa7 (7.83) · L4 #a2b09b (6.94)
-   dark ink #ecede0 on L1 #2a2e24 (11.72) · L2 #3a4334 (8.74) ·
-     L3 #4e5a47 (6.17) · L4 #596852 (5.03)
+   light ink #23231c on L1 #d8dcce (11.3) · L2 #c5ccbc (9.6) ·
+     L3 #afbaa7 (7.8) · L4 #a2b09b (6.9)
+   dark ink #ecede0 on L1 #2a2e24 (11.7) · L2 #3a4334 (8.7) ·
+     L3 #4e5a47 (6.2) · L4 #596852 (5.0)
    ———————————————————————————————————————————————— */
 
 :root {
@@ -1090,6 +1090,29 @@ button {
 .cal-shortcuts {
   flex-shrink: 0;
   margin-bottom: 12px;
+}
+
+/* Heat-scale selector — worded Global/Month/Year (not the shortcut row's
+   Today/This month/This year) so the two rows never read alike. */
+.cal-heat-scale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.cal-heat-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.chip-sm {
+  min-height: 34px;
+  padding: 5px 12px;
+  font-size: 14px;
 }
 
 .cal-scroll {

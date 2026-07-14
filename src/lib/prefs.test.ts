@@ -37,6 +37,7 @@ describe('prefs without localStorage (in-module Map fallback)', () => {
       lastAutoBackup: 'lastAutoBackupDate',
       summaryPeriod: 'summaryPeriodKind',
       historySort: 'historySort',
+      calendarHeatBasis: 'calendarHeatBasis',
     })
   })
 

@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../db'
-import { heatLevels } from '../lib/calendarHeat'
+import { heatLevels, type HeatBasis } from '../lib/calendarHeat'
 import {
   addMonths,
   formatDateLong,
@@ -12,9 +12,17 @@ import {
   todayISO,
 } from '../lib/dates'
 import { initialPeriod, periodBounds, periodLabel, type Period } from '../lib/period'
+import { getPref, PREFS, setPref } from '../lib/prefs'
 
 // Monday-first, matching monthGrid and weekStartOf.
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+
+const HEAT_BASES: HeatBasis[] = ['all', 'month', 'year']
+function readHeatBasis(): HeatBasis {
+  const v = getPref(PREFS.calendarHeatBasis, 'all')
+  return HEAT_BASES.includes(v as HeatBasis) ? (v as HeatBasis) : 'all'
+}
+const HEAT_LABEL: Record<HeatBasis, string> = { all: 'Global', month: 'Month', year: 'Year' }
 
 interface Props {
   period: Period
@@ -35,11 +43,20 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
   // the ✕ or closing the sheet discards.
   const [sel, setSel] = useState<{ a: string; b: string | null } | null>(null)
 
+  // Persisted (PREFS.calendarHeatBasis); the sheet mounts only while open, so
+  // this reads the last-chosen basis fresh on every open.
+  const [basis, setBasis] = useState<HeatBasis>(readHeatBasis)
+
   // Full rows (not just unique keys) — heat needs amounts. One toArray at
   // personal-ledger scale, and the sheet mounts only while open.
   const rows = useLiveQuery(() => db.expenses.toArray())
   const dateSet = useMemo(() => new Set((rows ?? []).map((r) => r.spentOn)), [rows])
-  const heat = useMemo(() => heatLevels(rows ?? [], currency, 'all'), [rows, currency])
+  const heat = useMemo(() => heatLevels(rows ?? [], currency, basis), [rows, currency, basis])
+
+  function changeBasis(next: HeatBasis) {
+    setBasis(next)
+    setPref(PREFS.calendarHeatBasis, next)
+  }
 
   const newestMonth = monthOf(maxAnchor)
   const months = useMemo(() => {
@@ -141,6 +158,23 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
               {s.label}
             </button>
           ))}
+        </div>
+
+        <div className="cal-heat-scale">
+          <span className="cal-heat-label">Heat</span>
+          <div className="chip-row" role="group" aria-label="Heat scale">
+            {HEAT_BASES.map((b) => (
+              <button
+                key={b}
+                type="button"
+                className="chip chip-sm"
+                aria-pressed={basis === b}
+                onClick={() => changeBasis(b)}
+              >
+                {HEAT_LABEL[b]}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="cal-scroll">
