@@ -60,6 +60,12 @@ describe('periodBounds', () => {
       to: '2026-05-06',
     })
   })
+  it('is a single day for a day period', () => {
+    expect(periodBounds({ kind: 'day', date: '2026-07-10' })).toEqual({
+      from: '2026-07-10',
+      to: '2026-07-10',
+    })
+  })
   it('is null for all time', () => {
     expect(periodBounds({ kind: 'all' })).toBeNull()
   })
@@ -96,6 +102,20 @@ describe('shiftPeriod', () => {
   it('leaves all time unchanged', () => {
     expect(shiftPeriod({ kind: 'all' }, 1)).toEqual({ kind: 'all' })
   })
+  it('steps a day, rolling across a month edge', () => {
+    expect(shiftPeriod({ kind: 'day', date: '2026-07-14' }, 1)).toEqual({
+      kind: 'day',
+      date: '2026-07-15',
+    })
+    expect(shiftPeriod({ kind: 'day', date: '2026-07-31' }, 1)).toEqual({
+      kind: 'day',
+      date: '2026-08-01',
+    })
+    expect(shiftPeriod({ kind: 'day', date: '2026-07-01' }, -1)).toEqual({
+      kind: 'day',
+      date: '2026-06-30',
+    })
+  })
 })
 
 describe('periodLabel', () => {
@@ -123,6 +143,11 @@ describe('periodLabel', () => {
       periodLabel({ kind: 'custom', from: '2025-12-29', to: '2026-01-04' }, TODAY),
     ).toBe('29 Dec 2025 – 4 Jan 2026')
   })
+  it('names a day Today, Yesterday, or a full date', () => {
+    expect(periodLabel({ kind: 'day', date: '2026-07-14' }, TODAY)).toBe('Today')
+    expect(periodLabel({ kind: 'day', date: '2026-07-13' }, TODAY)).toBe('Yesterday')
+    expect(periodLabel({ kind: 'day', date: '2026-06-10' }, TODAY)).toBe('10 Jun 2026')
+  })
 })
 
 describe('emptyPeriodPhrase', () => {
@@ -139,6 +164,10 @@ describe('emptyPeriodPhrase', () => {
     )
     expect(emptyPeriodPhrase({ kind: 'all' }, true)).toBe('yet')
   })
+  it('says today for the current day, that day for another', () => {
+    expect(emptyPeriodPhrase({ kind: 'day', date: '2026-07-14' }, true)).toBe('today')
+    expect(emptyPeriodPhrase({ kind: 'day', date: '2026-06-10' }, false)).toBe('that day')
+  })
 })
 
 describe('comparisonLabel', () => {
@@ -150,6 +179,9 @@ describe('comparisonLabel', () => {
       'vs prior 10 days',
     )
     expect(comparisonLabel({ kind: 'all' })).toBeNull()
+  })
+  it('names the previous day for a day period', () => {
+    expect(comparisonLabel({ kind: 'day', date: '2026-07-10' })).toBe('vs 9 Jul')
   })
 })
 
@@ -205,6 +237,18 @@ describe('comparisonSlice', () => {
   it('has nothing to compare for all time', () => {
     expect(comparisonSlice({ kind: 'all' }, TODAY)).toBeNull()
   })
+  it('compares a day against the whole previous day', () => {
+    // Today so far vs all of yesterday — a full (not to-date) one-day window.
+    expect(comparisonSlice({ kind: 'day', date: '2026-07-14' }, TODAY)).toEqual({
+      bounds: { from: '2026-07-13', to: '2026-07-13' },
+      toDate: false,
+    })
+    // A past day compares against the calendar day before it.
+    expect(comparisonSlice({ kind: 'day', date: '2026-07-10' }, TODAY)).toEqual({
+      bounds: { from: '2026-07-09', to: '2026-07-09' },
+      toDate: false,
+    })
+  })
 })
 
 describe('daysBetween / elapsedDays', () => {
@@ -226,6 +270,7 @@ describe('initialPeriod / changeKind', () => {
     expect(initialPeriod('all', TODAY)).toEqual({ kind: 'all' })
     expect(initialPeriod('custom', TODAY)).toEqual({ kind: 'month', month: '2026-07' })
     expect(initialPeriod('month', TODAY)).toEqual({ kind: 'month', month: '2026-07' })
+    expect(initialPeriod('day', TODAY)).toEqual({ kind: 'day', date: '2026-07-14' })
   })
   it('re-anchors on today when the period contains it, else on the period start', () => {
     expect(changeKind({ kind: 'month', month: '2026-07' }, 'week', TODAY)).toEqual({
@@ -237,6 +282,20 @@ describe('initialPeriod / changeKind', () => {
       year: '2024',
     })
     expect(changeKind({ kind: 'year', year: '2026' }, 'all', TODAY)).toEqual({ kind: 'all' })
+  })
+  it('re-anchors to a day: today if in view, else the period start', () => {
+    expect(changeKind({ kind: 'month', month: '2026-07' }, 'day', TODAY)).toEqual({
+      kind: 'day',
+      date: '2026-07-14',
+    })
+    expect(changeKind({ kind: 'month', month: '2024-03' }, 'day', TODAY)).toEqual({
+      kind: 'day',
+      date: '2024-03-01',
+    })
+    expect(changeKind({ kind: 'all' }, 'day', TODAY)).toEqual({
+      kind: 'day',
+      date: '2026-07-14',
+    })
   })
 })
 

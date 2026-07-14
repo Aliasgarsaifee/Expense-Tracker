@@ -1,9 +1,12 @@
 import { addMonths, localISO, monthLabel, monthOf } from './dates'
 
-// The unit a Summary view aggregates over. Day is deliberately absent: a
-// single day's summary is History's day group (Summary aggregates, History
-// enumerates), and the trend chart's per-day bars cover intra-period detail.
+// The unit a Summary view aggregates over. A day is the finest grain: a single
+// day still aggregates (total, by-category, by-payment, vs the previous day),
+// which History's day *list* does not show. Span-only tiles (daily average,
+// busiest day) collapse for a one-day window via a single-day rule in the
+// screen, not a per-kind branch.
 export type Period =
+  | { kind: 'day'; date: string } // ISO date
   | { kind: 'week'; start: string } // ISO date of its Monday
   | { kind: 'month'; month: string } // 'YYYY-MM'
   | { kind: 'year'; year: string } // 'YYYY'
@@ -42,6 +45,8 @@ export function daysBetween(from: string, to: string): number {
 
 export function periodBounds(p: Period): Bounds | null {
   switch (p.kind) {
+    case 'day':
+      return { from: p.date, to: p.date }
     case 'week':
       return { from: p.start, to: addDays(p.start, 6) }
     case 'month': {
@@ -67,6 +72,8 @@ export function elapsedDays(b: Bounds, today: string): number {
 
 export function shiftPeriod(p: Period, dir: 1 | -1): Period {
   switch (p.kind) {
+    case 'day':
+      return { kind: 'day', date: addDays(p.date, dir) }
     case 'week':
       return { kind: 'week', start: addDays(p.start, dir * 7) }
     case 'month':
@@ -108,6 +115,10 @@ function rangeLabel(from: string, to: string): string {
 
 export function periodLabel(p: Period, today: string): string {
   switch (p.kind) {
+    case 'day':
+      if (p.date === today) return 'Today'
+      if (p.date === addDays(today, -1)) return 'Yesterday'
+      return shortDay(p.date, true)
     case 'week': {
       const thisWeek = weekStartOf(today)
       if (p.start === thisWeek) return 'This week'
@@ -130,6 +141,8 @@ export function periodLabel(p: Period, today: string): string {
 // tracks whether the period is the current one (contains today).
 export function emptyPeriodPhrase(p: Period, containsToday: boolean): string {
   switch (p.kind) {
+    case 'day':
+      return containsToday ? 'today' : 'that day'
     case 'week':
       return containsToday ? 'this week' : 'that week'
     case 'month':
@@ -147,6 +160,8 @@ export function emptyPeriodPhrase(p: Period, containsToday: boolean): string {
 // meaningful previous period (all time).
 export function comparisonLabel(p: Period): string | null {
   switch (p.kind) {
+    case 'day':
+      return `vs ${shortDay(addDays(p.date, -1), false)}`
     case 'week':
       return 'vs last week'
     case 'month': {
@@ -190,6 +205,8 @@ export function comparisonSlice(
 // never persisted, so it lands on this month.
 export function initialPeriod(kind: string, today: string): Period {
   switch (kind) {
+    case 'day':
+      return { kind: 'day', date: today }
     case 'week':
       return { kind: 'week', start: weekStartOf(today) }
     case 'year':
@@ -206,13 +223,15 @@ export function initialPeriod(kind: string, today: string): Period {
 // year lands on 2024, not this year.
 export function changeKind(
   p: Period,
-  kind: 'week' | 'month' | 'year' | 'all',
+  kind: 'day' | 'week' | 'month' | 'year' | 'all',
   today: string,
 ): Period {
   if (kind === 'all') return { kind: 'all' }
   const b = periodBounds(p)
   const anchor = b ? (today >= b.from && today <= b.to ? today : b.from) : today
   switch (kind) {
+    case 'day':
+      return { kind: 'day', date: anchor }
     case 'week':
       return { kind: 'week', start: weekStartOf(anchor) }
     case 'month':
