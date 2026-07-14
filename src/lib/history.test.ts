@@ -5,6 +5,8 @@ import {
   formatTotals,
   groupByDay,
   groupByMonth,
+  sortExpenses,
+  isGroupedSort,
 } from './history'
 import { formatMoney } from './money'
 
@@ -268,5 +270,71 @@ describe('formatTotals', () => {
 
   it('renders an empty string for empty totals', () => {
     expect(formatTotals({})).toBe('')
+  })
+})
+
+describe('sortExpenses', () => {
+  it('newest first: spentOn desc, then createdAt desc', () => {
+    const older = exp({ spentOn: '2026-07-10', createdAt: '2026-07-10T09:00:00.000Z' })
+    const newDayEarly = exp({ spentOn: '2026-07-12', createdAt: '2026-07-12T08:00:00.000Z' })
+    const newDayLate = exp({ spentOn: '2026-07-12', createdAt: '2026-07-12T20:00:00.000Z' })
+    expect(sortExpenses([older, newDayEarly, newDayLate], 'newest')).toEqual([
+      newDayLate,
+      newDayEarly,
+      older,
+    ])
+  })
+
+  it('oldest first is the exact reverse of newest', () => {
+    const older = exp({ spentOn: '2026-07-10', createdAt: '2026-07-10T09:00:00.000Z' })
+    const newDayEarly = exp({ spentOn: '2026-07-12', createdAt: '2026-07-12T08:00:00.000Z' })
+    const newDayLate = exp({ spentOn: '2026-07-12', createdAt: '2026-07-12T20:00:00.000Z' })
+    expect(sortExpenses([older, newDayEarly, newDayLate], 'oldest')).toEqual([
+      older,
+      newDayEarly,
+      newDayLate,
+    ])
+  })
+
+  it('largest first: amount desc, ties broken by newest', () => {
+    const big = exp({ amount: 900, spentOn: '2026-07-01' })
+    const midNew = exp({ amount: 100, spentOn: '2026-07-20' })
+    const midOld = exp({ amount: 100, spentOn: '2026-07-05' })
+    expect(sortExpenses([midOld, midNew, big], 'largest')).toEqual([big, midNew, midOld])
+  })
+
+  it('smallest first: amount asc, ties broken by newest', () => {
+    const small = exp({ amount: 20 })
+    const bigNew = exp({ amount: 500, spentOn: '2026-07-20' })
+    const bigOld = exp({ amount: 500, spentOn: '2026-07-05' })
+    expect(sortExpenses([bigOld, bigNew, small], 'smallest')).toEqual([small, bigNew, bigOld])
+  })
+
+  it('does not mutate the input array', () => {
+    const rows = [exp({ amount: 1 }), exp({ amount: 9 })]
+    const snapshot = [...rows]
+    sortExpenses(rows, 'largest')
+    expect(rows).toEqual(snapshot)
+  })
+
+  it('returns an empty array unchanged', () => {
+    expect(sortExpenses([], 'largest')).toEqual([])
+  })
+
+  it('feeds groupByDay ascending day groups when sorted oldest-first', () => {
+    const d10 = exp({ spentOn: '2026-07-10' })
+    const d12early = exp({ spentOn: '2026-07-12', createdAt: '2026-07-12T08:00:00.000Z' })
+    const d12late = exp({ spentOn: '2026-07-12', createdAt: '2026-07-12T20:00:00.000Z' })
+    const sorted = sortExpenses([d12late, d10, d12early], 'oldest')
+    expect(groupByDay(sorted).map((g) => g.date)).toEqual(['2026-07-10', '2026-07-12'])
+  })
+})
+
+describe('isGroupedSort', () => {
+  it('is true for date modes, false for amount modes', () => {
+    expect(isGroupedSort('newest')).toBe(true)
+    expect(isGroupedSort('oldest')).toBe(true)
+    expect(isGroupedSort('largest')).toBe(false)
+    expect(isGroupedSort('smallest')).toBe(false)
   })
 })

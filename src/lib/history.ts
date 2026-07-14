@@ -38,6 +38,31 @@ export interface HistoryJump {
   to?: string | null
 }
 
+export type HistorySort = 'newest' | 'oldest' | 'largest' | 'smallest'
+
+// Date modes keep the day/month grouping; amount modes flatten to a ranked list.
+export function isGroupedSort(sort: HistorySort): boolean {
+  return sort === 'newest' || sort === 'oldest'
+}
+
+// A stable total order per mode. Amount modes rank by the raw number across
+// currencies — there is no FX in this app, so a mixed-currency ranking is not
+// value-accurate; acceptable because the ledger is effectively single-currency.
+// Every mode breaks ties down to createdAt so the order never wobbles between
+// renders. Returns a new array; never mutates the input (it is a live-query result).
+export function sortExpenses(expenses: Expense[], sort: HistorySort): Expense[] {
+  const byNewest = (a: Expense, b: Expense) =>
+    b.spentOn.localeCompare(a.spentOn) || b.createdAt.localeCompare(a.createdAt)
+  const comparators: Record<HistorySort, (a: Expense, b: Expense) => number> = {
+    newest: byNewest,
+    oldest: (a, b) =>
+      a.spentOn.localeCompare(b.spentOn) || a.createdAt.localeCompare(b.createdAt),
+    largest: (a, b) => b.amount - a.amount || byNewest(a, b),
+    smallest: (a, b) => a.amount - b.amount || byNewest(a, b),
+  }
+  return [...expenses].sort(comparators[sort])
+}
+
 // Dimensions AND together; the id/label arrays OR within their dimension.
 // Date bounds compare lexicographically — ISO dates make that chronological.
 export function filterExpenses(expenses: Expense[], f: HistoryFilter): Expense[] {
