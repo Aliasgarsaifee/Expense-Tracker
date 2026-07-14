@@ -35,3 +35,6 @@ old_expenses/
 
 # Design/planning docs (superpowers plans + specs): kept locally, not published
 docs/superpowers/
+
+# Subagent-driven-development scratch: task briefs, reports, diffs, progress ledger
+.superpowers/
