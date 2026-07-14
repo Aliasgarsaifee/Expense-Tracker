@@ -32,3 +32,6 @@ dist-ssr
 
 # Personal financial data: old notes exports + one-off import tooling
 old_expenses/
+
+# Design/planning docs (superpowers plans + specs): kept locally, not published
+docs/superpowers/

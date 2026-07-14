@@ -9,10 +9,10 @@ on your iPhone with a free Apple ID.
 
 **What it tracks per entry:** amount + currency (every active ISO 4217
 currency, searchable; INR default; no FX conversion — foreign spends stay in
-their own currency), payment method
-(grouped as Cash / UPI / Credit card / Debit card, plus custom groups;
-Cash and UPI built in, add your own cards), a category (8 built in, add
-your own with an emoji), date, and a free-text note.
+their own currency), payment method (grouped as Cash / UPI / Credit card /
+Debit card, plus custom groups; Cash is the one built-in method — add your
+own cards and UPI apps), a category (8 built in, add your own with an emoji),
+date, and a free-text note.
 
 ## The screens
 
@@ -23,13 +23,16 @@ your own with an emoji), date, and a free-text note.
   Each save confirms with a toast (plus a haptic tick on the phone) that
   offers a few seconds of **Undo**.
 - **History** — month pager or all-time view with sticky month sections;
-  filter by payment method, search notes/categories/amounts. Built for
-  reconciling against card/UPI statements: pick a month + a card, compare.
+  a filter sheet slices by any mix of payment methods, whole payment groups,
+  categories, and a date range (OR within each dimension, AND across), plus
+  note/amount search — every active filter shows as a dismissible chip. Built
+  for reconciling against card/UPI statements: pick a month + a card, compare.
 - **Summary** — month totals per currency, stat tiles (daily average,
   vs last month, biggest spend, busiest day), category chart, by-payment
   breakdown.
-- **Settings drawer** (☰) — manage payment methods and categories
-  (rename / archive / delete-if-unused), default currency,
+- **Settings drawer** (☰) — a collapsible group tree of payment methods and
+  categories (rename / archive / delete-if-unused, rename your custom groups;
+  tap any row to jump to its History), plus default currency,
   exports/imports, auto-backup.
 
 ## Development
@@ -48,7 +51,7 @@ money/date/summary/history helpers are all unit-tested. UI lives in
 
 ## Where the data lives
 
-Everything is stored in IndexedDB (`ExpenseTrackerDB`, schema v3: `expenses` +
+Everything is stored in IndexedDB (`ExpenseTrackerDB`, schema v4: `expenses` +
 `paymentMethods` + `categories`) inside the app's own WKWebView sandbox —
 durable, offline, private. Nothing ever leaves the phone unless you export it.
 
