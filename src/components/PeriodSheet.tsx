@@ -59,14 +59,28 @@ export function PeriodSheet({ period, maxAnchor, focusCustom, onApply, onClose }
   // The now-shortcut speaks the active granularity; all/custom fall back to the
   // month (the default granularity).
   const nowKind =
-    period.kind === 'week' ? 'week' : period.kind === 'year' ? 'year' : 'month'
+    period.kind === 'day'
+      ? 'day'
+      : period.kind === 'week'
+        ? 'week'
+        : period.kind === 'year'
+          ? 'year'
+          : 'month'
   const nowLabel =
-    nowKind === 'week' ? 'This week' : nowKind === 'year' ? 'This year' : 'This month'
+    nowKind === 'day'
+      ? 'Today'
+      : nowKind === 'week'
+        ? 'This week'
+        : nowKind === 'year'
+          ? 'This year'
+          : 'This month'
 
   function applyCustom() {
     if (!from || !to) return
     const [f, t] = from > to ? [to, from] : [from, to] // reversed bounds swap
-    onApply({ kind: 'custom', from: f, to: t })
+    // A single-day range is the Day period, not a custom one: one code path for
+    // all one-day windows, and it persists/reopens cleanly as 'day'.
+    onApply(f === t ? { kind: 'day', date: f } : { kind: 'custom', from: f, to: t })
   }
 
   return (
