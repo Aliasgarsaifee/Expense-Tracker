@@ -45,6 +45,7 @@ import {
 } from '../lib/summarize'
 
 const GRANULARITIES = [
+  { kind: 'day', label: 'Day' },
   { kind: 'week', label: 'Week' },
   { kind: 'month', label: 'Month' },
   { kind: 'year', label: 'Year' },
@@ -156,6 +157,12 @@ export function SummaryScreen({
   const dayScale = bounds !== null && trendUnitOf === 'day'
   const containsToday = bounds !== null && today >= bounds.from && today <= bounds.to
   const isAggregateSpan = period.kind === 'year' || period.kind === 'all'
+  // One-day windows (the Day period, or a same-day custom range) can't say
+  // anything a span can: the daily average equals the total and the "busiest
+  // day" is the day itself. Suppress both; the vs-previous and biggest-entry
+  // tiles still carry real content. Keyed on the span, not the kind, so it also
+  // covers a same-day custom range (Open/Closed).
+  const singleDay = bounds !== null && bounds.from === bounds.to
 
   const busiest = useMemo(
     () => (dayScale ? busiestDay(bucket?.expenses ?? []) : null),
@@ -231,7 +238,7 @@ export function SummaryScreen({
     setPeriod(p)
     if (p.kind !== 'custom') setPref(PREFS.summaryPeriod, p.kind)
   }
-  function selectKind(kind: 'week' | 'month' | 'year' | 'all') {
+  function selectKind(kind: 'day' | 'week' | 'month' | 'year' | 'all') {
     applyPeriod(changeKind(period, kind, today))
   }
   function openSheet(focusCustom: boolean) {
@@ -322,13 +329,15 @@ export function SummaryScreen({
 
       {entryCount > 0 && bounds && (
         <section className="stat-grid" aria-label="Period statistics">
-          <div className="stat-tile">
-            <p className="stat-label">Daily average</p>
-            {/* Rounded at display only: paise read as noise beside whole-₹
-               tiles, but the "≈ a month" derivation keeps the precise value. */}
-            <p className="stat-value money">{formatMoney(Math.round(avg), currency)}</p>
-            <p className="stat-sub">{avgSub}</p>
-          </div>
+          {!singleDay && (
+            <div className="stat-tile">
+              <p className="stat-label">Daily average</p>
+              {/* Rounded at display only: paise read as noise beside whole-₹
+                 tiles, but the "≈ a month" derivation keeps the precise value. */}
+              <p className="stat-value money">{formatMoney(Math.round(avg), currency)}</p>
+              <p className="stat-sub">{avgSub}</p>
+            </div>
+          )}
           {showPace && (
             <div className="stat-tile">
               <p className="stat-label">On pace for</p>
@@ -370,7 +379,7 @@ export function SummaryScreen({
               </p>
             </button>
           )}
-          {busiest && (
+          {!singleDay && busiest && (
             <button
               type="button"
               className="stat-tile stat-tile-btn"
