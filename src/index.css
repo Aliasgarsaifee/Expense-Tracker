@@ -1011,22 +1011,28 @@ button {
   margin-bottom: 6px;
 }
 
-.pm-now {
-  display: block;
-  width: 100%;
-  margin-bottom: 18px;
-  text-align: center;
-  font-weight: 500;
+/* The sheet itself stops scrolling: head + shortcuts pin above, the Apply
+   footer pins below, and only the month list scrolls between them — one
+   scrollport, so no nested scroll traps. */
+.period-sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.pm-years {
-  display: grid;
-  gap: 18px;
+.cal-shortcuts {
+  flex-shrink: 0;
+  margin-bottom: 12px;
 }
 
-.pm-year-block {
+.cal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
-  gap: 10px;
+  gap: 16px;
+  align-content: start;
 }
 
 .pm-year-head {
@@ -1063,28 +1069,85 @@ button {
   background: var(--chip);
 }
 
-.pm-grid {
+/* Off-screen months skip layout/paint; the estimate only steadies the
+   scrollbar, it doesn't have to be exact. */
+.cal-month {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 4px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
 }
 
-/* Month cell: a chip re-shaped into a square-ish grid target with room for the
-   data dot underneath. */
-.pm-cell {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.cal-month-head {
   min-height: 44px;
-  padding: 8px 4px;
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  text-align: left;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 18px;
 }
 
-.pm-cell:disabled {
+.cal-month-head[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.cal-month-head:active {
+  background: var(--chip);
+}
+
+.cal-weekdays,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.cal-day {
+  position: relative;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.cal-day:disabled {
   opacity: 0.38;
 }
 
-/* A month that holds entries — a non-text marker in the validated ledger
+.cal-day:active {
+  background: var(--chip);
+}
+
+/* Range endpoints read like a pressed chip (the validated accent/on-accent
+   pair); days between them wash in the same 18% accent-into-chip mix the
+   pickers' selected rows use, with plain ink on top — no new contrast pairs. */
+.cal-day[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.cal-day.cal-in-range {
+  background: color-mix(in srgb, var(--accent) 18%, var(--chip));
+}
+
+/* A day that holds entries — a non-text marker in the validated ledger
    green, so no new contrast pair. */
 .pm-dot {
   position: absolute;
@@ -1097,12 +1160,32 @@ button {
   background: var(--accent);
 }
 
-.pm-cell[aria-pressed='true'] .pm-dot {
+.cal-day[aria-pressed='true'] .pm-dot {
   background: var(--on-accent);
 }
 
-.pm-custom {
-  margin-top: 22px;
+.cal-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.cal-footer .btn-text {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.cal-footer-label {
+  flex: 1;
+  font-weight: 700;
+}
+
+.cal-apply {
+  width: auto;
+  flex-shrink: 0;
 }
 
 /* ——— search ——— */

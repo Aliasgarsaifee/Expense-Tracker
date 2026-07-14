@@ -1,75 +1,110 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../db'
-import { todayISO } from '../lib/dates'
-import { addDays, initialPeriod, periodBounds, type Period } from '../lib/period'
-import { RangeDateField } from './RangeDateField'
+import { addMonths, formatDateLong, monthGrid, monthOf, todayISO } from '../lib/dates'
+import { periodBounds, periodLabel, type Period } from '../lib/period'
 
-// Locale month abbreviations, computed once (en-IN, matches the rest of the UI).
-const MONTH_ABBR = Array.from({ length: 12 }, (_, i) =>
-  new Date(2000, i, 1).toLocaleDateString('en-IN', { month: 'short' }),
-)
+// Monday-first, matching monthGrid and weekStartOf.
+const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+
+// "July" — the year lives on the year header above, so month heads stay short.
+function monthName(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long' })
+}
 
 interface Props {
   period: Period
   maxAnchor: string // last selectable day (max of today and the newest entry)
-  focusCustom?: boolean // opened via the Custom chip → scroll to that section
   onApply: (p: Period) => void
   onClose: () => void
 }
 
-// Jump to any month or year, or set a custom range. Mounted only while open
-// (the parent gates it), so the index scan for month dots and the custom-range
-// prefill both happen fresh per open.
-export function PeriodSheet({ period, maxAnchor, focusCustom, onApply, onClose }: Props) {
+// One calendar to point at: granularity is a consequence of the target — a
+// day cell, two day cells (a range), a month name, a year header, a shortcut.
+// Mounted only while open (the parent gates it), so the day-dot scan and the
+// scroll-to-viewed-month both run fresh per open.
+export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
   const today = todayISO()
-  const initial = periodBounds(period) ?? { from: addDays(today, -29), to: today }
-  const [from, setFrom] = useState<string | null>(initial.from)
-  const [to, setTo] = useState<string | null>(initial.to)
-  const customRef = useRef<HTMLDivElement>(null)
+  // A day tap opens a pending selection; a second tap on another day closes
+  // it into a range; any further tap restarts at that day. Apply commits;
+  // the ✕ or closing the sheet discards.
+  const [sel, setSel] = useState<{ a: string; b: string | null } | null>(null)
 
-  // Every distinct spentOn date, reduced to the set of months that hold data —
-  // one index scan, cheap at personal-ledger scale.
+  // Every distinct spentOn date — dots per day, and the oldest month to
+  // render. One index scan, cheap at personal-ledger scale.
   const dateKeys = useLiveQuery(() => db.expenses.orderBy('spentOn').uniqueKeys())
+  const dateSet = useMemo(() => new Set((dateKeys ?? []).map(String)), [dateKeys])
 
-  // Scroll only after the dot query resolves: the year grid above the custom
-  // section grows by one block per data year at that moment, so scrolling on
-  // mount targets a layout that is about to be pushed off-screen.
-  useEffect(() => {
-    if (focusCustom && dateKeys) customRef.current?.scrollIntoView({ block: 'center' })
-  }, [focusCustom, dateKeys])
-  const monthsSet = useMemo(() => {
-    const s = new Set<string>()
-    for (const k of dateKeys ?? []) s.add(String(k).slice(0, 7))
-    return s
-  }, [dateKeys])
-
-  const maxYear = Number(maxAnchor.slice(0, 4))
-  const minYear = useMemo(() => {
-    let min = maxYear
-    for (const m of monthsSet) min = Math.min(min, Number(m.slice(0, 4)))
-    return min
-  }, [monthsSet, maxYear])
-  const years = useMemo(() => {
-    const out: number[] = []
-    for (let y = maxYear; y >= minYear; y--) out.push(y)
+  const newestMonth = monthOf(maxAnchor)
+  const months = useMemo(() => {
+    // Newest first, down to the oldest entry (this month on a fresh install)
+    // — the direction History and the old year list already scroll.
+    let oldest = monthOf(today) < newestMonth ? monthOf(today) : newestMonth
+    for (const d of dateSet) {
+      const m = monthOf(d)
+      if (m < oldest) oldest = m
+    }
+    const out: string[] = []
+    for (let m = newestMonth; m >= oldest; m = addMonths(m, -1)) out.push(m)
     return out
-  }, [maxYear, minYear])
+  }, [dateSet, newestMonth, today])
 
-  // The now-shortcut speaks the active granularity; all/custom fall back to the
-  // month (the default granularity).
-  const nowKind =
-    period.kind === 'day' ? 'day' : period.kind === 'year' ? 'year' : 'month'
-  const nowLabel =
-    nowKind === 'day' ? 'Today' : nowKind === 'year' ? 'This year' : 'This month'
+  // Scroll to the viewed period's month only after the dot query resolves:
+  // before that the month list is still growing and the target may not exist.
+  const scrolled = useRef(false)
+  useEffect(() => {
+    if (scrolled.current || !dateKeys) return
+    scrolled.current = true
+    const from = periodBounds(period)?.from
+    const target = monthOf(from ?? maxAnchor)
+    document
+      .getElementById(`cal-${target < newestMonth ? target : newestMonth}`)
+      ?.scrollIntoView({ block: 'center' })
+  }, [dateKeys, period, maxAnchor, newestMonth])
 
-  function applyCustom() {
-    if (!from || !to) return
-    const [f, t] = from > to ? [to, from] : [from, to] // reversed bounds swap
-    // A single-day range is the Day period, not a custom one: one code path for
-    // all one-day windows, and it persists/reopens cleanly as 'day'.
-    onApply(f === t ? { kind: 'day', date: f } : { kind: 'custom', from: f, to: t })
+  // The pending selection outranks the viewed period for day-cell paint; a
+  // viewed month/year reads through its header, not 30 shouting cells.
+  const viewed =
+    period.kind === 'day' || period.kind === 'custom' ? periodBounds(period) : null
+  const pend = sel
+    ? sel.b === null
+      ? { from: sel.a, to: sel.a }
+      : sel.b < sel.a
+        ? { from: sel.b, to: sel.a }
+        : { from: sel.a, to: sel.b }
+    : null
+  const hl = pend ?? viewed
+  const pendingPeriod: Period | null = pend
+    ? pend.from === pend.to
+      ? { kind: 'day', date: pend.from }
+      : { kind: 'custom', from: pend.from, to: pend.to }
+    : null
+
+  function tapDay(d: string) {
+    setSel((s) => (s && s.b === null && d !== s.a ? { a: s.a, b: d } : { a: d, b: null }))
   }
+
+  const thisMonth = monthOf(today)
+  const thisYear = today.slice(0, 4)
+  const shortcuts: { label: string; p: Period; on: boolean }[] = [
+    {
+      label: 'Today',
+      p: { kind: 'day', date: today },
+      on: period.kind === 'day' && period.date === today,
+    },
+    {
+      label: 'This month',
+      p: { kind: 'month', month: thisMonth },
+      on: period.kind === 'month' && period.month === thisMonth,
+    },
+    {
+      label: 'This year',
+      p: { kind: 'year', year: thisYear },
+      on: period.kind === 'year' && period.year === thisYear,
+    },
+    { label: 'All time', p: { kind: 'all' }, on: period.kind === 'all' },
+  ]
 
   return (
     <div className="sheet-scrim" onClick={onClose}>
@@ -88,67 +123,107 @@ export function PeriodSheet({ period, maxAnchor, focusCustom, onApply, onClose }
           </button>
         </header>
 
-        <button
-          type="button"
-          className="chip pm-now"
-          onClick={() => onApply(initialPeriod(nowKind, today))}
-        >
-          {nowLabel}
-        </button>
-
-        <div className="pm-years">
-          {years.map((y) => (
-            <div key={y} className="pm-year-block">
-              <button
-                type="button"
-                className="pm-year-head"
-                aria-pressed={period.kind === 'year' && period.year === String(y)}
-                onClick={() => onApply({ kind: 'year', year: String(y) })}
-              >
-                <span className="display">{y}</span>
-                <span className="pm-year-hint">whole year</span>
-              </button>
-              <div className="pm-grid" role="group" aria-label={`Months in ${y}`}>
-                {MONTH_ABBR.map((abbr, i) => {
-                  const month = `${y}-${String(i + 1).padStart(2, '0')}`
-                  const disabled = `${month}-01` > maxAnchor
-                  const selected = period.kind === 'month' && period.month === month
-                  return (
-                    <button
-                      key={month}
-                      type="button"
-                      className="chip pm-cell"
-                      aria-pressed={selected}
-                      aria-label={`${abbr} ${y}`}
-                      disabled={disabled}
-                      onClick={() => onApply({ kind: 'month', month })}
-                    >
-                      {abbr}
-                      {monthsSet.has(month) && <span className="pm-dot" aria-hidden="true" />}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+        <div className="chip-row cal-shortcuts" role="group" aria-label="Shortcuts">
+          {shortcuts.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              className="chip"
+              aria-pressed={s.on}
+              onClick={() => onApply(s.p)}
+            >
+              {s.label}
+            </button>
           ))}
         </div>
 
-        <div className="field pm-custom" ref={customRef}>
-          <span>Custom range</span>
-          <div className="filter-dates">
-            <RangeDateField label="Start" value={from} onChange={setFrom} />
-            <RangeDateField label="End" value={to} onChange={setTo} />
-          </div>
-          <button
-            type="button"
-            className="btn-ghost"
-            disabled={!from || !to}
-            onClick={applyCustom}
-          >
-            <span>Apply range</span>
-            <span aria-hidden="true">→</span>
-          </button>
+        <div className="cal-scroll">
+          {months.map((m, i) => {
+            const year = m.slice(0, 4)
+            return (
+              <Fragment key={m}>
+                {(i === 0 || months[i - 1].slice(0, 4) !== year) && (
+                  <button
+                    type="button"
+                    className="pm-year-head"
+                    aria-pressed={period.kind === 'year' && period.year === year}
+                    onClick={() => onApply({ kind: 'year', year })}
+                  >
+                    <span className="display">{year}</span>
+                    <span className="pm-year-hint">whole year</span>
+                  </button>
+                )}
+                <div className="cal-month" id={`cal-${m}`}>
+                  <button
+                    type="button"
+                    className="cal-month-head"
+                    aria-pressed={period.kind === 'month' && period.month === m}
+                    onClick={() => onApply({ kind: 'month', month: m })}
+                  >
+                    {monthName(m)}
+                  </button>
+                  <div className="cal-weekdays" aria-hidden="true">
+                    {WEEKDAYS.map((w, wi) => (
+                      <span key={wi}>{w}</span>
+                    ))}
+                  </div>
+                  <div
+                    className="cal-grid"
+                    role="group"
+                    aria-label={`Days in ${monthName(m)} ${year}`}
+                  >
+                    {monthGrid(m)
+                      .flat()
+                      .map((d, di) =>
+                        d === null ? (
+                          <span key={`${m}-pad-${di}`} aria-hidden="true" />
+                        ) : (
+                          <button
+                            key={d}
+                            type="button"
+                            className={
+                              hl && hl.from < d && d < hl.to
+                                ? 'cal-day cal-in-range'
+                                : 'cal-day'
+                            }
+                            aria-pressed={hl !== null && (d === hl.from || d === hl.to)}
+                            aria-label={formatDateLong(d)}
+                            disabled={d > maxAnchor}
+                            onClick={() => tapDay(d)}
+                          >
+                            {Number(d.slice(8))}
+                            {dateSet.has(d) && <span className="pm-dot" aria-hidden="true" />}
+                          </button>
+                        ),
+                      )}
+                  </div>
+                </div>
+              </Fragment>
+            )
+          })}
         </div>
+
+        {pendingPeriod && (
+          <footer className="cal-footer">
+            <button
+              type="button"
+              className="btn-text"
+              aria-label="Clear selection"
+              onClick={() => setSel(null)}
+            >
+              ✕
+            </button>
+            <span className="cal-footer-label">{periodLabel(pendingPeriod, today)}</span>
+            <button
+              type="button"
+              className="btn-ghost cal-apply"
+              onClick={() => onApply(pendingPeriod)}
+            >
+              <span>Apply</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   )

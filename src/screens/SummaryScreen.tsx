@@ -79,7 +79,6 @@ export function SummaryScreen({
   )
   const [chosenCurrency, setChosenCurrency] = useState('INR')
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetFocusCustom, setSheetFocusCustom] = useState(false)
 
   const expenses = useLiveQuery(() => {
     if (period.kind === 'all') return listExpenses()
@@ -242,8 +241,7 @@ export function SummaryScreen({
   function selectKind(kind: 'day' | 'month' | 'year' | 'all') {
     applyPeriod(changeKind(period, kind, today))
   }
-  function openSheet(focusCustom: boolean) {
-    setSheetFocusCustom(focusCustom)
+  function openSheet() {
     setSheetOpen(true)
   }
 
@@ -258,7 +256,7 @@ export function SummaryScreen({
         label={periodLabel(period, today)}
         hint="tap to jump"
         labelAriaLabel={`Showing ${periodLabel(period, today)} — tap to choose a period`}
-        onLabelClick={() => openSheet(false)}
+        onLabelClick={openSheet}
         onPrev={() => setPeriod(shiftPeriod(period, -1))}
         onNext={() => setPeriod(shiftPeriod(period, 1))}
         prevDisabled={period.kind === 'all'}
@@ -281,7 +279,7 @@ export function SummaryScreen({
           type="button"
           className="chip"
           aria-pressed={period.kind === 'custom'}
-          onClick={() => openSheet(true)}
+          onClick={openSheet}
         >
           Custom
         </button>
@@ -495,7 +493,6 @@ export function SummaryScreen({
         <PeriodSheet
           period={period}
           maxAnchor={maxAnchor}
-          focusCustom={sheetFocusCustom}
           onApply={(p) => {
             applyPeriod(p)
             setSheetOpen(false)
