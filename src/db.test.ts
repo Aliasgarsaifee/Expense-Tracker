@@ -14,7 +14,7 @@ import {
   deletePaymentMethod,
   listCategories,
   listExpenses,
-  listExpensesForMonth,
+  listExpensesBetween,
   listPaymentMethods,
   PAYMENT_GROUPS,
   renameCategory,
@@ -166,15 +166,25 @@ describe('deleteExpense', () => {
   })
 })
 
-describe('listExpensesForMonth', () => {
-  it('returns only expenses inside the month, newest first', async () => {
+describe('listExpensesBetween', () => {
+  it('includes both bounds and sorts newest first', async () => {
     await addExpense({ amount: 1, category: 'Food', spentOn: '2026-06-30' })
-    const july1 = await addExpense({ amount: 2, category: 'Food', spentOn: '2026-07-01' })
-    const july31 = await addExpense({ amount: 3, category: 'Rent', spentOn: '2026-07-31' })
+    const jul1 = await addExpense({ amount: 2, category: 'Food', spentOn: '2026-07-01' })
+    const jul5 = await addExpense({ amount: 3, category: 'Rent', spentOn: '2026-07-05' })
+    await addExpense({ amount: 4, category: 'Food', spentOn: '2026-07-06' })
+
+    const rows = await listExpensesBetween('2026-07-01', '2026-07-05')
+    expect(rows.map((e) => e.id)).toEqual([jul5.id, jul1.id])
+  })
+
+  it('treats a full-month range as the month view', async () => {
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-06-30' })
+    const jul1 = await addExpense({ amount: 2, category: 'Food', spentOn: '2026-07-01' })
+    const jul31 = await addExpense({ amount: 3, category: 'Rent', spentOn: '2026-07-31' })
     await addExpense({ amount: 4, category: 'Food', spentOn: '2026-08-01' })
 
-    const july = await listExpensesForMonth('2026-07')
-    expect(july.map((e) => e.id)).toEqual([july31.id, july1.id])
+    const july = await listExpensesBetween('2026-07-01', '2026-07-31')
+    expect(july.map((e) => e.id)).toEqual([jul31.id, jul1.id])
   })
 })
 

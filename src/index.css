@@ -681,6 +681,11 @@ button {
   color: var(--ink-2);
 }
 
+.hero-add {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
 .chart-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -708,8 +713,20 @@ button {
   font-weight: 700;
 }
 
-.category-chart .recharts-tooltip-cursor {
+.category-chart .recharts-tooltip-cursor,
+.trend-chart .recharts-tooltip-cursor {
   fill: color-mix(in srgb, var(--chip) 70%, transparent);
+}
+
+/* Trend bars share the category chart's single validated hue and muted ticks. */
+.trend-chart .recharts-bar-rectangle path {
+  fill: var(--accent);
+}
+
+.trend-chart .recharts-cartesian-axis-tick text {
+  fill: var(--ink-3);
+  font-family: var(--font-body);
+  font-size: 11px;
 }
 
 .chart-tip {
@@ -911,6 +928,15 @@ button {
   white-space: nowrap;
 }
 
+/* Full-bleed scrollports: these standalone rows scroll under main's 20px
+   gutters so chips clip at the screen edge, not 20px early — at 375pt the
+   period row and a two-chip drill (+ Clear all) then fit outright. */
+.filter-row,
+.period-row {
+  margin-inline: -20px;
+  padding-inline: 20px;
+}
+
 .chip-add {
   border-style: dashed;
   border-color: var(--ink-3);
@@ -976,6 +1002,107 @@ button {
 .currency-row {
   justify-content: center;
   margin-bottom: 6px;
+}
+
+/* ——— summary period sheet ——— */
+
+/* Granularity switch under the Summary pager (full-bleed, see .filter-row). */
+.period-row {
+  margin-bottom: 6px;
+}
+
+.pm-now {
+  display: block;
+  width: 100%;
+  margin-bottom: 18px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.pm-years {
+  display: grid;
+  gap: 18px;
+}
+
+.pm-year-block {
+  display: grid;
+  gap: 10px;
+}
+
+.pm-year-head {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 2px 8px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+}
+
+.pm-year-head .display {
+  font-size: 20px;
+}
+
+.pm-year-head[aria-pressed='true'],
+.pm-year-head[aria-pressed='true'] .display {
+  color: var(--accent);
+}
+
+.pm-year-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.pm-year-head:active {
+  background: var(--chip);
+}
+
+.pm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+/* Month cell: a chip re-shaped into a square-ish grid target with room for the
+   data dot underneath. */
+.pm-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 4px;
+}
+
+.pm-cell:disabled {
+  opacity: 0.38;
+}
+
+/* A month that holds entries — a non-text marker in the validated ledger
+   green, so no new contrast pair. */
+.pm-dot {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.pm-cell[aria-pressed='true'] .pm-dot {
+  background: var(--on-accent);
+}
+
+.pm-custom {
+  margin-top: 22px;
 }
 
 /* ——— search ——— */
@@ -1106,6 +1233,32 @@ button {
   text-overflow: ellipsis;
 }
 
+/* A stat tile that drills into History; keeps the .stat-tile look, resets the
+   button chrome, and presses on tap (ios-feel). */
+.stat-tile-btn {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.06s ease, background-color 0.12s ease;
+}
+
+.stat-tile-btn:active {
+  transform: scale(0.98);
+  background: var(--chip);
+}
+
+.stat-go {
+  color: var(--ink-3);
+  margin-left: 5px;
+}
+
+.category-chart[data-clickable],
+.trend-chart[data-clickable] {
+  cursor: pointer;
+}
+
 /* ——— payment breakdown (ledger rows) ——— */
 
 .pay-list {
@@ -1114,16 +1267,37 @@ button {
   padding: 0;
 }
 
+/* The divider lives on the li so both static rows and button rows share it and
+   only the last row drops it. */
+.pay-list li {
+  border-bottom: 1px solid var(--line);
+}
+
+.pay-list li:last-child {
+  border-bottom: 0;
+}
+
 .pay-row {
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 11px 2px;
-  border-bottom: 1px solid var(--line);
 }
 
-.pay-row:last-child {
-  border-bottom: 0;
+/* A tappable payment row drills into History; reset the button chrome and add
+   the pressed state, keeping the flex layout from .pay-row. */
+.pay-row-btn {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pay-row-btn:active {
+  background: var(--chip);
 }
 
 .pay-emoji {

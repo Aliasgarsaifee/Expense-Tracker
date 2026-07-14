@@ -27,11 +27,15 @@ export interface HistoryFilter {
   query?: string
 }
 
-// A settings-row tap: App hands this to HistoryScreen, which resets its view
-// to show everything for the tapped method or category (a set-of-one).
+// A cross-screen jump into History. A settings-row tap sends just a method or
+// category (→ All time); a Summary drill also sends the period as month OR
+// from/to (never both, preserving History's pager-XOR-range invariant).
 export interface HistoryJump {
   paymentMethodId?: string | null
   category?: string | null
+  month?: string | null
+  from?: string | null
+  to?: string | null
 }
 
 // Dimensions AND together; the id/label arrays OR within their dimension.

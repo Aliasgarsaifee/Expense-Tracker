@@ -27,9 +27,12 @@ date, and a free-text note.
   categories, and a date range (OR within each dimension, AND across), plus
   note/amount search — every active filter shows as a dismissible chip. Built
   for reconciling against card/UPI statements: pick a month + a card, compare.
-- **Summary** — month totals per currency, stat tiles (daily average,
-  vs last month, biggest spend, busiest day), category chart, by-payment
-  breakdown.
+- **Summary** — totals per currency for any period: week, month, year, all
+  time, or a custom range, stepped with ‹ › or picked from a jump sheet (month
+  grid with data dots, year headers, custom range). Stat tiles adapt to the
+  period (daily average, on-pace projection, vs the previous period, biggest
+  spend, busiest day/month), an "over time" trend chart, and a category chart
+  and by-payment breakdown that tap through to the matching History slice.
 - **Settings drawer** (☰) — a collapsible group tree of payment methods and
   categories (rename / archive / delete-if-unused, rename your custom groups;
   tap any row to jump to its History), plus default currency,

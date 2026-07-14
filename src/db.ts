@@ -215,8 +215,11 @@ export async function listExpenses(): Promise<Expense[]> {
   return sortNewestFirst(await db.expenses.toArray())
 }
 
-export async function listExpensesForMonth(month: string): Promise<Expense[]> {
-  const rows = await db.expenses.where('spentOn').startsWith(`${month}-`).toArray()
+// Inclusive on both bounds. Reads the existing spentOn index — no schema
+// change — so arbitrary Summary periods are just a range query. A one-month
+// range ('YYYY-MM-01' → last day) is the month view.
+export async function listExpensesBetween(from: string, to: string): Promise<Expense[]> {
+  const rows = await db.expenses.where('spentOn').between(from, to, true, true).toArray()
   return sortNewestFirst(rows)
 }
 

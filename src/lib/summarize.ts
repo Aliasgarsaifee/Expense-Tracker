@@ -1,7 +1,20 @@
 import type { Expense } from '../db'
+import {
+  bucketKeyOf,
+  bucketKeysBetween,
+  elapsedDays,
+  type Bounds,
+  type TrendUnit,
+} from './period'
 
 export interface CategoryTotal {
   category: string
+  total: number
+  count: number
+}
+
+export interface TrendBucket {
+  key: string // 'YYYY-MM-DD' (day/week start) | 'YYYY-MM' | 'YYYY', per unit
   total: number
   count: number
 }
@@ -114,16 +127,71 @@ export function busiestDay(
   return busiest
 }
 
-// For the current month averages over days elapsed, not the full month.
-export function dailyAverage(
-  total: number,
-  month: string,
-  todayIso: string,
-): number {
+// Spend per elapsed day over any period (elapsedDays counts from→today while
+// the period is still running, the full span once it is past).
+export function averagePerDay(total: number, bounds: Bounds, today: string): number {
   if (total === 0) return 0
-  if (month === todayIso.slice(0, 7)) {
-    return total / Number(todayIso.slice(8, 10))
+  return total / elapsedDays(bounds, today)
+}
+
+// busiestDay's rule at month grain, for periods too long for a single day to
+// be the interesting unit (a year, all time). Ties go to the later month.
+export function busiestMonth(
+  expenses: Expense[],
+): { month: string; total: number } | null {
+  const totals = new Map<string, number>()
+  for (const e of expenses) {
+    const month = e.spentOn.slice(0, 7)
+    totals.set(month, (totals.get(month) ?? 0) + e.amount)
   }
-  const [year, monthNum] = month.split('-').map(Number)
-  return total / new Date(year, monthNum, 0).getDate()
+  let busiest: { month: string; total: number } | null = null
+  for (const [month, total] of totals) {
+    if (
+      busiest === null ||
+      total > busiest.total ||
+      (total === busiest.total && month > busiest.month)
+    ) {
+      busiest = { month, total }
+    }
+  }
+  return busiest
+}
+
+// Straight-line projection of a still-running period: today's pace held to the
+// end. Honest arithmetic, tempered by the "by <end date>" sub-label.
+export function projectTotal(total: number, elapsed: number, totalDays: number): number {
+  if (elapsed <= 0) return total
+  return Math.round((total / elapsed) * totalDays)
+}
+
+// Elapsed days on which nothing was logged — a "restraint" counter for the
+// current-period daily-average tile. Only dates within the elapsed window
+// count as spend days (a future-dated entry hasn't happened yet).
+export function noSpendDays(expenses: Expense[], bounds: Bounds, today: string): number {
+  const effectiveTo = today < bounds.to ? today : bounds.to
+  const spent = new Set<string>()
+  for (const e of expenses) {
+    if (e.spentOn >= bounds.from && e.spentOn <= effectiveTo) spent.add(e.spentOn)
+  }
+  return Math.max(0, elapsedDays(bounds, today) - spent.size)
+}
+
+// Spend-over-time series for the trend chart, zero-filled across the whole
+// range (see bucketKeysBetween) so gaps read as ₹0. Amounts are summed as-is:
+// callers pass a single-currency list, like summarize.
+export function trendBuckets(
+  expenses: Expense[],
+  bounds: Bounds,
+  unit: TrendUnit,
+): TrendBucket[] {
+  const totals = new Map<string, { total: number; count: number }>()
+  for (const key of bucketKeysBetween(bounds, unit)) totals.set(key, { total: 0, count: 0 })
+  for (const e of expenses) {
+    const bucket = totals.get(bucketKeyOf(e.spentOn, unit))
+    if (bucket) {
+      bucket.total += e.amount
+      bucket.count += 1
+    }
+  }
+  return [...totals.entries()].map(([key, v]) => ({ key, total: v.total, count: v.count }))
 }

@@ -26,8 +26,27 @@ export function formatDateLong(iso: string): string {
   })
 }
 
+// "12 Jul" — day + short month, no year. The compact form used on Summary
+// tiles and the day-grain trend axis/tooltip.
+export function shortDayMonth(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+// "Jul 2026" — short month + year, from a 'YYYY-MM' key.
+export function shortMonthYear(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', {
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 // Local calendar date — toISOString() would shift dates near midnight IST.
-function localISO(d: Date): string {
+export function localISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 

@@ -103,7 +103,7 @@ export default function App() {
           <HistoryScreen jump={historyJump} />
         </section>
         <section hidden={tab !== 'summary'}>
-          <SummaryScreen />
+          <SummaryScreen onDrill={jumpToHistory} onAddNew={() => setTab('add')} />
         </section>
       </main>
       <nav className="tabbar" aria-label="Screens">

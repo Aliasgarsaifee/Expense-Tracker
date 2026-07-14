@@ -1,5 +1,4 @@
 import type { Category, PaymentMethod } from '../db'
-import { formatDateLong } from '../lib/dates'
 import {
   bucketize,
   groupEmoji,
@@ -7,6 +6,7 @@ import {
   toggleMethod,
   type MethodSelection,
 } from '../lib/paymentMeta'
+import { RangeDateField } from './RangeDateField'
 
 interface Props {
   open: boolean
@@ -21,48 +21,6 @@ interface Props {
   onRangeChange: (from: string | null, to: string | null) => void
   onClearAll: () => void
   onClose: () => void
-}
-
-// Optional-bound date field: same friendly face as DateField, but empty means
-// "no bound" and a set value is clearable. The ✕ needs a z-index because the
-// transparent native input covers the whole field to keep the iOS wheel.
-function RangeDateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string | null
-  onChange: (iso: string | null) => void
-}) {
-  return (
-    <div className="date-field">
-      <span className={value ? 'date-display' : 'date-display date-empty'}>
-        {value ? formatDateLong(value) : label}
-      </span>
-      {value ? (
-        <button
-          type="button"
-          className="btn-text date-clear"
-          aria-label={`Clear ${label.toLowerCase()} date`}
-          onClick={() => onChange(null)}
-        >
-          ✕
-        </button>
-      ) : (
-        <span className="date-caret" aria-hidden="true">
-          📅
-        </span>
-      )}
-      <input
-        type="date"
-        aria-label={`${label} date`}
-        value={value ?? ''}
-        max="9999-12-31"
-        onChange={(e) => onChange(e.target.value || null)}
-      />
-    </div>
-  )
 }
 
 // Fully controlled: HistoryScreen owns every filter value. Everything applies

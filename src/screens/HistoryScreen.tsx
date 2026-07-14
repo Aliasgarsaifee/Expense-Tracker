@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { EditSheet } from '../components/EditSheet'
 import { FilterSheet } from '../components/FilterSheet'
-import { MonthPager } from '../components/MonthPager'
+import { Pager } from '../components/Pager'
 import {
   listCategories,
   listExpenses,
@@ -11,7 +11,7 @@ import {
   type Expense,
   type PaymentMethod,
 } from '../db'
-import { monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
+import { addMonths, monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
 import {
   filterExpenses,
   formatTotals,
@@ -132,15 +132,18 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
   // App sends a fresh object per tap, so re-tapping the same row re-applies.
   useEffect(() => {
     if (!jump) return
-    setMonth(null)
+    // month and from/to arrive mutually exclusive (a Summary drill sends one or
+    // the other; a settings tap sends neither → All time), so setting all three
+    // preserves the pager-XOR-range invariant.
+    setMonth(jump.month ?? null)
     setQuery('')
     setSelection({
       methodIds: jump.paymentMethodId ? [jump.paymentMethodId] : [],
       groups: [],
     })
     setCatFilters(jump.category ? [jump.category] : [])
-    setFrom(null)
-    setTo(null)
+    setFrom(jump.from ?? null)
+    setTo(jump.to ?? null)
     setSheetOpen(false)
   }, [jump])
 
@@ -278,7 +281,9 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
   const filtersActive = activeChipCount > 0 || query.trim() !== ''
   const rangeChipLabel =
     from && to
-      ? `${shortDate(from)} – ${shortDate(to)}`
+      ? from === to
+        ? shortDate(from) // a single-day slice (e.g. a Summary biggest/busiest drill)
+        : `${shortDate(from)} – ${shortDate(to)}`
       : from
         ? `from ${shortDate(from)}`
         : to
@@ -292,7 +297,20 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
         <h1 className="sr-only">History</h1>
       </header>
 
-      <MonthPager month={month} onChange={changeMonth} allowAll maxMonth={maxMonth} />
+      <Pager
+        label={month === null ? 'All time' : monthLabel(month)}
+        hint={month === null ? 'tap for monthly' : 'tap for all time'}
+        labelAriaLabel={
+          month === null
+            ? 'Showing all time — switch to one month'
+            : `Showing ${monthLabel(month)} — switch to all time`
+        }
+        onLabelClick={() => changeMonth(month === null ? monthOf(todayISO()) : null)}
+        onPrev={() => month && changeMonth(addMonths(month, -1))}
+        onNext={() => month && changeMonth(addMonths(month, 1))}
+        prevDisabled={month === null}
+        nextDisabled={month === null || month >= maxMonth}
+      />
 
       {hasAnything && (
         <>

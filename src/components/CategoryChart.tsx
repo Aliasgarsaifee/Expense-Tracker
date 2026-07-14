@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
 import { Bar, BarChart, LabelList, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatMoney } from '../lib/money'
 import type { CategoryTotal } from '../lib/summarize'
+import { useMeasuredWidth } from '../lib/useMeasuredWidth'
 
 const ROW_HEIGHT = 36
 
@@ -28,52 +28,22 @@ function ChartTip({ active, payload, currency }: TipProps) {
 }
 
 // Labeled bar list: one measure, identity carried by the row label, so a
-// single (validated) hue — bar colors and text styles live in index.css.
-//
-// The width is measured by hand instead of recharts' ResponsiveContainer:
-// this chart mounts inside a [hidden] section (all tabs stay mounted), where
-// ResponsiveContainer reads 0×0 and shows nothing until its ResizeObserver
-// fires — and some embedded WebViews never deliver observer callbacks at
-// all. Measuring after every render needs no observer: the tab switch that
-// unhides this screen always re-renders it, and that render sees the box.
+// single (validated) hue — bar colors and text styles live in index.css. The
+// wrapper width is measured by hand (see useMeasuredWidth) because this chart
+// lives in an always-mounted [hidden] tab.
 export function CategoryChart({
   data,
   currency,
+  onSelect,
 }: {
   data: CategoryTotal[]
   currency: string
+  onSelect?: (category: string) => void
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(0)
-
-  // No dep array on purpose: the unhide is driven by the parent's tab state,
-  // which this component can't list as a dependency. setWidth with an
-  // unchanged value is a no-op, so this settles instead of looping.
-  // oxlint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const w = wrapRef.current?.offsetWidth ?? 0
-    if (w > 0) setWidth(w)
-  })
-
-  // Live resizes (rotation, split view) on engines with working observers.
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const measure = () => {
-      const w = el.offsetWidth
-      if (w > 0) setWidth(w)
-    }
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    window.addEventListener('resize', measure)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-  }, [])
+  const [wrapRef, width] = useMeasuredWidth()
 
   return (
-    <div className="category-chart" ref={wrapRef}>
+    <div className="category-chart" ref={wrapRef} data-clickable={onSelect ? '' : undefined}>
       {width > 0 && (
         <BarChart
           width={width}
@@ -82,6 +52,14 @@ export function CategoryChart({
           layout="vertical"
           margin={{ top: 0, right: 84, bottom: 0, left: 0 }}
           barCategoryGap={9}
+          onClick={
+            onSelect
+              ? (s) => {
+                  // activeLabel is the YAxis category value of the tapped row.
+                  if (s?.activeLabel != null) onSelect(String(s.activeLabel))
+                }
+              : undefined
+          }
         >
           <XAxis type="number" hide domain={[0, 'dataMax']} />
           <YAxis

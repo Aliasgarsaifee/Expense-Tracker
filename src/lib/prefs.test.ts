@@ -35,6 +35,7 @@ describe('prefs without localStorage (in-module Map fallback)', () => {
       defaultCurrency: 'defaultCurrency',
       autoBackup: 'autoBackupEnabled',
       lastAutoBackup: 'lastAutoBackupDate',
+      summaryPeriod: 'summaryPeriodKind',
     })
   })
 

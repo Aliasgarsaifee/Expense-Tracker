@@ -6,6 +6,7 @@ export const PREFS = {
   defaultCurrency: 'defaultCurrency',
   autoBackup: 'autoBackupEnabled',
   lastAutoBackup: 'lastAutoBackupDate',
+  summaryPeriod: 'summaryPeriodKind', // week|month|year|all; custom is never persisted
 } as const
 
 const PREFIX = 'et-pref:'

@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { Expense } from '../db'
 import {
+  averagePerDay,
   biggestExpense,
   busiestDay,
-  dailyAverage,
+  busiestMonth,
+  noSpendDays,
+  projectTotal,
   splitByCurrency,
   summarize,
+  trendBuckets,
 } from './summarize'
 
 function expense(
@@ -203,28 +207,94 @@ describe('busiestDay', () => {
   })
 })
 
-describe('dailyAverage', () => {
-  it('returns 0 for a zero total', () => {
-    expect(dailyAverage(0, '2026-07', '2026-07-12')).toBe(0)
+describe('averagePerDay', () => {
+  it('divides by elapsed days when the range contains today', () => {
+    expect(averagePerDay(140, { from: '2026-07-01', to: '2026-07-31' }, '2026-07-14')).toBe(10)
   })
-
-  it('divides by the day of month so far for the current month', () => {
-    expect(dailyAverage(120, '2026-07', '2026-07-12')).toBe(10)
+  it('divides by the full length for a past range', () => {
+    expect(averagePerDay(300, { from: '2026-06-01', to: '2026-06-30' }, '2026-07-14')).toBe(10)
   })
-
-  it('divides by 1 on the first day of the current month', () => {
-    expect(dailyAverage(75, '2026-07', '2026-07-01')).toBe(75)
+  it('is 0 for a zero total', () => {
+    expect(averagePerDay(0, { from: '2026-07-01', to: '2026-07-31' }, '2026-07-14')).toBe(0)
   })
+})
 
-  it('divides by days in the month for a past month', () => {
-    expect(dailyAverage(310, '2026-05', '2026-07-12')).toBe(10)
+describe('busiestMonth', () => {
+  it('returns null for no expenses', () => {
+    expect(busiestMonth([])).toBeNull()
   })
-
-  it('knows February has 28 days in a non-leap year', () => {
-    expect(dailyAverage(280, '2026-02', '2026-07-12')).toBe(10)
+  it('picks the larger month, the later month on ties', () => {
+    const list = [
+      expense('Food', 100, { spentOn: '2026-01-10' }),
+      expense('Food', 60, { spentOn: '2026-03-01' }),
+      expense('Food', 40, { spentOn: '2026-03-20' }),
+    ]
+    expect(busiestMonth(list)).toEqual({ month: '2026-03', total: 100 })
   })
+})
 
-  it('knows February has 29 days in a leap year', () => {
-    expect(dailyAverage(290, '2024-02', '2026-07-12')).toBe(10)
+describe('projectTotal', () => {
+  it('projects the pace across the whole period', () => {
+    expect(projectTotal(140, 14, 31)).toBe(310)
+  })
+  it('is the total itself once the period is fully elapsed', () => {
+    expect(projectTotal(300, 30, 30)).toBe(300)
+  })
+})
+
+describe('noSpendDays', () => {
+  it('counts elapsed days with no entries', () => {
+    const list = [
+      expense('Food', 10, { spentOn: '2026-07-01' }),
+      expense('Food', 20, { spentOn: '2026-07-01' }),
+      expense('Food', 30, { spentOn: '2026-07-03' }),
+    ]
+    expect(noSpendDays(list, { from: '2026-07-01', to: '2026-07-31' }, '2026-07-05')).toBe(3)
+  })
+})
+
+describe('trendBuckets', () => {
+  it('zero-fills day buckets across the range', () => {
+    const buckets = trendBuckets(
+      [expense('Food', 50, { spentOn: '2026-07-02' })],
+      { from: '2026-07-01', to: '2026-07-03' },
+      'day',
+    )
+    expect(buckets).toEqual([
+      { key: '2026-07-01', total: 0, count: 0 },
+      { key: '2026-07-02', total: 50, count: 1 },
+      { key: '2026-07-03', total: 0, count: 0 },
+    ])
+  })
+  it('buckets by week under Monday keys with zero-fill', () => {
+    const list = [
+      expense('Food', 100, { spentOn: '2026-07-01' }), // Wednesday → week of 29 Jun
+      expense('Food', 50, { spentOn: '2026-07-13' }), // Monday → its own week
+    ]
+    expect(trendBuckets(list, { from: '2026-07-01', to: '2026-07-14' }, 'week')).toEqual([
+      { key: '2026-06-29', total: 100, count: 1 },
+      { key: '2026-07-06', total: 0, count: 0 },
+      { key: '2026-07-13', total: 50, count: 1 },
+    ])
+  })
+  it('buckets by month with zero-fill', () => {
+    const list = [
+      expense('Food', 10, { spentOn: '2026-01-05' }),
+      expense('Food', 20, { spentOn: '2026-03-09' }),
+    ]
+    expect(
+      trendBuckets(list, { from: '2026-01-01', to: '2026-03-31' }, 'month').map((b) => b.total),
+    ).toEqual([10, 0, 20])
+  })
+  it('buckets by year with zero-fill and sums counts', () => {
+    const list = [
+      expense('Food', 10, { spentOn: '2026-01-05' }),
+      expense('Food', 20, { spentOn: '2026-03-09' }),
+    ]
+    const years = trendBuckets(list, { from: '2025-01-01', to: '2026-12-31' }, 'year')
+    expect(years).toEqual([
+      { key: '2025', total: 0, count: 0 },
+      { key: '2026', total: 30, count: 2 },
+    ])
   })
 })
