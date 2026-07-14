@@ -8,6 +8,12 @@
    Hues validated for WCAG AA (4.5:1) as text, not just as chart fills:
    light accent #4c6b4a on #ebebe0 (5.0) · dark accent #a4c39a on #191a14 (9.0)
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
+   heat cells (--ink on color-mix(--accent, --bg), levels 1–4 = 12/24/38/46%;
+   level 4 lowered from an even 12/24/38/54 ramp — 54% failed dark AA):
+   light ink #23231c on L1 #d8dcce (11.33) · L2 #c5ccbc (9.59) ·
+     L3 #afbaa7 (7.83) · L4 #a2b09b (6.94)
+   dark ink #ecede0 on L1 #2a2e24 (11.72) · L2 #3a4334 (8.74) ·
+     L3 #4e5a47 (6.17) · L4 #596852 (5.03)
    ———————————————————————————————————————————————— */
 
 :root {
@@ -1206,6 +1212,23 @@ button {
 
 .cal-day.cal-in-range {
   background: color-mix(in srgb, var(--accent) 18%, var(--chip));
+}
+
+/* Spend-heat wash on day cells: --accent mixed into the sheet paper (--bg), in
+   four steps. Day numbers stay var(--ink); each step is validated to hold AA
+   4.5:1 against ink in BOTH themes (see the file header). Kept clear of
+   .cal-in-range's 18%-into-chip mix so heat never reads as a pending range. */
+.cal-heat-1 {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+}
+.cal-heat-2 {
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg));
+}
+.cal-heat-3 {
+  background: color-mix(in srgb, var(--accent) 38%, var(--bg));
+}
+.cal-heat-4 {
+  background: color-mix(in srgb, var(--accent) 46%, var(--bg));
 }
 
 /* A day that holds entries — a non-text marker in the validated ledger

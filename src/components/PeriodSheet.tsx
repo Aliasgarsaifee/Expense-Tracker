@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '../db'
+import { heatLevels } from '../lib/calendarHeat'
 import {
   addMonths,
   formatDateLong,
@@ -18,6 +19,7 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 interface Props {
   period: Period
   maxAnchor: string // last selectable day (max of today and the newest entry)
+  currency: string
   onApply: (p: Period) => void
   onClose: () => void
 }
@@ -26,17 +28,18 @@ interface Props {
 // day cell, two day cells (a range), a month name, a year header, a shortcut.
 // Mounted only while open (the parent gates it), so the day-dot scan and the
 // scroll-to-viewed-month both run fresh per open.
-export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
+export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: Props) {
   const today = todayISO()
   // A day tap opens a pending selection; a second tap on another day closes
   // it into a range; any further tap restarts at that day. Apply commits;
   // the ✕ or closing the sheet discards.
   const [sel, setSel] = useState<{ a: string; b: string | null } | null>(null)
 
-  // Every distinct spentOn date — dots per day, and the oldest month to
-  // render. One index scan, cheap at personal-ledger scale.
-  const dateKeys = useLiveQuery(() => db.expenses.orderBy('spentOn').uniqueKeys())
-  const dateSet = useMemo(() => new Set((dateKeys ?? []).map(String)), [dateKeys])
+  // Full rows (not just unique keys) — heat needs amounts. One toArray at
+  // personal-ledger scale, and the sheet mounts only while open.
+  const rows = useLiveQuery(() => db.expenses.toArray())
+  const dateSet = useMemo(() => new Set((rows ?? []).map((r) => r.spentOn)), [rows])
+  const heat = useMemo(() => heatLevels(rows ?? [], currency, 'all'), [rows, currency])
 
   const newestMonth = monthOf(maxAnchor)
   const months = useMemo(() => {
@@ -57,14 +60,14 @@ export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
   // before that the month list is still growing and the target may not exist.
   const scrolled = useRef(false)
   useEffect(() => {
-    if (scrolled.current || !dateKeys) return
+    if (scrolled.current || !rows) return
     scrolled.current = true
     const from = periodBounds(period)?.from
     const target = monthOf(from ?? maxAnchor)
     document
       .getElementById(`cal-${target < newestMonth ? target : newestMonth}`)
       ?.scrollIntoView({ block: 'center' })
-  }, [dateKeys, period, maxAnchor, newestMonth])
+  }, [rows, period, maxAnchor, newestMonth])
 
   // The pending selection outranks the viewed period for day-cell paint; a
   // viewed month/year reads through its header, not 30 shouting cells.
@@ -177,28 +180,36 @@ export function PeriodSheet({ period, maxAnchor, onApply, onClose }: Props) {
                     ))}
                   </div>
                   <div className="cal-grid" role="group" aria-label={`Days in ${label}`}>
-                    {monthGrid(m).map((d, di) =>
-                      d === null ? (
-                        <span key={`${m}-pad-${di}`} aria-hidden="true" />
-                      ) : (
+                    {monthGrid(m).map((d, di) => {
+                      if (d === null) return <span key={`${m}-pad-${di}`} aria-hidden="true" />
+                      const isEndpoint = hl !== null && (d === hl.from || d === hl.to)
+                      const inRange = hl !== null && hl.from < d && d < hl.to
+                      const level = heat.get(d)
+                      // Selection must always dominate heat: endpoints paint via
+                      // aria-pressed (solid accent); in-range via cal-in-range;
+                      // heat only when the cell is neither.
+                      const className = inRange
+                        ? 'cal-day cal-in-range'
+                        : level && !isEndpoint
+                          ? `cal-day cal-heat-${level}`
+                          : 'cal-day'
+                      return (
                         <button
                           key={d}
                           type="button"
-                          className={
-                            hl && hl.from < d && d < hl.to
-                              ? 'cal-day cal-in-range'
-                              : 'cal-day'
-                          }
-                          aria-pressed={hl !== null && (d === hl.from || d === hl.to)}
+                          className={className}
+                          aria-pressed={isEndpoint}
                           aria-label={formatDateLong(d)}
                           disabled={d > maxAnchor}
                           onClick={() => tapDay(d)}
                         >
                           {Number(d.slice(8))}
-                          {dateSet.has(d) && <span className="pm-dot" aria-hidden="true" />}
+                          {dateSet.has(d) && !level && (
+                            <span className="pm-dot" aria-hidden="true" />
+                          )}
                         </button>
-                      ),
-                    )}
+                      )
+                    })}
                   </div>
                 </div>
               </Fragment>

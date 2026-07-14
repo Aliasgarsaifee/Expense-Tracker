@@ -459,6 +459,7 @@ export function SummaryScreen({
         <PeriodSheet
           period={period}
           maxAnchor={maxAnchor}
+          currency={currency}
           onApply={(p) => {
             applyPeriod(p)
             setSheetOpen(false)
