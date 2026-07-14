@@ -59,3 +59,19 @@ export function yesterdayISO(): string {
   d.setDate(d.getDate() - 1) // setDate rolls months/years back correctly
   return localISO(d)
 }
+
+// Calendar layout of a 'YYYY-MM' month: Monday-first weeks of 7, null-padded
+// at both ends. Monday matches weekStartOf's convention in lib/period.
+export function monthGrid(month: string): (string | null)[][] {
+  const [y, m] = month.split('-').map(Number)
+  const daysInMonth = new Date(y, m, 0).getDate() // day 0 of the next month
+  const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7 // Sun=0…Sat=6 → Mon=0…Sun=6
+  const cells: (string | null)[] = Array.from({ length: lead }, () => null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${month}-${String(d).padStart(2, '0')}`)
+  }
+  while (cells.length % 7 !== 0) cells.push(null)
+  const weeks: (string | null)[][] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return weeks
+}

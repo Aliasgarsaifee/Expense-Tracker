@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addMonths, monthLabel, monthOf, todayISO, yesterdayISO } from './dates'
+import { addMonths, monthGrid, monthLabel, monthOf, todayISO, yesterdayISO } from './dates'
 
 describe('monthOf', () => {
   it('extracts the YYYY-MM month from an ISO date', () => {
@@ -32,6 +32,52 @@ describe('todayISO', () => {
     const now = new Date()
     const local = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     expect(today).toBe(local)
+  })
+})
+
+describe('monthGrid', () => {
+  it('lays out July 2026 Monday-first (the 1st is a Wednesday)', () => {
+    const weeks = monthGrid('2026-07')
+    expect(weeks).toHaveLength(5)
+    expect(weeks[0]).toEqual([
+      null,
+      null,
+      '2026-07-01',
+      '2026-07-02',
+      '2026-07-03',
+      '2026-07-04',
+      '2026-07-05',
+    ])
+    expect(weeks[4]).toEqual([
+      '2026-07-27',
+      '2026-07-28',
+      '2026-07-29',
+      '2026-07-30',
+      '2026-07-31',
+      null,
+      null,
+    ])
+  })
+
+  it('starts flush when the 1st is a Monday (June 2026)', () => {
+    const weeks = monthGrid('2026-06')
+    expect(weeks[0][0]).toBe('2026-06-01')
+    expect(weeks[4]).toEqual(['2026-06-29', '2026-06-30', null, null, null, null, null])
+  })
+
+  it('covers leap February 2024 (the 1st is a Thursday, 29 days)', () => {
+    const weeks = monthGrid('2024-02')
+    expect(weeks[0]).toEqual([
+      null,
+      null,
+      null,
+      '2024-02-01',
+      '2024-02-02',
+      '2024-02-03',
+      '2024-02-04',
+    ])
+    expect(weeks.at(-1)!.filter(Boolean).at(-1)).toBe('2024-02-29')
+    expect(weeks.every((w) => w.length === 7)).toBe(true)
   })
 })
 
