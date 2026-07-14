@@ -128,7 +128,7 @@ no App Store involved.
 ## App icon & splash
 
 Source art is in `assets/` (SVG → PNG via sharp). The mark is a "pocket
-ledger": a butter card tucked into a matcha-green pocket on warm matcha paper,
+ledger": a clay card tucked into a sage-green pocket on warm sage paper,
 with a faint paper grain. Light and dark variants exist — `icon.svg` /
 `icon-dark.svg` (1024²) and `splash.svg` / `splash-dark.svg` (2732²). iOS picks
 the dark icon and splash automatically in dark mode; the dark app icon is wired

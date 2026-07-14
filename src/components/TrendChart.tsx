@@ -1,4 +1,4 @@
-import { Bar, BarChart, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, Cell, Tooltip, XAxis, YAxis } from 'recharts'
 import { shortDayMonth, shortMonthYear } from '../lib/dates'
 import { formatMoney } from '../lib/money'
 import type { TrendUnit } from '../lib/period'
@@ -54,20 +54,23 @@ function TrendTip({ active, payload, unit, currency }: TipProps) {
   )
 }
 
-// Spend over time: vertical bars, one validated hue (styles in index.css),
-// zero-filled buckets so empty spans read as ₹0. maxBarSize keeps a
-// low-bucket chart (a 2-month custom range) from rendering slabs. Measured
-// width, not ResponsiveContainer — see useMeasuredWidth (always-mounted
-// [hidden] tab).
+// Spend over time: vertical bars in one validated hue (styles in index.css),
+// with the current still-filling period bar in clay (.bar-now → --now) so it
+// reads as incomplete. Zero-filled buckets so empty spans read as ₹0.
+// maxBarSize keeps a low-bucket chart (a 2-month custom range) from rendering
+// slabs. Measured width, not ResponsiveContainer — see useMeasuredWidth
+// (always-mounted [hidden] tab).
 export function TrendChart({
   buckets,
   unit,
   currency,
+  currentKey,
   onSelect,
 }: {
   buckets: TrendBucket[]
   unit: TrendUnit
   currency: string
+  currentKey?: string
   onSelect?: (key: string) => void
 }) {
   const [wrapRef, width] = useMeasuredWidth()
@@ -105,7 +108,11 @@ export function TrendChart({
             content={<TrendTip unit={unit} currency={currency} />}
             isAnimationActive={false}
           />
-          <Bar dataKey="total" maxBarSize={56} radius={[3, 3, 0, 0]} animationDuration={500} />
+          <Bar dataKey="total" maxBarSize={56} radius={[3, 3, 0, 0]} animationDuration={500}>
+            {buckets.map((b) => (
+              <Cell key={b.key} className={b.key === currentKey ? 'bar-now' : undefined} />
+            ))}
+          </Bar>
         </BarChart>
       )}
     </div>

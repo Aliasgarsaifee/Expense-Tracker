@@ -33,7 +33,7 @@ expense-tracker/
 │   └── test/setup.ts           # fake-indexeddb → Dexie runs unmodified in Node
 ├── ios/App/                    # Capacitor Xcode project (SPM mode: CapApp-SPM package, no Pods)
 │   └── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
-├── assets/                     # icon/splash source SVGs (the ₹ is a Fraunces glyph outlined to a path)
+├── assets/                     # icon/splash source SVGs (sage "pocket ledger" mark; light + dark variants)
 ├── capacitor.config.ts         # appId com.saifee.expenses, webDir dist
 ├── vite.config.ts              # vitest (node env) + __APP_VERSION__ from package.json
 ├── .claude/skills/             # project skills — this repo's own rituals (see Skill playbook)

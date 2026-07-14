@@ -1,22 +1,28 @@
 /* ————————————————————————————————————————————————
-   Pocket ledger: warm paper, ink, ledger-green.
+   Pocket ledger: sage paper, ink, sage-green. Clay (#B5542F light /
+   #E0A47F dark) is a warm brand accent used as a fill only, never as text
+   (it can't hold 4.5:1 on paper, and would muddle with the red --danger): it
+   is the app icon/splash, and --now, the lone non-text highlight on the
+   current-period trend bar. Clay and sage share a luminance (≈1.2:1), so --now
+   may only mark a bar already set apart by position — never a second series.
    Hues validated for WCAG AA (4.5:1) as text, not just as chart fills:
-   light accent #0A7A50 on #F5F0E6 (4.7) · dark accent #0DA271 on #17130D (5.7)
-   light ink-3 #736A59 (4.7) · dark ink-3 #8D8475 (5.0)
+   light accent #4c6b4a on #ebebe0 (5.0) · dark accent #a4c39a on #191a14 (9.0)
+   light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
    ———————————————————————————————————————————————— */
 
 :root {
-  --bg: #f5f0e6;
-  --surface: #fdfaf3;
-  --ink: #221d14;
-  --ink-2: #6b6355;
-  --ink-3: #736a59;
-  --line: #e3daca;
-  --chip: #ede6d6;
-  --accent: #0a7a50;
-  --on-accent: #f7f3e9;
+  --bg: #ebebe0;
+  --surface: #f5f4ec;
+  --ink: #23231c;
+  --ink-2: #5e5e50;
+  --ink-3: #63644f;
+  --line: #dad9c9;
+  --chip: #e3e2d3;
+  --accent: #4c6b4a;
+  --on-accent: #f4f4ec;
   --danger: #b3372b;
-  --scrim: rgba(38, 30, 16, 0.45);
+  --now: #b5542f;
+  --scrim: rgba(35, 35, 28, 0.45);
   --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --font-body: 'Atkinson Hyperlegible', -apple-system, 'Segoe UI', sans-serif;
   color-scheme: light dark;
@@ -24,17 +30,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17130d;
-    --surface: #201b13;
-    --ink: #f0e9db;
-    --ink-2: #a89f8d;
-    --ink-3: #8d8475;
-    --line: #322b20;
-    --chip: #2a241a;
-    --accent: #0da271;
-    --on-accent: #10130d;
+    --bg: #191a14;
+    --surface: #21231a;
+    --ink: #ecede0;
+    --ink-2: #a6a890;
+    --ink-3: #8c8c79;
+    --line: #30321f;
+    --chip: #262719;
+    --accent: #a4c39a;
+    --on-accent: #12140d;
     --danger: #e06a5e;
-    --scrim: rgba(5, 4, 2, 0.6);
+    --now: #e0a47f;
+    --scrim: rgba(5, 6, 2, 0.6);
   }
 }
 
@@ -721,6 +728,15 @@ button {
 /* Trend bars share the category chart's single validated hue and muted ticks. */
 .trend-chart .recharts-bar-rectangle path {
   fill: var(--accent);
+}
+
+/* The current, still-filling period bar wears clay (--now) so a half-height
+   "so far" bar isn't misread as a low period. Fill only; its height and
+   right-edge position — not the hue — are the primary signal (clay ≈ sage in
+   luminance), so it reinforces rather than encodes. */
+.trend-chart .recharts-bar-rectangle path.bar-now,
+.trend-chart .recharts-bar-rectangle.bar-now path {
+  fill: var(--now);
 }
 
 .trend-chart .recharts-cartesian-axis-tick text {

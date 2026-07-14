@@ -19,6 +19,7 @@ import { formatMoney } from '../lib/money'
 import { groupEmoji } from '../lib/paymentMeta'
 import {
   bucketBounds,
+  bucketKeyOf,
   comparisonLabel,
   comparisonSlice,
   daysBetween,
@@ -147,6 +148,10 @@ export function SummaryScreen({
   // grain, so the busiest tile and the chart can never disagree.
   const dayScale = bounds !== null && trendUnitOf === 'day'
   const containsToday = bounds !== null && today >= bounds.from && today <= bounds.to
+  // The trend bucket that holds today — clay-marked as the still-filling
+  // period so a partial bar isn't misread as a low one. Absent when the view
+  // is wholly in the past (nothing is "now").
+  const currentBucketKey = containsToday ? bucketKeyOf(today, trendUnitOf) : undefined
   const isAggregateSpan = period.kind === 'year' || period.kind === 'all'
   // One-day windows (the Day period, or a same-day custom range) can't say
   // anything a span can: the daily average equals the total and the "busiest
@@ -382,6 +387,7 @@ export function SummaryScreen({
             buckets={trend}
             unit={trendUnitOf}
             currency={currency}
+            currentKey={currentBucketKey}
             onSelect={(key) => onDrill(bucketJump(key))}
           />
         </section>
