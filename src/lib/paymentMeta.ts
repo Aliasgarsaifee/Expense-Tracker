@@ -48,6 +48,36 @@ export function bucketize(methods: PaymentMethod[]): GroupBucket[] {
   return out
 }
 
+// Most-recently-used first, by the `recency` map (method id → last-used ISO
+// timestamp). Methods absent from the map (never used) sort after every used
+// one and keep their incoming order among themselves — callers pass
+// listPaymentMethods output, so that means createdAt order. Non-mutating;
+// relies on Array.prototype.sort being stable (ES2019+, WKWebView included).
+export function orderByRecency(
+  members: PaymentMethod[],
+  recency: Map<string, string>,
+): PaymentMethod[] {
+  return [...members].sort((a, b) => {
+    const ra = recency.get(a.id)
+    const rb = recency.get(b.id)
+    if (ra && rb) return rb.localeCompare(ra)
+    if (ra) return -1
+    if (rb) return 1
+    return 0
+  })
+}
+
+// Case-insensitive substring match on label; a blank/whitespace query returns
+// every member unchanged. Non-mutating.
+export function filterByLabel(
+  members: PaymentMethod[],
+  query: string,
+): PaymentMethod[] {
+  const q = query.trim().toLowerCase()
+  if (q === '') return members
+  return members.filter((m) => m.label.toLowerCase().includes(q))
+}
+
 // ——— History method-filter selection ———
 
 // What the History filter sheet manipulates: whole groups plus individual

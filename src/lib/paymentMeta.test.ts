@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { PaymentMethod } from '../db'
 import {
   bucketize,
+  filterByLabel,
   groupChoices,
   groupEmoji,
+  orderByRecency,
   toggleGroup,
   toggleMethod,
 } from './paymentMeta'
@@ -118,5 +120,65 @@ describe('toggleMethod', () => {
       methodIds: [],
       groups: [],
     })
+  })
+})
+
+describe('orderByRecency', () => {
+  it('puts more-recently-used methods first', () => {
+    const members = [pm('a', 'Credit card'), pm('b', 'Credit card'), pm('c', 'Credit card')]
+    const recency = new Map([
+      ['a', '2026-07-10T00:00:00.000Z'],
+      ['b', '2026-07-12T00:00:00.000Z'],
+      ['c', '2026-07-11T00:00:00.000Z'],
+    ])
+    expect(orderByRecency(members, recency).map((m) => m.id)).toEqual(['b', 'c', 'a'])
+  })
+
+  it('sorts never-used methods after used ones, keeping their input order', () => {
+    const members = [pm('a', 'Credit card'), pm('b', 'Credit card'), pm('c', 'Credit card')]
+    const recency = new Map([['b', '2026-07-12T00:00:00.000Z']])
+    expect(orderByRecency(members, recency).map((m) => m.id)).toEqual(['b', 'a', 'c'])
+  })
+
+  it('keeps input order when nothing has been used', () => {
+    const members = [pm('a', 'Credit card'), pm('b', 'Credit card')]
+    expect(orderByRecency(members, new Map()).map((m) => m.id)).toEqual(['a', 'b'])
+  })
+
+  it('breaks a recency tie by input order', () => {
+    const members = [pm('a', 'Credit card'), pm('b', 'Credit card')]
+    const recency = new Map([
+      ['a', '2026-07-12T00:00:00.000Z'],
+      ['b', '2026-07-12T00:00:00.000Z'],
+    ])
+    expect(orderByRecency(members, recency).map((m) => m.id)).toEqual(['a', 'b'])
+  })
+
+  it('does not mutate the input array', () => {
+    const members = [pm('a', 'Credit card'), pm('b', 'Credit card')]
+    const before = members.map((m) => m.id)
+    orderByRecency(members, new Map([['b', '2026-07-12T00:00:00.000Z']]))
+    expect(members.map((m) => m.id)).toEqual(before)
+  })
+})
+
+describe('filterByLabel', () => {
+  const cards = [
+    { ...pm('a', 'Credit card'), label: 'HDFC Regalia' },
+    { ...pm('b', 'Credit card'), label: 'Amazon ICICI' },
+  ]
+
+  it('matches a case-insensitive substring of the label', () => {
+    expect(filterByLabel(cards, 'reg').map((m) => m.id)).toEqual(['a'])
+    expect(filterByLabel(cards, 'ICIC').map((m) => m.id)).toEqual(['b'])
+  })
+
+  it('trims the query and returns all members when it is blank', () => {
+    expect(filterByLabel(cards, '   ')).toEqual(cards)
+    expect(filterByLabel(cards, '')).toEqual(cards)
+  })
+
+  it('returns an empty array when nothing matches', () => {
+    expect(filterByLabel(cards, 'zzz')).toEqual([])
   })
 })
