@@ -103,4 +103,21 @@ describe('heatLevels', () => {
     expect(heatLevels([], 'INR', 'all').size).toBe(0)
     expect(heatLevels([exp({ currency: 'USD' })], 'INR', 'all').size).toBe(0)
   })
+
+  it('sums only the requested currency on a mixed-currency day', () => {
+    const h = heatLevels(
+      [
+        exp({ spentOn: '2026-07-01', amount: 100, currency: 'INR' }),
+        exp({ spentOn: '2026-07-01', amount: 5000, currency: 'USD' }),
+        exp({ spentOn: '2026-07-02', amount: 50, currency: 'INR' }),
+      ],
+      'INR',
+      'all',
+    )
+    // The USD 5000 on day 1 is ignored: day-1 INR total = 100 (the bucket max),
+    // day-2 = 50 → 50/100 = 0.5 → ceil(sqrt(0.5) * 4) = 3. If USD were wrongly
+    // summed, day 1 would be 5100 and day 2 would drop to level 1.
+    expect(h.get('2026-07-01')).toBe(4)
+    expect(h.get('2026-07-02')).toBe(3)
+  })
 })

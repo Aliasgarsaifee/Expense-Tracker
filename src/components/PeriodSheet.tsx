@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { db } from '../db'
+import { listExpenses } from '../db'
 import { heatLevels, type HeatBasis } from '../lib/calendarHeat'
 import {
   addMonths,
@@ -49,7 +49,7 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
 
   // Full rows (not just unique keys) — heat needs amounts. One toArray at
   // personal-ledger scale, and the sheet mounts only while open.
-  const rows = useLiveQuery(() => db.expenses.toArray())
+  const rows = useLiveQuery(() => listExpenses())
   const dateSet = useMemo(() => new Set((rows ?? []).map((r) => r.spentOn)), [rows])
   const heat = useMemo(() => heatLevels(rows ?? [], currency, basis), [rows, currency, basis])
 

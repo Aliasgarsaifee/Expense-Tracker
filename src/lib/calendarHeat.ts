@@ -40,8 +40,9 @@ export function heatLevels(
   const levels = new Map<string, number>()
   for (const [day, total] of dayTotals) {
     if (total <= 0) continue
-    const max = bucketMax.get(bucketKey(day, basis)) ?? total
-    const frac = max > 0 ? total / max : 1
+    // max is always defined and >= total (every day set its own bucket's max), so no fallback needed
+    const max = bucketMax.get(bucketKey(day, basis))!
+    const frac = total / max
     const level = Math.min(LEVELS, Math.max(1, Math.ceil(frac ** GAMMA * LEVELS)))
     levels.set(day, level)
   }
