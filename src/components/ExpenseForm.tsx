@@ -5,6 +5,7 @@ import {
   db,
   listCategories,
   listPaymentMethods,
+  methodRecency,
   type Category,
   type PaymentMethod,
 } from '../db'
@@ -77,6 +78,9 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
   }, [])
 
   const methods = useLiveQuery(() => listPaymentMethods(), [])
+  // Recent-first ordering in the picker; falls back to an empty map until the
+  // query resolves (picker then orders by createdAt, as before).
+  const recency = useLiveQuery(() => methodRecency(), []) ?? new Map<string, string>()
   const categories = useLiveQuery(() => listCategories(), [])
   // An EDITED entry may point at an archived method; keep it pickable instead
   // of silently re-filing the expense. The Add screen never offers archived
@@ -187,6 +191,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
           <PaymentPicker
             methods={methodChips}
             selectedId={paymentMethodId}
+            recency={recency}
             onSelect={setPaymentMethodId}
             onAddNew={(g) => setAddMethodGroup(g ?? null)}
           />

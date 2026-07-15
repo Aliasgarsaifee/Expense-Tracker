@@ -1,22 +1,53 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PaymentMethod } from '../db'
-import { bucketize, groupEmoji } from '../lib/paymentMeta'
+import { bucketize, filterByLabel, groupEmoji, orderByRecency } from '../lib/paymentMeta'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 
 interface Props {
   methods: PaymentMethod[]
   selectedId?: string
+  recency: Map<string, string>
   onSelect: (id: string) => void
   onAddNew: (presetGroup?: string) => void
 }
 
+// Above this many methods in one group, that group's sheet shows a search field.
+const SEARCH_THRESHOLD = 5
+
 // The "Paid with" control: one chip per payment group. A group with a single
 // method toggles it directly; a group with several opens a dropdown sheet so
-// the row never sprawls as cards pile up.
-export function PaymentPicker({ methods, selectedId, onSelect, onAddNew }: Props) {
-  const buckets = useMemo(() => bucketize(methods), [methods])
+// the row never sprawls as cards pile up. Within a group, methods are ordered
+// most-recently-used first; a long group's sheet also gains a search field
+// (the app's standard search-in-sheet pattern, see CurrencySheet).
+export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew }: Props) {
+  const buckets = useMemo(
+    () =>
+      bucketize(methods).map((b) => ({
+        ...b,
+        members: orderByRecency(b.members, recency),
+      })),
+    [methods, recency],
+  )
   const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const listRef = useRef<HTMLUListElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
+
+  // A stale query would greet the next open with a filtered list.
+  useEffect(() => {
+    setQuery('')
+  }, [openGroup])
+
+  // A new query re-ranks the list; reset scroll so the top matches show.
+  useEffect(() => {
+    listRef.current?.scrollTo(0, 0)
+  }, [query])
+
+  useKeyboardInset(sheetRef, openGroup !== null)
 
   const active = openGroup ? buckets.find((b) => b.group === openGroup) : null
+  const searchable = !!active && active.members.length > SEARCH_THRESHOLD
+  const visible = active ? filterByLabel(active.members, query) : []
 
   return (
     <>
@@ -69,7 +100,8 @@ export function PaymentPicker({ methods, selectedId, onSelect, onAddNew }: Props
       {active && (
         <div className="sheet-scrim" onClick={() => setOpenGroup(null)}>
           <div
-            className="sheet"
+            ref={sheetRef}
+            className={searchable ? 'sheet sheet-search' : 'sheet'}
             role="dialog"
             aria-modal="true"
             aria-label={`Choose ${active.group}`}
@@ -80,16 +112,33 @@ export function PaymentPicker({ methods, selectedId, onSelect, onAddNew }: Props
               <h2 className="display">
                 <span aria-hidden="true">{groupEmoji(active.group)}</span> {active.group}
               </h2>
-              <button
-                className="btn-text"
-                type="button"
-                onClick={() => setOpenGroup(null)}
-              >
+              <button className="btn-text" type="button" onClick={() => setOpenGroup(null)}>
                 Cancel
               </button>
             </header>
-            <ul className="pick-list">
-              {active.members.map((m) => (
+            {searchable && (
+              // label, not div: a tap anywhere on the field focuses the input
+              <label className="search-field">
+                <span aria-hidden="true">🔎</span>
+                <input
+                  type="search"
+                  placeholder={`Search ${active.members.length} ${active.group.toLowerCase()}s…`}
+                  aria-label={`Search ${active.group}`}
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                {query !== '' && (
+                  <button type="button" className="btn-text" onClick={() => setQuery('')}>
+                    Clear
+                  </button>
+                )}
+              </label>
+            )}
+            <ul className="pick-list" ref={listRef}>
+              {visible.map((m) => (
                 <li key={m.id}>
                   <button
                     type="button"
@@ -112,6 +161,9 @@ export function PaymentPicker({ methods, selectedId, onSelect, onAddNew }: Props
                   </button>
                 </li>
               ))}
+              {visible.length === 0 && (
+                <li className="pick-none">Nothing matches “{query.trim()}”</li>
+              )}
             </ul>
             <button
               type="button"
