@@ -122,7 +122,7 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
                 <span aria-hidden="true">🔎</span>
                 <input
                   type="search"
-                  placeholder={`Search ${active.members.length} ${active.group.toLowerCase()}s…`}
+                  placeholder={`Search ${active.group}…`}
                   aria-label={`Search ${active.group}`}
                   autoCorrect="off"
                   autoCapitalize="none"

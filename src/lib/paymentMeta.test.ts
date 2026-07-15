@@ -181,4 +181,14 @@ describe('filterByLabel', () => {
   it('returns an empty array when nothing matches', () => {
     expect(filterByLabel(cards, 'zzz')).toEqual([])
   })
+
+  it('trims surrounding whitespace on a non-blank query', () => {
+    expect(filterByLabel(cards, '  reg  ').map((m) => m.id)).toEqual(['a'])
+  })
+
+  it('does not mutate the input array', () => {
+    const before = cards.map((m) => m.id)
+    filterByLabel(cards, 'amazon')
+    expect(cards.map((m) => m.id)).toEqual(before)
+  })
 })
