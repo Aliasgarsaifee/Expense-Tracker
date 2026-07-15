@@ -331,6 +331,21 @@ export async function deletePaymentMethod(id: string): Promise<void> {
   await db.paymentMethods.delete(id)
 }
 
+// method id → the most recent expense `createdAt` for that method (ISO string).
+// Feeds the picker's recent-first ordering. Methods with no expenses are
+// absent; entries with no paymentMethodId (pre-v2) are skipped. Read-time
+// aggregation over existing rows — no schema change.
+export async function methodRecency(): Promise<Map<string, string>> {
+  const recency = new Map<string, string>()
+  for (const e of await db.expenses.toArray()) {
+    const id = e.paymentMethodId
+    if (!id) continue
+    const prev = recency.get(id)
+    if (!prev || e.createdAt > prev) recency.set(id, e.createdAt)
+  }
+  return recency
+}
+
 export async function listCategories(opts?: {
   includeArchived?: boolean
 }): Promise<Category[]> {

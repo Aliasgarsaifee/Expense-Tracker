@@ -16,6 +16,7 @@ import {
   listExpenses,
   listExpensesBetween,
   listPaymentMethods,
+  methodRecency,
   PAYMENT_GROUPS,
   renameCategory,
   renameGroup,
@@ -598,5 +599,34 @@ describe('categories', () => {
 
     const food = (await listCategories()).find((c) => c.label === 'Food')!
     await expect(deleteCategory(food.id)).rejects.toThrow(/built-in/i)
+  })
+})
+
+describe('methodRecency', () => {
+  it('maps each method to its most recent expense createdAt', async () => {
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-07-10', paymentMethodId: 'c1' })
+    await tick()
+    const newer = await addExpense({ amount: 2, category: 'Food', spentOn: '2026-07-11', paymentMethodId: 'c1' })
+    await tick()
+    const other = await addExpense({ amount: 3, category: 'Food', spentOn: '2026-07-12', paymentMethodId: 'c2' })
+
+    const recency = await methodRecency()
+    expect(recency.get('c1')).toBe(newer.createdAt) // newer of c1's two wins
+    expect(recency.get('c2')).toBe(other.createdAt)
+  })
+
+  it('omits methods that have no expenses', async () => {
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-07-10', paymentMethodId: 'c1' })
+    const recency = await methodRecency()
+    expect(recency.has('c2')).toBe(false)
+  })
+
+  it('skips expenses that have no paymentMethodId', async () => {
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-07-10' })
+    expect((await methodRecency()).size).toBe(0)
+  })
+
+  it('returns an empty map for an empty ledger', async () => {
+    expect((await methodRecency()).size).toBe(0)
   })
 })
