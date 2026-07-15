@@ -603,16 +603,23 @@ describe('categories', () => {
 })
 
 describe('methodRecency', () => {
-  it('maps each method to its most recent expense createdAt', async () => {
-    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-07-10', paymentMethodId: 'c1' })
-    await tick()
-    const newer = await addExpense({ amount: 2, category: 'Food', spentOn: '2026-07-11', paymentMethodId: 'c1' })
-    await tick()
-    const other = await addExpense({ amount: 3, category: 'Food', spentOn: '2026-07-12', paymentMethodId: 'c2' })
+  it('maps each method to its most recent expense createdAt, order-independent', async () => {
+    // Explicit ids so Dexie's primary-key iteration order is deterministic and
+    // deliberately does NOT match createdAt order: for c1 the true-max createdAt
+    // (e2) sits in the MIDDLE of ascending-id order, so neither first-write-wins
+    // nor last-write-wins lands on it — only a real max comparison does. e2 is
+    // also backdated (earliest spentOn) so an impl keyed off spentOn fails too.
+    await db.expenses.bulkAdd([
+      { id: 'e1', amount: 1, currency: 'INR', category: 'Food', spentOn: '2026-07-20', createdAt: '2026-07-10T00:00:02.000Z', paymentMethodId: 'c1' },
+      { id: 'e2', amount: 2, currency: 'INR', category: 'Food', spentOn: '2026-07-01', createdAt: '2026-07-10T00:00:03.000Z', paymentMethodId: 'c1' },
+      { id: 'e3', amount: 3, currency: 'INR', category: 'Food', spentOn: '2026-07-15', createdAt: '2026-07-10T00:00:01.000Z', paymentMethodId: 'c1' },
+      { id: 'e4', amount: 4, currency: 'INR', category: 'Food', spentOn: '2026-07-05', createdAt: '2026-07-09T00:00:00.000Z', paymentMethodId: 'c2' },
+    ])
 
     const recency = await methodRecency()
-    expect(recency.get('c1')).toBe(newer.createdAt) // newer of c1's two wins
-    expect(recency.get('c2')).toBe(other.createdAt)
+    // e2 wins for c1: max createdAt, despite its mid id-order and earliest spentOn.
+    expect(recency.get('c1')).toBe('2026-07-10T00:00:03.000Z')
+    expect(recency.get('c2')).toBe('2026-07-09T00:00:00.000Z')
   })
 
   it('omits methods that have no expenses', async () => {
