@@ -21,6 +21,7 @@ import {
   renameCategory,
   renameGroup,
   renamePaymentMethod,
+  restoreExpense,
   setCategoryArchived,
   setPaymentMethodArchived,
   UPI_METHOD_ID,
@@ -164,6 +165,70 @@ describe('deleteExpense', () => {
     await addExpense({ amount: 1, category: 'Food', spentOn: '2026-07-10' })
     await deleteExpense('no-such-id')
     expect(await listExpenses()).toHaveLength(1)
+  })
+})
+
+describe('restoreExpense', () => {
+  it('puts every field back exactly as it was', async () => {
+    const method = await addPaymentMethod({ label: 'HDFC Regalia', group: 'Credit card' })
+    const created = await addExpense({
+      amount: 249.5,
+      currency: 'USD',
+      category: 'Shopping',
+      spentOn: '2026-07-04',
+      note: 'headphones',
+      paymentMethodId: method.id,
+    })
+
+    await deleteExpense(created.id)
+    expect(await listExpenses()).toEqual([])
+
+    await restoreExpense(created)
+
+    expect(await listExpenses()).toEqual([created])
+  })
+
+  it('is idempotent — a double-tapped Undo leaves one row', async () => {
+    const created = await addExpense({ amount: 40, category: 'Food', spentOn: '2026-07-05' })
+    await deleteExpense(created.id)
+
+    await restoreExpense(created)
+    await restoreExpense(created)
+
+    expect(await listExpenses()).toEqual([created])
+  })
+
+  // createdAt is what sortNewestFirst breaks day-ties on: a restore that
+  // re-stamped it would silently move the entry to the top of its day.
+  it('returns the entry to its original position within the day', async () => {
+    const a = await addExpense({ amount: 1, category: 'Food', spentOn: '2026-07-10' })
+    await tick()
+    const b = await addExpense({ amount: 2, category: 'Transport', spentOn: '2026-07-10' })
+    await tick()
+    const c = await addExpense({ amount: 3, category: 'Rent', spentOn: '2026-07-10' })
+
+    await deleteExpense(b.id)
+    await restoreExpense(b)
+
+    expect((await listExpenses()).map((e) => e.id)).toEqual([c.id, b.id, a.id])
+  })
+
+  // No cascade and no validation on the way back in: the method the entry
+  // points at may have been archived while the toast was still up.
+  it('restores an entry whose payment method was archived meanwhile', async () => {
+    const method = await addPaymentMethod({ label: 'Old card', group: 'Credit card' })
+    const created = await addExpense({
+      amount: 12,
+      category: 'Food',
+      spentOn: '2026-07-06',
+      paymentMethodId: method.id,
+    })
+
+    await deleteExpense(created.id)
+    await setPaymentMethodArchived(method.id, true)
+    await restoreExpense(created)
+
+    expect(await listExpenses()).toEqual([created])
   })
 })
 

@@ -240,6 +240,14 @@ export async function deleteExpense(id: string): Promise<void> {
   await db.expenses.delete(id)
 }
 
+// Put a deleted entry back exactly as it was, for the Undo toast. Deliberately
+// not addExpense: id and createdAt must survive, or the entry jumps within its
+// day (sortNewestFirst breaks ties on createdAt) and stops matching its own id
+// in older backups. `put`, not `add`, so a double-tapped Undo is a no-op.
+export async function restoreExpense(expense: Expense): Promise<void> {
+  await db.expenses.put(expense)
+}
+
 const BUILTIN_GROUP_RANK: Record<string, number> = {
   Cash: 0,
   UPI: 1,
