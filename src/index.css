@@ -7,13 +7,13 @@
    may only mark a bar already set apart by position — never a second series.
    Hues validated for WCAG AA (4.5:1) as text, not just as chart fills:
    light accent #4c6b4a on #ebebe0 (5.0) · dark accent #a4c39a on #191a14 (9.0)
+   light ink-2 #5e5e50 on #ebebe0 (5.5) · dark ink-2 #a6a890 on #191a14 (7.2)
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
-   heat cells (--ink on color-mix(--accent, --bg), levels 1–4 = 12/24/38/46%;
-   level 4 lowered from an even 12/24/38/54 ramp — 54% failed dark AA):
-   light ink #23231c on L1 #d8dcce (11.3) · L2 #c5ccbc (9.6) ·
-     L3 #afbaa7 (7.8) · L4 #a2b09b (6.9)
-   dark ink #ecede0 on L1 #2a2e24 (11.7) · L2 #3a4334 (8.7) ·
-     L3 #4e5a47 (6.2) · L4 #596852 (5.0)
+   Calendar spend-heat once lived here as four background tints and no longer
+   does: the day number sits inside the cell, so ink legibility capped the
+   ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
+   step against the ~8 adjacent classes need). It is bar length now — see
+   .cal-heat — which costs no contrast budget at all.
    ———————————————————————————————————————————————— */
 
 :root {
@@ -1237,21 +1237,34 @@ button {
   background: color-mix(in srgb, var(--accent) 18%, var(--chip));
 }
 
-/* Spend-heat wash on day cells: --accent mixed into the sheet paper (--bg), in
-   four steps. Day numbers stay var(--ink); each step is validated to hold AA
-   4.5:1 against ink in BOTH themes (see the file header). Kept clear of
-   .cal-in-range's 18%-into-chip mix so heat never reads as a pending range. */
+/* Spend heat, encoded as bar length rather than cell tint. The tint version
+   could not work: the day number sits inside the cell, so ink legibility caps
+   how far the wash may travel, and inside that cap the widest four-step ramp
+   reached only ΔL* 4.9 per step where ~8 is needed to separate adjacent
+   classes — measured, along with every 3- and 4-step alternative, none of
+   which cleared both bounds. Length has no contrast budget at all: these four
+   widths differ by ~8px on a 43px cell. Non-text mark in the validated ledger
+   green, like .pm-dot, so no contrast pair to maintain. */
+.cal-heat {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+}
 .cal-heat-1 {
-  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  width: 22%;
 }
 .cal-heat-2 {
-  background: color-mix(in srgb, var(--accent) 24%, var(--bg));
+  width: 42%;
 }
 .cal-heat-3 {
-  background: color-mix(in srgb, var(--accent) 38%, var(--bg));
+  width: 62%;
 }
 .cal-heat-4 {
-  background: color-mix(in srgb, var(--accent) 46%, var(--bg));
+  width: 82%;
 }
 
 /* A day that holds entries — a non-text marker in the validated ledger

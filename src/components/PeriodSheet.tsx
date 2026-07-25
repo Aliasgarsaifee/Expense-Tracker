@@ -219,27 +219,29 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
                       const isEndpoint = hl !== null && (d === hl.from || d === hl.to)
                       const inRange = hl !== null && hl.from < d && d < hl.to
                       const level = heat.get(d)
-                      // Selection must always dominate heat: endpoints paint via
-                      // aria-pressed (solid accent); in-range via cal-in-range;
-                      // heat only when the cell is neither.
-                      const className = inRange
-                        ? 'cal-day cal-in-range'
-                        : level && !isEndpoint
-                          ? `cal-day cal-heat-${level}`
-                          : 'cal-day'
+                      // Heat is a bar rather than a wash, so it no longer
+                      // competes with the selection background — an in-range
+                      // day can carry both. An endpoint still can't: its cell
+                      // is solid --accent, which the bar would vanish into.
+                      const showHeat = level !== undefined && !isEndpoint
                       return (
                         <button
                           key={d}
                           type="button"
-                          className={className}
+                          className={inRange ? 'cal-day cal-in-range' : 'cal-day'}
                           aria-pressed={isEndpoint}
                           aria-label={formatDateLong(d)}
                           disabled={d > maxAnchor}
                           onClick={() => tapDay(d)}
                         >
                           {Number(d.slice(8))}
-                          {dateSet.has(d) && !level && (
-                            <span className="pm-dot" aria-hidden="true" />
+                          {showHeat ? (
+                            <span className={`cal-heat cal-heat-${level}`} aria-hidden="true" />
+                          ) : (
+                            // Entries, but none in the viewed currency: no level
+                            // to draw, yet the day isn't empty either.
+                            dateSet.has(d) &&
+                            !level && <span className="pm-dot" aria-hidden="true" />
                           )}
                         </button>
                       )
