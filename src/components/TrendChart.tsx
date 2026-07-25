@@ -7,6 +7,15 @@ import { useMeasuredWidth } from '../lib/useMeasuredWidth'
 
 const HEIGHT = 148
 
+// One rent-sized day flattens an ordinary one to well under a pixel (measured:
+// 0.5px against a 122px rent bar), so a real day of spending renders as blank
+// paper. Floor it at a visible stub. Deliberately a callback and not a plain
+// number: Recharts applies a numeric minPointSize to *every* bar, and the
+// buckets are zero-filled — a stub on a no-spend day would invent spending.
+// The outlier still compresses the rest; this only guarantees "something
+// happened here" survives, with the exact figure a tap away in the tooltip.
+const MIN_BAR = (value: number | null | undefined) => (value != null && value > 0 ? 3 : 0)
+
 // Full label for the tooltip: "7 Jul" / "Week of 6 Jul" / "Jun 2025" / "2024".
 function keyLabel(key: string, unit: TrendUnit): string {
   if (unit === 'year') return key
@@ -108,7 +117,13 @@ export function TrendChart({
             content={<TrendTip unit={unit} currency={currency} />}
             isAnimationActive={false}
           />
-          <Bar dataKey="total" maxBarSize={56} radius={[3, 3, 0, 0]} animationDuration={500}>
+          <Bar
+            dataKey="total"
+            maxBarSize={56}
+            minPointSize={MIN_BAR}
+            radius={[3, 3, 0, 0]}
+            animationDuration={500}
+          >
             {buckets.map((b) => (
               <Cell key={b.key} className={b.key === currentKey ? 'bar-now' : undefined} />
             ))}
