@@ -610,11 +610,27 @@ button {
   white-space: nowrap;
 }
 
-.record-count {
-  text-align: center;
+/* What the visible slice comes to, directly under the period it belongs to.
+   It used to sit at the very foot of the page — a ~4250px scroll once rent is
+   in the ledger — in the faintest type, while every day header carried its own
+   total. Tracks the filters, so it answers "how much, of what I'm looking at". */
+.history-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 9px;
+  margin: -8px 0 16px;
+}
+
+.history-total .money {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.history-total-count {
+  font-size: 12.5px;
   color: var(--ink-3);
-  font-size: 13px;
-  margin: 18px 0 0;
 }
 
 /* ——— summary ——— */

@@ -363,6 +363,15 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
         nextDisabled={month === null || month >= maxMonth}
       />
 
+      {hasMatches && (
+        <p className="history-total">
+          <span className="money">{formatTotals(totals)}</span>
+          <span className="history-total-count">
+            {filtered.length === 1 ? '1 entry' : `${filtered.length} entries`}
+          </span>
+        </p>
+      )}
+
       {hasAnything && (
         <>
           <div className="chip-row filter-row">
@@ -573,13 +582,6 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
             onEdit={setEditing}
           />
         ))
-      )}
-
-      {hasMatches && (
-        <p className="record-count">
-          {filtered.length === 1 ? '1 entry' : `${filtered.length} entries`} ·{' '}
-          {formatTotals(totals)}
-        </p>
       )}
 
       <FilterSheet
