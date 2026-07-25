@@ -235,9 +235,12 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
           </label>
           <label className="field">
             <span>What was it?</span>
+            {/* The placeholder is kept short enough to fit: this field shares
+                its row with the date, leaving 110px, and the old "e.g. auto to
+                office" needed 122 — it rendered as "e.g. auto to offic". */}
             <input
               type="text"
-              placeholder="e.g. auto to office"
+              placeholder="e.g. auto fare"
               maxLength={120}
               enterKeyHint="done"
               value={note}

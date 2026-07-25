@@ -658,7 +658,7 @@ button {
 }
 
 .month-label-hint {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -920,7 +920,7 @@ button {
 }
 
 .currency-code {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--ink-3);
@@ -978,7 +978,7 @@ button {
 }
 
 .chip-tag {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   opacity: 0.75;
@@ -1087,8 +1087,14 @@ button {
   overflow: hidden;
 }
 
+/* Wraps rather than scrolls: four fixed shortcuts need 432px against 335px of
+   sheet, and scrolling hid "All time" as a clipped "All tim". A closed set of
+   options should all be visible — the scroll affordance is for open-ended
+   rows like the filter chips. */
 .cal-shortcuts {
   flex-shrink: 0;
+  flex-wrap: wrap;
+  overflow-x: visible;
   margin-bottom: 12px;
 }
 
@@ -1109,10 +1115,21 @@ button {
   color: var(--ink-3);
 }
 
+/* Stays 34px so this row reads as secondary to the shortcut chips above it —
+   but 34px is not a touch target. The hit area grows to 44px via a
+   pseudo-element rather than padding, which would inflate the visible pill.
+   Vertical only, so neighbours 8px apart never overlap. */
 .chip-sm {
+  position: relative;
   min-height: 34px;
   padding: 5px 12px;
   font-size: 14px;
+}
+
+.chip-sm::after {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
 }
 
 .cal-scroll {
@@ -1413,7 +1430,7 @@ button {
 
 .stat-label {
   margin: 0 0 5px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
