@@ -7,14 +7,24 @@ import { ExpenseForm, type ExpenseFormValues } from './ExpenseForm'
 interface Props {
   expense: Expense | null
   onClose: () => void
+  /** Delete succeeded — the screen owns the undo toast (the sheet is gone by then). */
+  onDeleted: (expense: Expense) => void
 }
 
-export function EditSheet({ expense, onClose }: Props) {
+export function EditSheet({ expense, onClose, onDeleted }: Props) {
   if (!expense) return null
-  return <SheetBody expense={expense} onClose={onClose} />
+  return <SheetBody expense={expense} onClose={onClose} onDeleted={onDeleted} />
 }
 
-function SheetBody({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+function SheetBody({
+  expense,
+  onClose,
+  onDeleted,
+}: {
+  expense: Expense
+  onClose: () => void
+  onDeleted: (expense: Expense) => void
+}) {
   const sheetRef = useRef<HTMLDivElement>(null)
   useKeyboardInset(sheetRef)
 
@@ -37,14 +47,16 @@ function SheetBody({ expense, onClose }: { expense: Expense; onClose: () => void
   }
 
   async function remove() {
-    if (!window.confirm('Delete this expense? This cannot be undone.')) return
+    // The confirm stays — this ledger is the only copy — but it can no longer
+    // claim the delete is final: the screen offers Undo once the sheet closes.
+    if (!window.confirm('Delete this expense?')) return
     try {
       await deleteExpense(expense.id)
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Could not delete the expense.')
       return
     }
-    onClose()
+    onDeleted(expense)
   }
 
   return (

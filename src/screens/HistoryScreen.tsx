@@ -4,15 +4,18 @@ import { EditSheet } from '../components/EditSheet'
 import { FilterSheet } from '../components/FilterSheet'
 import { Pager } from '../components/Pager'
 import { SortSheet } from '../components/SortSheet'
+import { Toast } from '../components/Toast'
 import {
   listCategories,
   listExpenses,
   listPaymentMethods,
+  restoreExpense,
   type Category,
   type Expense,
   type PaymentMethod,
 } from '../db'
 import { addMonths, monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
+import { tapFeedback } from '../lib/haptics'
 import {
   filterExpenses,
   formatTotals,
@@ -28,6 +31,7 @@ import {
 import { formatMoney } from '../lib/money'
 import { groupEmoji, type MethodSelection } from '../lib/paymentMeta'
 import { getPref, PREFS, setPref } from '../lib/prefs'
+import { useToast } from '../lib/useToast'
 
 function dayLabel(iso: string): string {
   const today = todayISO()
@@ -147,6 +151,7 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
   const [sortOpen, setSortOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Expense | null>(null)
+  const { toast, show } = useToast()
 
   // A settings-row tap resets the whole view to that method/category: All
   // time, no search, nothing else filtered — the ledger slice for one thing.
@@ -293,6 +298,25 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
     setCatFilters([])
     setFrom(null)
     setTo(null)
+  }
+
+  // Mirrors the Add screen's added-toast, in reverse. The record is held in the
+  // closure for the life of the toast, so the undo needs no database read.
+  function handleDeleted(expense: Expense) {
+    setEditing(null)
+    show({
+      message: `${emojiFor(expense.category)} ${formatMoney(expense.amount, expense.currency)} deleted`,
+      onUndo: async () => {
+        try {
+          await restoreExpense(expense)
+        } catch {
+          show({ message: 'Could not restore that entry' }, 2000)
+          return
+        }
+        void tapFeedback() // an entry landing in the ledger, same as a save
+        show({ message: 'Entry restored' }, 2000)
+      },
+    })
   }
 
   if (expenses === undefined) return null // first IndexedDB read, avoid a flash
@@ -578,7 +602,12 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
         onSortChange={changeSort}
         onClose={() => setSortOpen(false)}
       />
-      <EditSheet expense={editing} onClose={() => setEditing(null)} />
+      <EditSheet
+        expense={editing}
+        onClose={() => setEditing(null)}
+        onDeleted={handleDeleted}
+      />
+      <Toast state={toast} />
     </div>
   )
 }
