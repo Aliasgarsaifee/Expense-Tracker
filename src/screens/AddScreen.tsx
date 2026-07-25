@@ -1,14 +1,17 @@
 import { useRef } from 'react'
+import { Dialog } from '../components/Dialog'
 import { ExpenseForm, type ExpenseFormValues } from '../components/ExpenseForm'
 import { Toast } from '../components/Toast'
 import { addExpense, CASH_METHOD_ID, db, deleteExpense } from '../db'
 import { tapFeedback } from '../lib/haptics'
 import { formatMoney } from '../lib/money'
+import { useDialog } from '../lib/useDialog'
 import { getPref, PREFS, setPref } from '../lib/prefs'
 import { useToast } from '../lib/useToast'
 
 export function AddScreen() {
   const { toast, show } = useToast()
+  const { dialog, close, showAlert } = useDialog()
   // Read once at mount: the form keeps its own state from then on, so the
   // fast path stays "type amount, tap Add" with everything else remembered.
   const initial = useRef({
@@ -22,7 +25,8 @@ export function AddScreen() {
     try {
       created = await addExpense(values)
     } catch (err) {
-      window.alert(
+      await showAlert(
+        'Could not save',
         err instanceof Error ? err.message : 'Could not save the expense.',
       )
       throw err // tell the form not to clear the entered values
@@ -65,6 +69,7 @@ export function AddScreen() {
         initial={initial.current}
       />
       <Toast state={toast} />
+      <Dialog state={dialog} onClose={close} />
     </div>
   )
 }

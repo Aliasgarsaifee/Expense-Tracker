@@ -2,7 +2,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState, type FormEvent } from 'react'
 import { addPaymentMethod, listPaymentMethods, type PaymentMethod } from '../db'
 import { groupChoices, groupEmoji } from '../lib/paymentMeta'
+import { useDialog } from '../lib/useDialog'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
+import { Dialog } from './Dialog'
 
 const CUSTOM = '__custom__'
 
@@ -54,6 +56,7 @@ function SheetBody({
   const [saving, setSaving] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
   useKeyboardInset(sheetRef)
+  const { dialog, close, showAlert } = useDialog()
 
   const group = groupChip === CUSTOM ? customGroup : groupChip
 
@@ -67,7 +70,10 @@ function SheetBody({
       onCreated(created)
       onClose()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not add the method.')
+      await showAlert(
+        'Could not add the method',
+        err instanceof Error ? err.message : undefined,
+      )
     } finally {
       inFlight.current = false
       setSaving(false)
@@ -156,6 +162,7 @@ function SheetBody({
           </button>
         </form>
       </div>
+      <Dialog state={dialog} onClose={close} />
     </div>
   )
 }

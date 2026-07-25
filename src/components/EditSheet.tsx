@@ -1,7 +1,9 @@
 import { useRef } from 'react'
 import { deleteExpense, updateExpense, type Expense } from '../db'
+import { useDialog } from '../lib/useDialog'
 import { tapFeedback } from '../lib/haptics'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
+import { Dialog } from './Dialog'
 import { ExpenseForm, type ExpenseFormValues } from './ExpenseForm'
 
 interface Props {
@@ -27,6 +29,7 @@ function SheetBody({
 }) {
   const sheetRef = useRef<HTMLDivElement>(null)
   useKeyboardInset(sheetRef)
+  const { dialog, close, showAlert, askConfirm } = useDialog()
 
   async function save(values: ExpenseFormValues) {
     try {
@@ -39,7 +42,10 @@ function SheetBody({
         paymentMethodId: values.paymentMethodId,
       })
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not save the changes.')
+      await showAlert(
+        'Could not save',
+        err instanceof Error ? err.message : 'Could not save the changes.',
+      )
       return // keep the sheet open with the edited values
     }
     void tapFeedback()
@@ -49,11 +55,19 @@ function SheetBody({
   async function remove() {
     // The confirm stays — this ledger is the only copy — but it can no longer
     // claim the delete is final: the screen offers Undo once the sheet closes.
-    if (!window.confirm('Delete this expense?')) return
+    const ok = await askConfirm({
+      title: 'Delete this expense?',
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deleteExpense(expense.id)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not delete the expense.')
+      await showAlert(
+        'Could not delete',
+        err instanceof Error ? err.message : 'Could not delete the expense.',
+      )
       return
     }
     onDeleted(expense)
@@ -86,6 +100,9 @@ function SheetBody({
           Delete expense
         </button>
       </div>
+      {/* Sibling of the sheet body, not a child of it: the dialog owns the
+          whole viewport while it is up. */}
+      <Dialog state={dialog} onClose={close} />
     </div>
   )
 }

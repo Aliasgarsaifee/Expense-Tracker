@@ -34,6 +34,10 @@ export class ErrorBoundary extends Component<Props, State> {
         'application/json',
       )
     } catch (err) {
+      // The only window.alert left in the app, and deliberately so: everything
+      // else moved to the in-app Dialog, but this runs after a render has
+      // already crashed. A React-rendered dialog is exactly what cannot be
+      // trusted here — the rescue path must not depend on the thing that broke.
       window.alert(
         err instanceof Error ? `Export failed: ${err.message}` : 'Export failed.',
       )

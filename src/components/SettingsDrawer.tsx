@@ -25,9 +25,11 @@ import { exportTextFile } from '../lib/exportFile'
 import type { HistoryJump } from '../lib/history'
 import { bucketize, groupEmoji } from '../lib/paymentMeta'
 import { getPref, PREFS, setPref } from '../lib/prefs'
+import { useDialog } from '../lib/useDialog'
 import { AddCategorySheet } from './AddCategorySheet'
 import { AddMethodSheet } from './AddMethodSheet'
 import { CurrencySheet } from './CurrencySheet'
+import { Dialog } from './Dialog'
 
 interface Props {
   open: boolean
@@ -186,6 +188,7 @@ function DrawerBody({
   const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [pickingCurrency, setPickingCurrency] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const { dialog, close, showAlert, askConfirm, askPrompt } = useDialog()
   const [autoBackup, setAutoBackup] = useState(() => getPref(PREFS.autoBackup, true))
   const [lastSnapshot, setLastSnapshot] = useState(() =>
     getPref(PREFS.lastAutoBackup, ''),
@@ -225,17 +228,25 @@ function DrawerBody({
   }, [expenses])
 
   async function renameMethod(method: PaymentMethod) {
-    const label = window.prompt('Rename payment method', method.label)
+    const label = await askPrompt({
+      title: 'Rename payment method',
+      label: 'Name',
+      initialValue: method.label,
+    })
     if (label === null) return
     try {
       await renamePaymentMethod(method.id, label)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not rename it.')
+      await showAlert('Could not rename', err instanceof Error ? err.message : undefined)
     }
   }
 
   async function renameGroupPrompt(group: string) {
-    const name = window.prompt('Rename group', group)
+    const name = await askPrompt({
+      title: 'Rename group',
+      label: 'Group name',
+      initialValue: group,
+    })
     if (name === null) return
     try {
       await renameGroup(group, name)
@@ -249,7 +260,7 @@ function DrawerBody({
         return next
       })
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not rename it.')
+      await showAlert('Could not rename', err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -257,26 +268,35 @@ function DrawerBody({
     try {
       await setPaymentMethodArchived(method.id, !method.archived)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not update it.')
+      await showAlert('Could not update', err instanceof Error ? err.message : undefined)
     }
   }
 
   async function removeMethod(method: PaymentMethod) {
-    if (!window.confirm(`Delete "${method.label}"?`)) return
+    const ok = await askConfirm({
+      title: `Delete "${method.label}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deletePaymentMethod(method.id)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not delete it.')
+      await showAlert('Could not delete', err instanceof Error ? err.message : undefined)
     }
   }
 
   async function renameCat(category: Category) {
-    const label = window.prompt('Rename category', category.label)
+    const label = await askPrompt({
+      title: 'Rename category',
+      label: 'Name',
+      initialValue: category.label,
+    })
     if (label === null) return
     try {
       await renameCategory(category.id, label)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not rename it.')
+      await showAlert('Could not rename', err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -284,16 +304,21 @@ function DrawerBody({
     try {
       await setCategoryArchived(category.id, !category.archived)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not update it.')
+      await showAlert('Could not update', err instanceof Error ? err.message : undefined)
     }
   }
 
   async function removeCat(category: Category) {
-    if (!window.confirm(`Delete "${category.label}"?`)) return
+    const ok = await askConfirm({
+      title: `Delete "${category.label}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deleteCategory(category.id)
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not delete it.')
+      await showAlert('Could not delete', err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -305,9 +330,7 @@ function DrawerBody({
     try {
       await build()
     } catch (err) {
-      window.alert(
-        err instanceof Error ? `Export failed: ${err.message}` : 'Export failed.',
-      )
+      await showAlert('Export failed', err instanceof Error ? err.message : undefined)
     } finally {
       setExporting(false)
     }
@@ -342,14 +365,21 @@ function DrawerBody({
   }
 
   async function importJson(file: File) {
-    // Read the file before any dialog: on iOS the change event fires while
-    // the document picker is still dismissing, and a native confirm/alert
-    // presented mid-transition can be dropped and hang the JS call.
+    // Read the file before any dialog. This ordering originally worked around
+    // a native-dialog hazard (on iOS the change event fires while the document
+    // picker is still dismissing, and a system alert presented mid-transition
+    // could be dropped, hanging the JS call). The dialogs are in-app React now,
+    // so that specific trap is gone — but the delay below is kept until the
+    // import has actually been re-run on the phone. This is the flow that
+    // carries years of entries; it is the wrong one to deregress on a guess.
     let text: string
     try {
       text = await file.text()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not read the file.')
+      await showAlert(
+        'Could not read the file',
+        err instanceof Error ? err.message : undefined,
+      )
       return
     }
     await new Promise((r) => setTimeout(r, 350)) // let the picker finish dismissing
@@ -358,12 +388,17 @@ function DrawerBody({
       const total =
         data.expenses.length + data.paymentMethods.length + data.categories.length
       if (total === 0) {
-        window.alert('That backup contains nothing to import.')
+        await showAlert(
+          'Nothing to import',
+          'That backup holds no entries, payment methods, or categories.',
+        )
         return
       }
-      const ok = window.confirm(
-        `Import ${data.expenses.length} expenses, ${data.paymentMethods.length} payment methods, and ${data.categories.length} categories? Entries with matching ids will be overwritten.`,
-      )
+      const ok = await askConfirm({
+        title: 'Import this backup?',
+        message: `${data.expenses.length} expenses, ${data.paymentMethods.length} payment methods, and ${data.categories.length} categories. Entries with matching ids will be overwritten.`,
+        confirmLabel: 'Import',
+      })
       if (!ok) return
       // Safety copy of the current ledger next to the daily snapshots. The
       // import itself is a user-confirmed merge, so a failed copy only logs.
@@ -373,11 +408,12 @@ function DrawerBody({
         console.error('pre-import snapshot failed', err)
       }
       const counts = await importBackup(data)
-      window.alert(
-        `Imported ${counts.expenses} expenses, ${counts.paymentMethods} payment methods, and ${counts.categories} categories.`,
+      await showAlert(
+        'Import complete',
+        `Merged ${counts.expenses} expenses, ${counts.paymentMethods} payment methods, and ${counts.categories} categories.`,
       )
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Import failed.')
+      await showAlert('Import failed', err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -388,11 +424,9 @@ function DrawerBody({
     if (next) {
       void runAutoBackupIfDue()
         .then(() => setLastSnapshot(getPref(PREFS.lastAutoBackup, '')))
-        .catch((err) =>
-          window.alert(
-            err instanceof Error ? `Snapshot failed: ${err.message}` : 'Snapshot failed.',
-          ),
-        )
+        .catch((err) => {
+          void showAlert('Snapshot failed', err instanceof Error ? err.message : undefined)
+        })
     }
   }
 
@@ -606,6 +640,7 @@ function DrawerBody({
           onClose={() => setPickingCurrency(false)}
         />
       </aside>
+      <Dialog state={dialog} onClose={close} />
     </div>
   )
 }

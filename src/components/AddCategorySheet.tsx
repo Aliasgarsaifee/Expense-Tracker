@@ -1,6 +1,8 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { addCategory, type Category } from '../db'
+import { useDialog } from '../lib/useDialog'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
+import { Dialog } from './Dialog'
 
 // A tap-palette of common spend emojis, so most new categories need no
 // keyboard at all; a free-text field covers anything else.
@@ -30,6 +32,7 @@ function SheetBody({ onCreated, onClose }: Omit<Props, 'open'>) {
   const [saving, setSaving] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
   useKeyboardInset(sheetRef)
+  const { dialog, close, showAlert } = useDialog()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -41,7 +44,10 @@ function SheetBody({ onCreated, onClose }: Omit<Props, 'open'>) {
       onCreated(created)
       onClose()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Could not add the category.')
+      await showAlert(
+        'Could not add the category',
+        err instanceof Error ? err.message : undefined,
+      )
     } finally {
       inFlight.current = false
       setSaving(false)
@@ -114,6 +120,7 @@ function SheetBody({ onCreated, onClose }: Omit<Props, 'open'>) {
           </button>
         </form>
       </div>
+      <Dialog state={dialog} onClose={close} />
     </div>
   )
 }

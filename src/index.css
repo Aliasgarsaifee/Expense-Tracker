@@ -809,6 +809,47 @@ button {
   font-size: 23px;
 }
 
+/* ——— dialog (in-app alert / confirm / prompt) ——— */
+
+/* Above the sheet scrim (40) and the drawer (50): every caller sits inside one
+   of those, and a question about what they are doing has to outrank them. */
+.dialog-scrim {
+  z-index: 60;
+}
+
+.dialog-title {
+  font-size: 23px;
+  margin: 0;
+}
+
+.dialog-message {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.dialog-field {
+  margin-top: 18px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Equal halves, confirm on the right. .btn-danger carries a margin-top for its
+   stacked use in EditSheet, which would misalign it in this row. */
+.dialog-actions > button {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* .btn-ghost is built for label-and-value rows; centre it as a plain button. */
+.dialog-cancel {
+  justify-content: center;
+}
+
 /* ——— toast & empty ——— */
 
 .toast {
