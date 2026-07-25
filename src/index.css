@@ -841,7 +841,10 @@ button {
   text-overflow: ellipsis;
 }
 
-/* The one interactive part of the toast, padded out to a real thumb target. */
+/* The one interactive part of the toast, and now the app's undo-a-delete
+   control — padded out to the full 44px iOS target. The negative vertical
+   margins cancel that padding in the flex line, so the pill keeps its height:
+   change the two together or the toast grows. */
 .toast-undo {
   pointer-events: auto;
   flex-shrink: 0;
@@ -855,8 +858,8 @@ button {
   text-transform: uppercase;
   text-decoration: underline;
   text-underline-offset: 3px;
-  padding: 10px 8px;
-  margin: -10px -4px -10px 0;
+  padding: 14px 8px;
+  margin: -14px -4px -14px 0;
 }
 
 .empty {
