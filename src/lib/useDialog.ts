@@ -60,14 +60,17 @@ export function useDialog() {
     })
   }
 
-  function showAlert(title: string, message?: string): Promise<null> {
-    return open({
+  // Resolves when dismissed, with no answer to give: an alert's one button and
+  // its scrim mean the same thing. Hence void, not the settled value — which
+  // differs between the two and would be a lie to type.
+  async function showAlert(title: string, message?: string): Promise<void> {
+    await open({
       kind: 'alert',
       title,
       message,
       confirmLabel: 'OK',
       destructive: false,
-    }) as Promise<null>
+    })
   }
 
   function askConfirm(o: ConfirmOptions): Promise<boolean> {
