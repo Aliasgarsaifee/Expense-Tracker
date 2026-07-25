@@ -709,29 +709,10 @@ button {
 
 /* Recharts wears the theme via CSS: single validated hue, muted ticks,
    ink value labels (text tokens, never the series color). */
-.category-chart .recharts-bar-rectangle path {
-  fill: var(--accent);
-}
-
-.category-chart .recharts-cartesian-axis-tick text {
-  fill: var(--ink-2);
-  font-family: var(--font-body);
-  font-size: 13px;
-}
-
-.category-chart text.recharts-label {
-  fill: var(--ink);
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  font-weight: 700;
-}
-
-.category-chart .recharts-tooltip-cursor,
 .trend-chart .recharts-tooltip-cursor {
   fill: color-mix(in srgb, var(--chip) 70%, transparent);
 }
 
-/* Trend bars share the category chart's single validated hue and muted ticks. */
 .trend-chart .recharts-bar-rectangle path {
   fill: var(--accent);
 }
@@ -1447,7 +1428,6 @@ button {
   margin-left: 5px;
 }
 
-.category-chart[data-clickable],
 .trend-chart[data-clickable] {
   cursor: pointer;
 }
@@ -1498,6 +1478,15 @@ button {
   line-height: 1;
 }
 
+/* Share and count sit on a second line rather than a fifth column: five items
+   on one 303px row left "HDFC Regalia" ellipsized to "HDFC Reg…". Same
+   two-line shape as .entry in History. */
+.pay-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
 .pay-label {
   font-size: 15px;
   white-space: nowrap;
@@ -1505,14 +1494,14 @@ button {
   text-overflow: ellipsis;
 }
 
-.pay-amount {
-  font-size: 15.5px;
+.pay-sub {
+  font-size: 12.5px;
+  color: var(--ink-3);
   white-space: nowrap;
 }
 
-.pay-count {
-  font-size: 11.5px;
-  color: var(--ink-3);
+.pay-amount {
+  font-size: 15.5px;
   white-space: nowrap;
 }
 

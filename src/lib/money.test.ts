@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney } from './money'
+import { formatMoney, formatShare } from './money'
 
 describe('formatMoney', () => {
   it('defaults to INR and formats whole rupees without decimals', () => {
@@ -43,5 +43,44 @@ describe('formatMoney', () => {
     expect(() => formatMoney(99.99, 'BTC!')).not.toThrow()
     expect(formatMoney(99.99, 'BTC!')).toBe('BTC! 99.99')
     expect(formatMoney(123456, 'BTC!')).toBe('BTC! 123456')
+  })
+})
+
+describe('formatShare', () => {
+  it('drops the decimal at and above 10%, where it is noise', () => {
+    expect(formatShare(85, 100)).toBe('85%')
+    expect(formatShare(1, 1)).toBe('100%')
+    expect(formatShare(10, 100)).toBe('10%')
+  })
+
+  // The whole point of the tier: a rent-dominated month leaves everything else
+  // under 10%, and whole percents would collapse 3.8 and 3.6 into one "4%".
+  it('keeps one decimal below 10% so a long tail stays ordered', () => {
+    expect(formatShare(7518.21, 200262.77)).toBe('3.8%')
+    expect(formatShare(7140.71, 200262.77)).toBe('3.6%')
+    expect(formatShare(1350.67, 200262.77)).toBe('0.7%')
+  })
+
+  it('picks the tier from the rounded value, not the raw one', () => {
+    expect(formatShare(9.96, 100)).toBe('10%') // not "10.0%"
+    expect(formatShare(99.96, 100)).toBe('100%')
+    expect(formatShare(9.94, 100)).toBe('9.9%')
+  })
+
+  it('never reports a real amount as nothing', () => {
+    expect(formatShare(0.04, 100)).toBe('<0.1%')
+    expect(formatShare(1, 10_000_000)).toBe('<0.1%')
+    expect(formatShare(0.06, 100)).toBe('0.1%')
+  })
+
+  it('reports a true zero as 0%', () => {
+    expect(formatShare(0, 100)).toBe('0%')
+  })
+
+  // An empty bucket can't divide; callers render the list from the same data,
+  // so this is belt-and-braces against a NaN reaching the screen.
+  it('does not divide by zero', () => {
+    expect(formatShare(0, 0)).toBe('0%')
+    expect(formatShare(5, 0)).toBe('0%')
   })
 })

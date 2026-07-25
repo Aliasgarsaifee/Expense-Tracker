@@ -1,14 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
-import { CategoryChart } from '../components/CategoryChart'
+import { BreakdownList } from '../components/BreakdownList'
 import { Pager } from '../components/Pager'
 import { PeriodSheet } from '../components/PeriodSheet'
 import { TrendChart } from '../components/TrendChart'
 import {
   db,
+  listCategories,
   listExpenses,
   listExpensesBetween,
   listPaymentMethods,
+  type Category,
   type Expense,
   type PaymentMethod,
 } from '../db'
@@ -90,6 +92,9 @@ export function SummaryScreen({
     return listExpensesBetween(cmp.bounds.from, cmp.bounds.to)
   }, [period, today])
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
+  // Archived categories included: their label still sits on old entries, and
+  // the breakdown must be able to put a face on every one of them.
+  const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
 
   // ‹ › reach any period that holds data, even a fat-fingered future date —
   // otherwise it is visible in History but unreachable here. All-time averages
@@ -138,6 +143,12 @@ export function SummaryScreen({
   const methodsById = useMemo(
     () => new Map((methods ?? []).map((m: PaymentMethod) => [m.id, m])),
     [methods],
+  )
+  // 🧾 covers labels with no category record (e.g. from an edited backup),
+  // the same fallback History uses.
+  const categoryEmoji = useMemo(
+    () => new Map((categories ?? []).map((c: Category) => [c.label, c.emoji])),
+    [categories],
   )
 
   const biggest = useMemo(() => biggestExpense(bucket?.expenses ?? []), [bucket])
@@ -396,10 +407,18 @@ export function SummaryScreen({
       {summary.byCategory.length > 0 && (
         <section className="chart-card">
           <h2 className="section-title">By category</h2>
-          <CategoryChart
-            data={summary.byCategory}
+          <BreakdownList
             currency={currency}
-            onSelect={(category) => onDrill({ category, ...drillBounds(period) })}
+            whole={summary.total}
+            rows={summary.byCategory.map((c) => ({
+              key: c.category,
+              emoji: categoryEmoji.get(c.category) ?? '🧾',
+              label: c.category,
+              total: c.total,
+              count: c.count,
+              selectLabel: `See ${c.category} entries in History`,
+              onSelect: () => onDrill({ category: c.category, ...drillBounds(period) }),
+            }))}
           />
         </section>
       )}
@@ -407,51 +426,32 @@ export function SummaryScreen({
       {summary.byPayment.length > 0 && (
         <section className="chart-card">
           <h2 className="section-title">By payment</h2>
-          <ul className="pay-list">
-            {summary.byPayment.map((p) => {
+          <BreakdownList
+            currency={currency}
+            whole={summary.total}
+            rows={summary.byPayment.map((p) => {
               const method = p.paymentMethodId
                 ? methodsById.get(p.paymentMethodId)
                 : undefined
-              const inner = (
-                <>
-                  <span className="pay-emoji" aria-hidden="true">
-                    {method ? groupEmoji(method.group) : '🧾'}
-                  </span>
-                  <span className="pay-label">{method?.label ?? 'Unrecorded'}</span>
-                  <span className="leader" aria-hidden="true" />
-                  <span className="pay-amount money">
-                    {formatMoney(p.total, currency)}
-                  </span>
-                  <span className="pay-count">
-                    {p.count === 1 ? '1 entry' : `${p.count} entries`}
-                  </span>
-                </>
-              )
-              // The null-method "Unrecorded" row stays static: History has no
-              // "no payment method" filter to drill into.
-              return (
-                <li key={p.paymentMethodId ?? 'none'}>
-                  {p.paymentMethodId ? (
-                    <button
-                      type="button"
-                      className="pay-row pay-row-btn"
-                      aria-label={`See ${method?.label ?? 'method'} entries in History`}
-                      onClick={() =>
-                        onDrill({ paymentMethodId: p.paymentMethodId, ...drillBounds(period) })
-                      }
-                    >
-                      {inner}
-                      <span className="stat-go" aria-hidden="true">
-                        ›
-                      </span>
-                    </button>
-                  ) : (
-                    <div className="pay-row">{inner}</div>
-                  )}
-                </li>
-              )
+              return {
+                key: p.paymentMethodId ?? 'none',
+                emoji: method ? groupEmoji(method.group) : '🧾',
+                label: method?.label ?? 'Unrecorded',
+                total: p.total,
+                count: p.count,
+                selectLabel: `See ${method?.label ?? 'method'} entries in History`,
+                // The null-method "Unrecorded" row stays static: History has no
+                // "no payment method" filter to drill into.
+                onSelect: p.paymentMethodId
+                  ? () =>
+                      onDrill({
+                        paymentMethodId: p.paymentMethodId,
+                        ...drillBounds(period),
+                      })
+                  : undefined,
+              }
             })}
-          </ul>
+          />
         </section>
       )}
 
