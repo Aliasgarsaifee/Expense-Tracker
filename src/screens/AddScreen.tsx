@@ -1,19 +1,14 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { ExpenseForm, type ExpenseFormValues } from '../components/ExpenseForm'
+import { Toast } from '../components/Toast'
 import { addExpense, CASH_METHOD_ID, db, deleteExpense } from '../db'
 import { tapFeedback } from '../lib/haptics'
 import { formatMoney } from '../lib/money'
 import { getPref, PREFS, setPref } from '../lib/prefs'
-
-interface Toast {
-  message: string
-  /** Present while the toast can still take the entry back. */
-  undoId?: string
-}
+import { useToast } from '../lib/useToast'
 
 export function AddScreen() {
-  const [toast, setToast] = useState<Toast | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const { toast, show } = useToast()
   // Read once at mount: the form keeps its own state from then on, so the
   // fast path stays "type amount, tap Add" with everything else remembered.
   const initial = useRef({
@@ -21,12 +16,6 @@ export function AddScreen() {
     category: getPref(PREFS.lastCategory, 'Food'),
     paymentMethodId: getPref(PREFS.lastPaymentMethod, CASH_METHOD_ID),
   })
-
-  function showToast(next: Toast, ms: number) {
-    clearTimeout(timer.current)
-    setToast(next)
-    timer.current = setTimeout(() => setToast(null), ms)
-  }
 
   async function add(values: ExpenseFormValues) {
     let created
@@ -48,13 +37,10 @@ export function AddScreen() {
     const emoji =
       (await db.categories.toArray()).find((c) => c.label === created.category)
         ?.emoji ?? '🧾'
-    showToast(
-      {
-        message: `${emoji} ${formatMoney(created.amount, created.currency)} added to ${created.category}`,
-        undoId: created.id,
-      },
-      4200, // long enough to read and still reach Undo
-    )
+    show({
+      message: `${emoji} ${formatMoney(created.amount, created.currency)} added to ${created.category}`,
+      onUndo: () => undo(created.id),
+    })
   }
 
   async function undo(id: string) {
@@ -63,10 +49,8 @@ export function AddScreen() {
     } catch {
       return // the entry stays; History still offers delete
     }
-    showToast({ message: 'Entry removed' }, 2000)
+    show({ message: 'Entry removed' }, 2000)
   }
-
-  const undoId = toast?.undoId
 
   return (
     <div className="screen">
@@ -80,20 +64,7 @@ export function AddScreen() {
         autoReset
         initial={initial.current}
       />
-      {toast && (
-        <output className="toast" aria-live="polite">
-          <span className="toast-text">{toast.message}</span>
-          {undoId !== undefined && (
-            <button
-              type="button"
-              className="toast-undo"
-              onClick={() => void undo(undoId)}
-            >
-              Undo
-            </button>
-          )}
-        </output>
-      )}
+      <Toast state={toast} />
     </div>
   )
 }
