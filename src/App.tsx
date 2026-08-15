@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { runAutoBackupIfDue } from './lib/autoBackup'
 import type { HistoryJump } from './lib/history'
@@ -59,11 +59,14 @@ export default function App() {
   // A settings row was tapped: close the drawer, land on History, filter to
   // it. A fresh object per tap means re-tapping the same row re-applies even
   // if the user changed filters in between (identity is the event).
-  function jumpToHistory(jump: HistoryJump) {
+  // The handler itself is stable (setState functions are): Summary passes it
+  // into a memoized chart, which would otherwise rebuild whenever this
+  // component re-rendered for an unrelated reason.
+  const jumpToHistory = useCallback((jump: HistoryJump) => {
     setHistoryJump({ ...jump })
     setTab('history')
     setSettingsOpen(false)
-  }
+  }, [])
   // Remounting AddScreen on this key re-reads the default-currency pref, so a
   // change in Settings takes effect immediately (not just next cold start).
   const [defaultCurrency, setDefaultCurrency] = useState(() =>

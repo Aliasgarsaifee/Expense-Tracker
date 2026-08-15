@@ -1,3 +1,38 @@
+// Constructing an Intl.DateTimeFormat runs locale resolution; .format() is
+// cheap by comparison (measured ~25µs vs ~1µs). Every labeller below used to
+// build one per call, and the trend axis labels each of a month's 31 ticks on
+// every re-render — so each option set is built once, here.
+const LOCALE = 'en-IN'
+const DAY_MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+const DAY_MONTH = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' })
+const MONTH_YEAR_LONG = new Intl.DateTimeFormat(LOCALE, {
+  month: 'long',
+  year: 'numeric',
+})
+const MONTH_YEAR_SHORT = new Intl.DateTimeFormat(LOCALE, {
+  month: 'short',
+  year: 'numeric',
+})
+const MONTH_LONG = new Intl.DateTimeFormat(LOCALE, { month: 'long' })
+const MONTH_NARROW = new Intl.DateTimeFormat(LOCALE, { month: 'narrow' })
+const WEEKDAY_NARROW = new Intl.DateTimeFormat(LOCALE, { weekday: 'narrow' })
+
+// 'YYYY-MM' → a local Date on the 1st; 'YYYY-MM-DD' → that local day. Local,
+// not UTC, for the same reason localISO exists: a UTC parse shifts the day.
+function dateOfMonth(month: string): Date {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m - 1, 1)
+}
+
+function dateOfDay(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 export function monthOf(isoDate: string): string {
   return isoDate.slice(0, 7)
 }
@@ -9,46 +44,38 @@ export function addMonths(month: string, delta: number): string {
 }
 
 export function monthLabel(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', {
-    month: 'long',
-    year: 'numeric',
-  })
+  return MONTH_YEAR_LONG.format(dateOfMonth(month))
 }
 
 // "July" — the bare long month name; monthLabel is the with-year sibling.
 export function monthName(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long' })
+  return MONTH_LONG.format(dateOfMonth(month))
 }
 
 // "12 July 2026" — the human-readable form used on the Add/Edit date field.
 export function formatDateLong(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return DAY_MONTH_YEAR.format(dateOfDay(iso))
 }
 
 // "12 Jul" — day + short month, no year. The compact form used on Summary
 // tiles and the day-grain trend axis/tooltip.
 export function shortDayMonth(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-  })
+  return DAY_MONTH.format(dateOfDay(iso))
 }
 
 // "Jul 2026" — short month + year, from a 'YYYY-MM' key.
 export function shortMonthYear(month: string): string {
-  const [y, m] = month.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', {
-    month: 'short',
-    year: 'numeric',
-  })
+  return MONTH_YEAR_SHORT.format(dateOfMonth(month))
+}
+
+// "J" / "M" — single-letter initials for the trend axis, which labels every
+// tick and so needs the cheapest possible per-tick call.
+export function narrowMonth(month: string): string {
+  return MONTH_NARROW.format(dateOfMonth(month))
+}
+
+export function narrowWeekday(iso: string): string {
+  return WEEKDAY_NARROW.format(dateOfDay(iso))
 }
 
 // Local calendar date — toISOString() would shift dates near midnight IST.

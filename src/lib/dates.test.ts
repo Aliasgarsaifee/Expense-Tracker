@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   addMonths,
+  formatDateLong,
   monthGrid,
   monthLabel,
   monthName,
   monthOf,
+  narrowMonth,
+  narrowWeekday,
+  shortDayMonth,
+  shortMonthYear,
   todayISO,
   yesterdayISO,
 } from './dates'
@@ -67,6 +72,53 @@ describe('monthGrid', () => {
     const cells = monthGrid('2024-02')
     expect(cells.slice(0, 4)).toEqual([null, null, null, '2024-02-01'])
     expect(cells.at(-1)).toBe('2024-02-29')
+  })
+})
+
+// The trend axis calls these once per tick with interval={0} — 31 times for a
+// month — so they live here behind a cached formatter rather than building an
+// Intl object per bar.
+describe('narrowMonth', () => {
+  it('renders the single-letter month initial', () => {
+    expect(narrowMonth('2026-01')).toBe('J')
+    expect(narrowMonth('2026-07')).toBe('J')
+    expect(narrowMonth('2026-09')).toBe('S')
+    expect(narrowMonth('2026-12')).toBe('D')
+  })
+
+  it('reads the month from the key, ignoring the year', () => {
+    expect(narrowMonth('1999-03')).toBe(narrowMonth('2026-03'))
+  })
+})
+
+describe('narrowWeekday', () => {
+  it('renders the single-letter weekday', () => {
+    // 2026-07-13 is a Monday.
+    expect(narrowWeekday('2026-07-13')).toBe('M')
+    expect(narrowWeekday('2026-07-15')).toBe('W')
+    expect(narrowWeekday('2026-07-19')).toBe('S') // Sunday
+  })
+})
+
+// The five labellers share one locale but five different option sets, and each
+// caches its formatter (the trend axis calls these once per tick). Interleaved
+// on one date, so a cache keyed on locale alone would show up as the wrong
+// shape rather than a missing one.
+describe('date labellers under repeated interleaved use', () => {
+  it('keeps each option set on its own formatter', () => {
+    for (let i = 0; i < 3; i++) {
+      expect(formatDateLong('2026-07-12')).toBe('12 July 2026')
+      expect(shortDayMonth('2026-07-12')).toBe('12 Jul')
+      expect(shortMonthYear('2026-07')).toBe('Jul 2026')
+      expect(monthLabel('2026-07')).toBe('July 2026')
+      expect(monthName('2026-07')).toBe('July')
+    }
+  })
+
+  it('formats different dates through the same cached formatter', () => {
+    expect(shortDayMonth('2026-01-01')).toBe('1 Jan')
+    expect(shortDayMonth('2024-02-29')).toBe('29 Feb')
+    expect(shortDayMonth('2026-12-31')).toBe('31 Dec')
   })
 })
 

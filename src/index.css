@@ -1452,6 +1452,31 @@ button {
   color: var(--ink-2);
 }
 
+/* ——— Summary: figures in flight ———
+
+   Paging a period re-reads the ledger, and useLiveQuery keeps serving the
+   previous result until the new one lands — so for that moment the old
+   period's figures are still in the DOM under the new heading. Blank every
+   value derived from them rather than show a number that belongs to another
+   month. `visibility`, not `display`: the boxes keep their space, so the page
+   does not collapse and snap back around the reader.
+
+   Deliberately not blanked: the pager label, the section titles and the tile
+   labels ("Daily average", "vs May"). Those are derived from the period
+   itself, not from the ledger, so they are already correct the instant the
+   arrow is tapped — and keeping them visible makes the pause read as filling
+   in rather than as a flash of empty page. */
+.screen[data-loading] .currency-row,
+.screen[data-loading] .hero-total,
+.screen[data-loading] .hero-meta,
+.screen[data-loading] .hero-add,
+.screen[data-loading] .stat-value,
+.screen[data-loading] .stat-sub,
+.screen[data-loading] .trend-chart,
+.screen[data-loading] .pay-list {
+  visibility: hidden;
+}
+
 /* ——— stat tiles ——— */
 
 .stat-grid {

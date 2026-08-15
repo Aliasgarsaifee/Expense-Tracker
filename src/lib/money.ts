@@ -1,17 +1,39 @@
-// Whole amounts show clean (₹450); fractions only when present (₹450.50).
-export function formatMoney(amount: number, currency = 'INR'): string {
-  const digits = Number.isInteger(amount) ? 0 : 2
+// Building an Intl.NumberFormat is the expensive half of formatting (locale
+// resolution); .format() is cheap. Summary renders 20+ amounts at once, so
+// each currency is built once and kept. Keyed on precision too — one currency
+// needs both a whole and a 2-decimal formatter, and sharing them would drop
+// the paise. A null entry remembers a malformed code so it isn't re-thrown on
+// every row. The key space is bounded by the currency list, so it never grows
+// beyond a handful of entries in practice.
+const formatters = new Map<string, Intl.NumberFormat | null>()
+
+function formatterFor(currency: string, digits: number): Intl.NumberFormat | null {
+  const key = `${currency}|${digits}`
+  const cached = formatters.get(key)
+  if (cached !== undefined) return cached
+  let made: Intl.NumberFormat | null = null
   try {
-    return new Intl.NumberFormat('en-IN', {
+    made = new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency,
       minimumFractionDigits: digits,
       maximumFractionDigits: digits,
-    }).format(amount)
+    })
   } catch {
     // Malformed codes can arrive via an imported backup; never throw.
-    return `${currency} ${amount.toFixed(digits)}`
+    made = null
   }
+  formatters.set(key, made)
+  return made
+}
+
+// Whole amounts show clean (₹450); fractions only when present (₹450.50).
+export function formatMoney(amount: number, currency = 'INR'): string {
+  const digits = Number.isInteger(amount) ? 0 : 2
+  const formatter = formatterFor(currency, digits)
+  return formatter
+    ? formatter.format(amount)
+    : `${currency} ${amount.toFixed(digits)}`
 }
 
 // A slice of a total, as a percentage. Carries the comparison a bar chart

@@ -1,4 +1,11 @@
-import { addMonths, localISO, monthLabel, monthName, monthOf } from './dates'
+import {
+  addMonths,
+  localISO,
+  monthLabel,
+  monthName,
+  monthOf,
+  shortDayMonth,
+} from './dates'
 
 // The unit a Summary view aggregates over. A day is the finest grain: a single
 // day still aggregates (total, by-category, by-payment, vs the previous day),
@@ -91,13 +98,17 @@ export function shiftPeriod(p: Period, dir: 1 | -1): Period {
 }
 
 // "12 Jun 2026" / "12 Jun" (year suppressed when it is redundant with a range).
+// Both formatters are built once — see the note in dates.ts.
+const DAY_MONTH_YEAR = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
 function shortDay(iso: string, withYear: boolean): string {
+  if (!withYear) return shortDayMonth(iso)
   const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    ...(withYear ? { year: 'numeric' } : {}),
-  })
+  return DAY_MONTH_YEAR.format(new Date(y, m - 1, d))
 }
 
 // A single day reads as one date; a same-year range carries the year once at
@@ -179,6 +190,23 @@ export function comparisonSlice(
   return {
     bounds: { from: prev.from, to: clipTo < prev.to ? clipTo : prev.to },
     toDate: true,
+  }
+}
+
+// Both ranges a Summary view reads, derived from one period in one place.
+// Deriving them separately is what let the screen show June's total under a
+// July heading: two reads meant two moments, and the comparison could still
+// describe the period you just left. A null `main` means the whole ledger
+// (all time has no bounds to range-query).
+export interface PeriodWindows {
+  main: Bounds | null
+  comparison: Bounds | null
+}
+
+export function periodWindows(p: Period, today: string): PeriodWindows {
+  return {
+    main: periodBounds(p),
+    comparison: comparisonSlice(p, today)?.bounds ?? null,
   }
 }
 

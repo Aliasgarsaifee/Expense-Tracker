@@ -44,6 +44,31 @@ describe('formatMoney', () => {
     expect(formatMoney(99.99, 'BTC!')).toBe('BTC! 99.99')
     expect(formatMoney(123456, 'BTC!')).toBe('BTC! 123456')
   })
+
+  // Formatters are cached (one per currency+precision, built once instead of
+  // once per call — Summary formats 20+ amounts a render). These pin the cache
+  // key: keying on currency alone would hand a whole-rupee formatter to the
+  // next fractional amount and silently drop the paise.
+  it('keeps whole and fractional precision apart for one currency', () => {
+    expect(formatMoney(450, 'INR')).toBe('₹450')
+    expect(formatMoney(450.5, 'INR')).toBe('₹450.50')
+    expect(formatMoney(450, 'INR')).toBe('₹450')
+    expect(formatMoney(450.5, 'INR')).toBe('₹450.50')
+  })
+
+  it('keeps currencies apart under repeated interleaved calls', () => {
+    expect(formatMoney(1000, 'USD')).toBe('$1,000')
+    expect(formatMoney(1000, 'INR')).toBe('₹1,000')
+    expect(formatMoney(1000, 'USD')).toBe('$1,000')
+  })
+
+  // A malformed code must never be remembered as a working formatter, nor
+  // block the valid ones around it — imported backups mix both.
+  it('does not let a malformed code poison later valid ones', () => {
+    expect(formatMoney(99.99, 'BTC!')).toBe('BTC! 99.99')
+    expect(formatMoney(99.99, 'BTC!')).toBe('BTC! 99.99')
+    expect(formatMoney(450, 'INR')).toBe('₹450')
+  })
 })
 
 describe('formatShare', () => {

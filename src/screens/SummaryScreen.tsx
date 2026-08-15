@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { BreakdownList } from '../components/BreakdownList'
 import { Pager } from '../components/Pager'
 import { PeriodSheet } from '../components/PeriodSheet'
@@ -30,6 +30,7 @@ import {
   initialPeriod,
   periodBounds,
   periodLabel,
+  periodWindows,
   shiftPeriod,
   trendUnit,
   type Period,
@@ -75,22 +76,45 @@ export function SummaryScreen({
   const [chosenCurrency, setChosenCurrency] = useState('INR')
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  const expenses = useLiveQuery(() => {
-    if (period.kind === 'all') return listExpenses()
-    const b = periodBounds(period)!
-    return listExpensesBetween(b.from, b.to)
-  }, [period])
+  // One read for both windows. Two separate live queries resolved at two
+  // different moments, so a month switch briefly rendered this period's total
+  // against last period's comparison — the vs-tile flashed a meaningless "=
+  // 0%" on the way through. periodWindows derives both from one period, and
+  // the result is stamped with the period (and day) it was built for so the
+  // screen can tell a loaded view from an in-flight one.
+  // `today` must be a dep: the screen sits mounted across midnight, and the
+  // clipped comparison window has to grow with the new day — deps of [period]
+  // alone would keep Dexie re-running the closure captured yesterday.
+  const view = useLiveQuery(async () => {
+    const windows = periodWindows(period, today)
+    return {
+      period,
+      today,
+      expenses: windows.main
+        ? await listExpensesBetween(windows.main.from, windows.main.to)
+        : await listExpenses(),
+      prevExpenses: windows.comparison
+        ? await listExpensesBetween(windows.comparison.from, windows.comparison.to)
+        : ([] as Expense[]),
+    }
+  }, [period, today])
+
+  // useLiveQuery holds the previous result while the next one is in flight, so
+  // without the stamp the old period's figures render under the new heading.
+  // Identity compare: setPeriod always hands us a fresh object.
+  const ready = view?.period === period && view.today === today
+  const expenses = view?.expenses
+  const prevExpenses = view?.prevExpenses
+  // Everything below the pager is derived from the period the loaded data
+  // actually belongs to, never the one just tapped. That keeps a total, its
+  // chart and its comparison describing one period at all times, and it leaves
+  // every memo (the trend, and so the chart) untouched on the in-flight
+  // render — the tap costs one re-render, not a rebuild of the whole chart.
+  const dataPeriod = view?.period ?? period
   // While the period is still running, cmp clips the previous window to the
   // same elapsed length (see comparisonSlice) so the vs-tile compares
   // like-for-like; cmp.toDate switches its sub-label to "by this point".
-  // `today` must be a dep: the screen sits mounted across midnight, and the
-  // clipped window has to grow with the new day — deps of [period] alone would
-  // keep Dexie re-running the closure captured yesterday.
-  const cmp = comparisonSlice(period, today)
-  const prevExpenses = useLiveQuery(() => {
-    if (!cmp) return [] as Expense[]
-    return listExpensesBetween(cmp.bounds.from, cmp.bounds.to)
-  }, [period, today])
+  const cmp = comparisonSlice(dataPeriod, today)
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   // Archived categories included: their label still sits on old entries, and
   // the breakdown must be able to put a face on every one of them.
@@ -108,12 +132,12 @@ export function SummaryScreen({
   const oldestDate = oldest?.spentOn
   const bounds = useMemo(
     () =>
-      period.kind === 'all'
+      dataPeriod.kind === 'all'
         ? oldestDate
           ? { from: oldestDate, to: maxAnchor }
           : null
-        : periodBounds(period),
-    [period, oldestDate, maxAnchor],
+        : periodBounds(dataPeriod),
+    [dataPeriod, oldestDate, maxAnchor],
   )
 
   const buckets = useMemo(() => splitByCurrency(expenses ?? []), [expenses])
@@ -163,7 +187,7 @@ export function SummaryScreen({
   // period so a partial bar isn't misread as a low one. Absent when the view
   // is wholly in the past (nothing is "now").
   const currentBucketKey = containsToday ? bucketKeyOf(today, trendUnitOf) : undefined
-  const isAggregateSpan = period.kind === 'year' || period.kind === 'all'
+  const isAggregateSpan = dataPeriod.kind === 'year' || dataPeriod.kind === 'all'
   // One-day windows (the Day period, or a same-day custom range) can't say
   // anything a span can: the daily average equals the total and the "busiest
   // day" is the day itself. Suppress both; the vs-previous and biggest-entry
@@ -210,28 +234,37 @@ export function SummaryScreen({
     return 'so far'
   })()
 
-  const emptyPhrase = emptyPeriodPhrase(period, containsToday)
+  const emptyPhrase = emptyPeriodPhrase(dataPeriod, containsToday)
   const entryCount = summary.count
   // A projection needs ≥ 2 elapsed days to mean anything, and once the period
   // has fully elapsed (a custom range ending today, a week on its Sunday) it
   // just equals the total — suppress both degenerate ends.
   const showPace =
-    containsToday && period.kind !== 'all' && elapsed >= 2 && elapsed < spanDays
+    containsToday && dataPeriod.kind !== 'all' && elapsed >= 2 && elapsed < spanDays
 
   // A tapped trend bucket drills to its span clipped to the viewed period; a
   // whole in-period month jumps as a month (History's monthly-pager mode, like
   // the busiest-month tile), everything else as an inclusive range.
-  function bucketJump(key: string): HistoryJump {
-    if (!bounds) return { from: key, to: key }
-    const b = bucketBounds(key, trendUnitOf)
-    if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
-      return { month: key }
-    }
-    return {
-      from: b.from < bounds.from ? bounds.from : b.from,
-      to: b.to > bounds.to ? bounds.to : b.to,
-    }
-  }
+  // useCallback because TrendChart is memo'd: a fresh handler each render
+  // would rebuild its ~213 nodes on every re-render regardless.
+  const onBucketSelect = useCallback(
+    (key: string) => {
+      if (!bounds) {
+        onDrill({ from: key, to: key })
+        return
+      }
+      const b = bucketBounds(key, trendUnitOf)
+      if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
+        onDrill({ month: key })
+        return
+      }
+      onDrill({
+        from: b.from < bounds.from ? bounds.from : b.from,
+        to: b.to > bounds.to ? bounds.to : b.to,
+      })
+    },
+    [bounds, trendUnitOf, onDrill],
+  )
 
   // Custom ranges are never persisted (a stale range would be a trap on the
   // next launch); every other granularity restores anchored at "now".
@@ -244,7 +277,11 @@ export function SummaryScreen({
   }
 
   return (
-    <div className="screen">
+    // data-loading blanks every figure below the pager while the next period
+    // is in flight (see index.css). The pager itself keeps updating: the tap
+    // gets its feedback immediately, and no number is ever shown against the
+    // wrong heading.
+    <div className="screen" data-loading={ready ? undefined : ''} aria-busy={!ready}>
       <header className="screen-head">
         <p className="eyebrow">Summary</p>
         <h1 className="sr-only">Summary</h1>
@@ -399,7 +436,7 @@ export function SummaryScreen({
             unit={trendUnitOf}
             currency={currency}
             currentKey={currentBucketKey}
-            onSelect={(key) => onDrill(bucketJump(key))}
+            onSelect={onBucketSelect}
           />
         </section>
       )}
@@ -417,7 +454,7 @@ export function SummaryScreen({
               total: c.total,
               count: c.count,
               selectLabel: `See ${c.category} entries in History`,
-              onSelect: () => onDrill({ category: c.category, ...drillBounds(period) }),
+              onSelect: () => onDrill({ category: c.category, ...drillBounds(dataPeriod) }),
             }))}
           />
         </section>
@@ -446,7 +483,7 @@ export function SummaryScreen({
                   ? () =>
                       onDrill({
                         paymentMethodId: p.paymentMethodId,
-                        ...drillBounds(period),
+                        ...drillBounds(dataPeriod),
                       })
                   : undefined,
               }

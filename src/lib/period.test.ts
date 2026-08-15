@@ -11,6 +11,7 @@ import {
   initialPeriod,
   periodBounds,
   periodLabel,
+  periodWindows,
   shiftPeriod,
   trendUnit,
   weekStartOf,
@@ -219,6 +220,46 @@ describe('comparisonSlice', () => {
       bounds: { from: '2026-07-09', to: '2026-07-09' },
       toDate: false,
     })
+  })
+})
+
+describe('periodWindows', () => {
+  // The whole point: Summary reads two ranges per view, and they must be
+  // derived together. Two independent reads let the main window advance a
+  // month while the comparison still described the old one.
+  it('derives the viewed window and its comparison from one period', () => {
+    expect(periodWindows({ kind: 'month', month: '2026-07' }, TODAY)).toEqual({
+      main: { from: '2026-07-01', to: '2026-07-31' },
+      comparison: { from: '2026-06-01', to: '2026-06-14' },
+    })
+  })
+
+  it('compares a completed period against the full previous one', () => {
+    expect(periodWindows({ kind: 'month', month: '2026-06' }, TODAY)).toEqual({
+      main: { from: '2026-06-01', to: '2026-06-30' },
+      comparison: { from: '2026-05-01', to: '2026-05-31' },
+    })
+  })
+
+  // A null main window means "the whole ledger" — all time has no bounds to
+  // range-query, and nothing to compare against.
+  it('leaves all time unbounded and uncompared', () => {
+    expect(periodWindows({ kind: 'all' }, TODAY)).toEqual({
+      main: null,
+      comparison: null,
+    })
+  })
+
+  it('moves both windows together when the period shifts', () => {
+    const july = periodWindows({ kind: 'month', month: '2026-07' }, TODAY)
+    const june = periodWindows(
+      shiftPeriod({ kind: 'month', month: '2026-07' }, -1),
+      TODAY,
+    )
+    expect(june.main).not.toEqual(july.main)
+    expect(june.comparison).not.toEqual(july.comparison)
+    // June's comparison is May — never July's stale June.
+    expect(june.comparison).toEqual({ from: '2026-05-01', to: '2026-05-31' })
   })
 })
 
