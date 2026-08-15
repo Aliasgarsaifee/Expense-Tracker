@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addMonths,
+  daysBetween,
   formatDateLong,
   monthGrid,
   monthLabel,
@@ -132,5 +133,27 @@ describe('yesterdayISO', () => {
     const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     expect(y).toBe(local)
     expect(y < todayISO()).toBe(true)
+  })
+})
+
+describe('daysBetween', () => {
+  it('is zero for the same day', () => {
+    expect(daysBetween('2026-08-16', '2026-08-16')).toBe(0)
+  })
+
+  it('counts whole days forward', () => {
+    expect(daysBetween('2026-08-09', '2026-08-16')).toBe(7)
+  })
+
+  it('counts across a month boundary', () => {
+    expect(daysBetween('2026-07-30', '2026-08-02')).toBe(3)
+  })
+
+  it('counts across a year boundary', () => {
+    expect(daysBetween('2025-12-30', '2026-01-02')).toBe(3)
+  })
+
+  it('is negative when the second day precedes the first', () => {
+    expect(daysBetween('2026-08-16', '2026-08-14')).toBe(-2)
   })
 })
