@@ -762,6 +762,23 @@ button {
   gap: 9px;
 }
 
+/* --danger as text holds AA in both themes (light 5.44 on --surface, dark
+   4.84 — the tightest pair in the file); the tint is a fill, not text. */
+.backup-warning {
+  border: 1.5px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.backup-warning p {
+  margin: 0 0 10px;
+  color: var(--danger);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
 /* ——— edit sheet ——— */
 
 .sheet-scrim {

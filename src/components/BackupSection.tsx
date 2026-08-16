@@ -1,7 +1,9 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
-import { listCategories, listExpenses, listPaymentMethods } from '../db'
+import { listCategories, listExpenses, listPaymentMethods, unbackedSince } from '../db'
 import { runAutoBackupIfDue, writePreImportSnapshot } from '../lib/autoBackup'
 import { backupToJson, expensesToCsv, importBackup, parseBackupJson } from '../lib/backup'
+import { assessBackupHealth } from '../lib/backupHealth'
 import { todayISO } from '../lib/dates'
 import { exportTextFile } from '../lib/exportFile'
 import { getPref, PREFS, setPref } from '../lib/prefs'
@@ -13,15 +15,29 @@ interface Props {
     message: string
     confirmLabel: string
   }) => Promise<boolean>
+  // Fired after a successful JSON export so an ancestor can re-read the pref;
+  // localStorage is not reactive, so nothing else would notice.
+  onExported?: () => void
 }
 
-export function BackupSection({ showAlert, askConfirm }: Props) {
+export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
   const [exporting, setExporting] = useState(false)
   const [autoBackup, setAutoBackup] = useState(() => getPref(PREFS.autoBackup, true))
   const [lastSnapshot, setLastSnapshot] = useState(() =>
     getPref(PREFS.lastAutoBackup, ''),
   )
+  const [lastExport, setLastExport] = useState(() => getPref(PREFS.lastExport, ''))
   const fileInput = useRef<HTMLInputElement>(null)
+
+  const unbacked = useLiveQuery(
+    () => unbackedSince(lastExport === '' ? null : lastExport),
+    [lastExport],
+  )
+  const health = assessBackupHealth({
+    unbackedCount: unbacked?.count ?? 0,
+    oldestUnbackedAt: unbacked?.oldestAt ?? null,
+    now: new Date().toISOString(),
+  })
 
   // A failed backup must never be silent, and a double-tap must not race
   // the share sheet ("Can't share while sharing is in progress").
@@ -53,6 +69,13 @@ export function BackupSection({ showAlert, askConfirm }: Props) {
 
   function exportJson() {
     void runExport(async () => {
+      // Stamped BEFORE the ledger is read, never after. unbackedSince uses an
+      // exclusive `.above(cursor)`, so an entry created while the export is in
+      // flight — the share sheet can sit open for seconds — must fall after
+      // this cursor to still count as unbacked. Over-reporting costs one
+      // spurious nudge; under-reporting silently marks an entry safe when no
+      // file contains it.
+      const stampedAt = new Date().toISOString()
       await exportTextFile(
         `expense-backup-${todayISO()}.json`,
         backupToJson({
@@ -62,6 +85,11 @@ export function BackupSection({ showAlert, askConfirm }: Props) {
         }),
         'application/json',
       )
+      // Only a JSON export counts: it is the only artefact importBackup can
+      // read back, and only reached here, after the write actually succeeded.
+      setPref(PREFS.lastExport, stampedAt)
+      setLastExport(getPref(PREFS.lastExport, ''))
+      onExported?.()
     })
   }
 
@@ -139,6 +167,21 @@ export function BackupSection({ showAlert, askConfirm }: Props) {
         snapshots land in Files → On My iPhone → Expense Tracker. For an iCloud
         copy, export JSON and pick “Save to Files → iCloud Drive”.
       </p>
+      {health.stale && (
+        <div className="backup-warning" role="status">
+          <p>
+            {health.unbackedCount === 1
+              ? '1 entry isn’t in any backup'
+              : `${health.unbackedCount} entries aren’t in any backup`}
+            {' — the oldest is '}
+            {health.atRiskDays === 1 ? '1 day' : `${health.atRiskDays} days`} old.
+          </p>
+          <button type="button" className="btn-ghost" disabled={exporting} onClick={exportJson}>
+            <span>Save backup</span>
+            <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+      )}
       <label className="switch-row">
         <span className="switch-text">
           <span>Daily snapshot on launch</span>
