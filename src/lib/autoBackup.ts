@@ -3,6 +3,7 @@ import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { db, listCategories, listPaymentMethods } from '../db'
 import { backupToJson } from './backup'
 import { todayISO } from './dates'
+import { exportTextFile } from './exportFile'
 import { getPref, PREFS, setPref } from './prefs'
 
 const KEEP = 7
@@ -32,14 +33,23 @@ async function writeBackupFile(name: string, json: string): Promise<void> {
   })
 }
 
-// Safety copy taken just before an import merges foreign data in. The name
-// sits outside SNAP_RE so the pruner never rotates it away; one per day is
-// enough (a second same-day import overwrites the same file).
+// Safety copy taken just before an import merges foreign data in. importBackup
+// ends in bulkPut, so importing an older backup reverts every edit made since
+// it was taken — this is the only thing standing between the owner and that.
+// The name sits outside SNAP_RE so the pruner never rotates it away; one per
+// day is enough (a second same-day import overwrites the same file).
 export async function writePreImportSnapshot(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return
   const json = await currentBackupJson()
   if (json === null) return
-  await writeBackupFile(`pre-import-${todayISO()}.json`, json)
+  const name = `pre-import-${todayISO()}.json`
+  if (Capacitor.isNativePlatform()) {
+    await writeBackupFile(name, json)
+    return
+  }
+  // A browser has no Documents folder, so the copy goes straight to the owner
+  // via the share sheet. That is stricter than the native path, which writes
+  // it to the very phone whose loss the backup exists to survive.
+  await exportTextFile(name, json, 'application/json')
 }
 
 // Daily safety net: a JSON snapshot lands in the app's Documents folder,

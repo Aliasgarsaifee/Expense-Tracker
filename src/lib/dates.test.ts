@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addMonths,
+  daysSince,
   formatDateLong,
   monthGrid,
   monthLabel,
@@ -132,5 +133,55 @@ describe('yesterdayISO', () => {
     const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     expect(y).toBe(local)
     expect(y < todayISO()).toBe(true)
+  })
+})
+
+describe('daysSince', () => {
+  it('is zero for the same day', () => {
+    expect(daysSince('2026-08-16', '2026-08-16')).toBe(0)
+  })
+
+  it('counts whole days forward', () => {
+    expect(daysSince('2026-08-09', '2026-08-16')).toBe(7)
+  })
+
+  it('counts across a month boundary', () => {
+    expect(daysSince('2026-07-30', '2026-08-02')).toBe(3)
+  })
+
+  it('counts across a year boundary', () => {
+    expect(daysSince('2025-12-30', '2026-01-02')).toBe(3)
+  })
+
+  it('is negative when the second day precedes the first', () => {
+    expect(daysSince('2026-08-16', '2026-08-14')).toBe(-2)
+  })
+})
+
+// IST (this machine's zone) has no DST, so proving the Math.round claim above
+// needs a zone that does. process.env.TZ is saved/restored per-test in
+// try/finally rather than beforeEach/afterEach so the mutation is confined to
+// exactly one `it` and cannot leak into the rest of this file even if a
+// future edit adds more tests to this describe block.
+//
+// tsconfig.app.json's `types` is `["vite/client"]` only — this file runs
+// under Node via vitest, but the app itself is browser-only, so `process`
+// isn't ambiently typed here. A narrow local declaration avoids widening the
+// project-wide config for one test's sake.
+declare const process: { env: Record<string, string | undefined> }
+
+describe('daysSince across a DST boundary', () => {
+  it('counts one whole day over the spring-forward transition, where the day is 23 hours', () => {
+    const originalTZ = process.env.TZ
+    try {
+      // 2026-03-08: America/New_York clocks jump 2am -> 3am, so this
+      // calendar day is only 23 hours. Math.floor would read that as 0 whole
+      // days elapsed instead of 1 — this is the case the rounding guards.
+      process.env.TZ = 'America/New_York'
+      expect(daysSince('2026-03-08', '2026-03-09')).toBe(1)
+    } finally {
+      if (originalTZ === undefined) delete process.env.TZ
+      else process.env.TZ = originalTZ
+    }
   })
 })

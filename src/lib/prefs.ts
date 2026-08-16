@@ -9,6 +9,7 @@ export const PREFS = {
   summaryPeriod: 'summaryPeriodKind', // day|month|year|all ('week' from ≤ v1.3.0 restores as month); custom is never persisted
   historySort: 'historySort', // newest|oldest|largest|smallest (view pref; unknown → newest)
   calendarHeatBasis: 'calendarHeatBasis', // all|month|year — Summary calendar heat scale
+  lastExport: 'lastExportAt', // ISO timestamp of the last JSON export — the only backup that leaves the device
 } as const
 
 const PREFIX = 'et-pref:'

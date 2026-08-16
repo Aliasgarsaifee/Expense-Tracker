@@ -9,6 +9,10 @@
    light accent #4c6b4a on #ebebe0 (5.0) · dark accent #a4c39a on #191a14 (9.0)
    light ink-2 #5e5e50 on #ebebe0 (5.5) · dark ink-2 #a6a890 on #191a14 (7.2)
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
+   light danger #b3372b on #ebebe0 (5.0) · dark danger #e06a5e on #191a14 (5.3)
+   light danger on #f5f4ec surface (5.4) · dark danger on #21231a (4.8)
+   danger on the .backup-warning tint (danger 4% + surface): 5.1 / 4.6 dark —
+   the tightest pair here; raising that 4% fails AA in dark (8% measures 4.38)
    Calendar spend-heat once lived here as four background tints and no longer
    does: the day number sits inside the cell, so ink legibility capped the
    ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
@@ -163,6 +167,20 @@ body::after {
 
 .menu-btn:active {
   background: var(--chip);
+}
+
+/* Ambient, not alarming: a dot the owner sees daily without it ever
+   interrupting an entry. aria-label carries the same fact for screen
+   readers, so this is never a colour-only signal. */
+.menu-btn.is-stale::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
 }
 
 .eyebrow {
@@ -760,6 +778,25 @@ button {
 .backup-actions {
   display: grid;
   gap: 9px;
+}
+
+/* The tint is what caps this: it lightens --surface in dark mode, eroding
+   contrast with --danger text. Measured in-browser — 8% gives 4.38 in dark
+   (fails AA), 6% lands exactly on 4.50 with no margin, 4% holds
+   light 5.13 / dark 4.61. Do not raise it without re-measuring both themes. */
+.backup-warning {
+  border: 1.5px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.backup-warning p {
+  margin: 0 0 10px;
+  color: var(--danger);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 /* ——— edit sheet ——— */

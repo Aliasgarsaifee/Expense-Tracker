@@ -423,3 +423,23 @@ export async function deleteCategory(id: string): Promise<void> {
   }
   await db.categories.delete(id)
 }
+
+// What would be lost right now: entries created since the last export, plus
+// the oldest of them so the caller can say how long they have been at risk.
+// createdAt has been indexed since version(1), so both reads are range scans
+// over the index rather than a table scan. The collection is rebuilt per read
+// because a Dexie Collection is a one-shot query description, not a result.
+export async function unbackedSince(
+  lastExportAt: string | null,
+): Promise<{ count: number; oldestAt: string | null }> {
+  const unbacked = () =>
+    lastExportAt === null
+      ? db.expenses.orderBy('createdAt')
+      : db.expenses.where('createdAt').above(lastExportAt)
+
+  const count = await unbacked().count()
+  if (count === 0) return { count: 0, oldestAt: null }
+  // Index order is ascending, so first() is the oldest.
+  const oldest = await unbacked().first()
+  return { count, oldestAt: oldest?.createdAt ?? null }
+}

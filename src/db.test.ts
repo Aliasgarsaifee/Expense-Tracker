@@ -24,6 +24,7 @@ import {
   restoreExpense,
   setCategoryArchived,
   setPaymentMethodArchived,
+  unbackedSince,
   UPI_METHOD_ID,
   updateExpense,
 } from './db'
@@ -700,5 +701,107 @@ describe('methodRecency', () => {
 
   it('returns an empty map for an empty ledger', async () => {
     expect((await methodRecency()).size).toBe(0)
+  })
+})
+
+describe('unbackedSince', () => {
+  it('reports nothing on an empty ledger', async () => {
+    expect(await unbackedSince(null)).toEqual({ count: 0, oldestAt: null })
+  })
+
+  it('counts every entry when nothing has ever been exported', async () => {
+    const first = await addExpense({
+      amount: 100,
+      category: 'Food',
+      spentOn: '2026-08-01',
+    })
+    await tick()
+    await addExpense({ amount: 200, category: 'Food', spentOn: '2026-08-02' })
+
+    const { count, oldestAt } = await unbackedSince(null)
+    expect(count).toBe(2)
+    expect(oldestAt).toBe(first.createdAt)
+  })
+
+  it('counts only entries created after the cursor', async () => {
+    await addExpense({ amount: 100, category: 'Food', spentOn: '2026-08-01' })
+    await tick()
+    const cursor = new Date().toISOString()
+    await tick()
+    const after = await addExpense({
+      amount: 300,
+      category: 'Food',
+      spentOn: '2026-08-03',
+    })
+
+    const { count, oldestAt } = await unbackedSince(cursor)
+    expect(count).toBe(1)
+    expect(oldestAt).toBe(after.createdAt)
+  })
+
+  it('reports nothing when the cursor is newer than every entry', async () => {
+    await addExpense({ amount: 100, category: 'Food', spentOn: '2026-08-01' })
+    await tick()
+
+    expect(await unbackedSince(new Date().toISOString())).toEqual({
+      count: 0,
+      oldestAt: null,
+    })
+  })
+
+  // addExpense always stamps a fresh createdAt, so tick()-separated entries
+  // can never land exactly on the cursor — insert directly to pin the
+  // boundary as already-backed-up (exclusive), not merely "not older".
+  it('treats an entry created exactly at the cursor as already backed up', async () => {
+    const cursor = '2026-08-01T12:00:00.000Z'
+    await db.expenses.add({
+      id: 'at-cursor',
+      amount: 100,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-01',
+      createdAt: cursor,
+    })
+    const after = {
+      id: 'after-cursor',
+      amount: 200,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-02',
+      createdAt: '2026-08-01T12:00:00.001Z',
+    }
+    await db.expenses.add(after)
+
+    expect(await unbackedSince(cursor)).toEqual({ count: 1, oldestAt: after.createdAt })
+  })
+
+  // Two entries past the cursor with distinct createdAt, inserted newest
+  // first so table order is the reverse of createdAt order: oldestAt must
+  // come from the createdAt index, not from insertion or primary-key order
+  // (the id is a random uuid, so toArray() order is arbitrary).
+  it('returns the older of two entries past the cursor, not the one inserted first', async () => {
+    const cursor = '2026-08-01T00:00:00.000Z'
+    const newer = {
+      id: 'newer',
+      amount: 200,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-03',
+      createdAt: '2026-08-03T00:00:00.000Z',
+    }
+    const older = {
+      id: 'older',
+      amount: 100,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-02',
+      createdAt: '2026-08-02T00:00:00.000Z',
+    }
+    await db.expenses.add(newer)
+    await db.expenses.add(older)
+
+    const { count, oldestAt } = await unbackedSince(cursor)
+    expect(count).toBe(2)
+    expect(oldestAt).toBe(older.createdAt)
   })
 })

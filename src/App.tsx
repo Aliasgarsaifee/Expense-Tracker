@@ -1,6 +1,9 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { SettingsDrawer } from './components/SettingsDrawer'
+import { unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
+import { assessBackupHealth } from './lib/backupHealth'
 import type { HistoryJump } from './lib/history'
 import { getPref, PREFS } from './lib/prefs'
 import { AddScreen } from './screens/AddScreen'
@@ -73,16 +76,38 @@ export default function App() {
     getPref(PREFS.defaultCurrency, 'INR'),
   )
 
+  // Prefs are not reactive, so the last-export timestamp lives here and the
+  // drawer reports back when an export succeeds.
+  const [lastExport, setLastExport] = useState(() => getPref(PREFS.lastExport, ''))
+  // Staleness is a function of elapsed time, not of data changing, so resuming
+  // after days away has to re-run the check — nothing else would trigger it on
+  // the PWA, where runAutoBackupIfDue is a no-op.
+  const [resumeTick, setResumeTick] = useState(0)
+  const unbacked = useLiveQuery(
+    () => unbackedSince(lastExport === '' ? null : lastExport),
+    [lastExport, resumeTick],
+  )
+  const backupStale = assessBackupHealth({
+    unbackedCount: unbacked?.count ?? 0,
+    oldestUnbackedAt: unbacked?.oldestAt ?? null,
+    now: new Date().toISOString(),
+  }).stale
+
   useEffect(() => {
     // Fire-and-forget: a failed snapshot only shows up as a stale
-    // "last snapshot" date in Settings, never as a launch blocker. Also runs
-    // on foreground (visibilitychange fires in WKWebView on app resume), so
-    // the daily snapshot isn't limited to cold starts.
+    // "last snapshot" date in Settings, never as a launch blocker. Runs on
+    // foreground too (visibilitychange fires in WKWebView on app resume): on
+    // native that catches a snapshot a cold-start-only check would miss; on
+    // the PWA the snapshot call is a no-op, and this is what bumps
+    // resumeTick so the staleness check re-runs instead.
     const run = () =>
       runAutoBackupIfDue().catch((err) => console.error('auto-backup failed', err))
     run()
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') run()
+      if (document.visibilityState === 'visible') {
+        run()
+        setResumeTick((tick) => tick + 1)
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
@@ -92,8 +117,8 @@ export default function App() {
     <div className="app">
       <button
         type="button"
-        className="menu-btn"
-        aria-label="Open settings"
+        className={backupStale ? 'menu-btn is-stale' : 'menu-btn'}
+        aria-label={backupStale ? 'Open settings — backup overdue' : 'Open settings'}
         onClick={() => setSettingsOpen(true)}
       >
         <MenuIcon />
@@ -127,6 +152,7 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onDefaultCurrencyChange={setDefaultCurrency}
         onJumpToHistory={jumpToHistory}
+        onExported={() => setLastExport(getPref(PREFS.lastExport, ''))}
       />
     </div>
   )

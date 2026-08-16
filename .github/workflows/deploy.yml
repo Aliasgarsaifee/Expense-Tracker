@@ -1,0 +1,48 @@
+name: Deploy PWA
+
+on:
+  push:
+    branches: [main]
+  # On-demand so a feature branch can be deployed for the on-device gate
+  # (install to home screen, airplane-mode launch) before it merges.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; let an in-flight run finish rather than
+# publishing a half-built site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The same three gates CLAUDE.md requires locally. A red test must not
+      # reach the phone, and autoUpdate means a bad deploy arrives silently.
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      # Must run last: both scripts write dist with emptyOutDir, and dist is
+      # what upload-pages-artifact ships — swapping the order silently
+      # deploys root-base assets that 404 on Pages.
+      - run: npm run build:pwa
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
