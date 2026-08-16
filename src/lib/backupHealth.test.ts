@@ -67,4 +67,17 @@ describe('assessBackupHealth', () => {
       assessBackupHealth({ unbackedCount: 5, oldestUnbackedAt: null, now: NOW }),
     ).toEqual({ unbackedCount: 0, atRiskDays: null, stale: false })
   })
+
+  // The mirror of the test above: a non-null, old timestamp paired with a
+  // zero count must still short-circuit to the zero-state — the count is the
+  // authority on whether anything is unbacked, not the timestamp's presence.
+  it('reports nothing at risk when the count is zero, even with a real timestamp', () => {
+    expect(
+      assessBackupHealth({
+        unbackedCount: 0,
+        oldestUnbackedAt: '2023-01-04T09:00:00.000Z',
+        now: NOW,
+      }),
+    ).toEqual({ unbackedCount: 0, atRiskDays: null, stale: false })
+  })
 })

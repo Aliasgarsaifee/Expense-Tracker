@@ -107,10 +107,14 @@ export function monthGrid(month: string): (string | null)[] {
   return cells
 }
 
-// Whole calendar days from A to B, negative when B precedes A. Both sides go
-// through dateOfDay (local, not UTC) for the same reason localISO exists, and
-// the result is rounded because a DST boundary makes a "day" 23 or 25 hours.
-export function daysBetween(isoDayA: string, isoDayB: string): number {
-  const ms = dateOfDay(isoDayB).getTime() - dateOfDay(isoDayA).getTime()
+// Whole calendar days elapsed, negative when `to` precedes `from`. Exclusive:
+// the same day is 0. Deliberately NOT named daysBetween — period.ts already
+// exports one with inclusive semantics (same day → 1), and two same-signature
+// functions differing by exactly one is a silent off-by-one waiting to happen.
+// Both sides go through dateOfDay (local, not UTC) for the same reason localISO
+// exists, and the result is rounded because a DST boundary makes a "day" 23 or
+// 25 hours.
+export function daysSince(fromIsoDay: string, toIsoDay: string): number {
+  const ms = dateOfDay(toIsoDay).getTime() - dateOfDay(fromIsoDay).getTime()
   return Math.round(ms / 86_400_000)
 }

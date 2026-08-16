@@ -1,4 +1,4 @@
-import { daysBetween, localISO } from './dates'
+import { daysSince, localISO } from './dates'
 
 // A week of unsaved entries is the point where losing the phone stops being
 // an inconvenience. Exported so tests and callers share one number.
@@ -33,7 +33,7 @@ export function assessBackupHealth({
   }
   // createdAt is a UTC instant but the shown count must mean calendar days as
   // the owner experiences them, so both sides land on a local date first.
-  const atRiskDays = daysBetween(
+  const atRiskDays = daysSince(
     localISO(new Date(oldestUnbackedAt)),
     localISO(new Date(now)),
   )
