@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import { listCategories, listExpenses, listPaymentMethods, unbackedSince } from '../db'
@@ -21,6 +22,9 @@ interface Props {
 }
 
 export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
+  // runAutoBackupIfDue is a no-op off-native, and a switch that does nothing
+  // is worse than no switch.
+  const native = Capacitor.isNativePlatform()
   const [exporting, setExporting] = useState(false)
   const [autoBackup, setAutoBackup] = useState(() => getPref(PREFS.autoBackup, true))
   const [lastSnapshot, setLastSnapshot] = useState(() =>
@@ -166,9 +170,9 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
     <section className="drawer-section">
       <h3 className="drawer-title">Backup</h3>
       <p className="drawer-note">
-        No cloud, no account — if the phone goes, the ledger goes with it. Daily
-        snapshots land in Files → On My iPhone → Expense Tracker. For an iCloud
-        copy, export JSON and pick “Save to Files → iCloud Drive”.
+        {native
+          ? 'No cloud, no account — if the phone goes, the ledger goes with it. Daily snapshots land in Files → On My iPhone → Expense Tracker. For an iCloud copy, export JSON and pick “Save to Files → iCloud Drive”.'
+          : 'No cloud, no account — if the phone goes, the ledger goes with it. Nothing is backed up automatically here: export JSON and pick “Save to Files → iCloud Drive” to keep a copy that survives this device.'}
       </p>
       {health.stale && (
         <div className="backup-warning" role="status">
@@ -185,20 +189,22 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           </button>
         </div>
       )}
-      <label className="switch-row">
-        <span className="switch-text">
-          <span>Daily snapshot on launch</span>
-          <span className="switch-sub">
-            {lastSnapshot ? `last snapshot ${lastSnapshot}` : 'no snapshot yet'}
+      {native && (
+        <label className="switch-row">
+          <span className="switch-text">
+            <span>Daily snapshot on launch</span>
+            <span className="switch-sub">
+              {lastSnapshot ? `last snapshot ${lastSnapshot}` : 'no snapshot yet'}
+            </span>
           </span>
-        </span>
-        <input
-          type="checkbox"
-          className="switch"
-          checked={autoBackup}
-          onChange={toggleAutoBackup}
-        />
-      </label>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={autoBackup}
+            onChange={toggleAutoBackup}
+          />
+        </label>
+      )}
       <div className="backup-actions">
         <button
           type="button"
