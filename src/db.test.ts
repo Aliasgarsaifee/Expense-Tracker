@@ -24,6 +24,7 @@ import {
   restoreExpense,
   setCategoryArchived,
   setPaymentMethodArchived,
+  unbackedSince,
   UPI_METHOD_ID,
   updateExpense,
 } from './db'
@@ -700,5 +701,51 @@ describe('methodRecency', () => {
 
   it('returns an empty map for an empty ledger', async () => {
     expect((await methodRecency()).size).toBe(0)
+  })
+})
+
+describe('unbackedSince', () => {
+  it('reports nothing on an empty ledger', async () => {
+    expect(await unbackedSince(null)).toEqual({ count: 0, oldestAt: null })
+  })
+
+  it('counts every entry when nothing has ever been exported', async () => {
+    const first = await addExpense({
+      amount: 100,
+      category: 'Food',
+      spentOn: '2026-08-01',
+    })
+    await tick()
+    await addExpense({ amount: 200, category: 'Food', spentOn: '2026-08-02' })
+
+    const { count, oldestAt } = await unbackedSince(null)
+    expect(count).toBe(2)
+    expect(oldestAt).toBe(first.createdAt)
+  })
+
+  it('counts only entries created after the cursor', async () => {
+    await addExpense({ amount: 100, category: 'Food', spentOn: '2026-08-01' })
+    await tick()
+    const cursor = new Date().toISOString()
+    await tick()
+    const after = await addExpense({
+      amount: 300,
+      category: 'Food',
+      spentOn: '2026-08-03',
+    })
+
+    const { count, oldestAt } = await unbackedSince(cursor)
+    expect(count).toBe(1)
+    expect(oldestAt).toBe(after.createdAt)
+  })
+
+  it('reports nothing when the cursor is newer than every entry', async () => {
+    await addExpense({ amount: 100, category: 'Food', spentOn: '2026-08-01' })
+    await tick()
+
+    expect(await unbackedSince(new Date().toISOString())).toEqual({
+      count: 0,
+      oldestAt: null,
+    })
   })
 })
