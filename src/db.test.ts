@@ -748,4 +748,60 @@ describe('unbackedSince', () => {
       oldestAt: null,
     })
   })
+
+  // addExpense always stamps a fresh createdAt, so tick()-separated entries
+  // can never land exactly on the cursor — insert directly to pin the
+  // boundary as already-backed-up (exclusive), not merely "not older".
+  it('treats an entry created exactly at the cursor as already backed up', async () => {
+    const cursor = '2026-08-01T12:00:00.000Z'
+    await db.expenses.add({
+      id: 'at-cursor',
+      amount: 100,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-01',
+      createdAt: cursor,
+    })
+    const after = {
+      id: 'after-cursor',
+      amount: 200,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-02',
+      createdAt: '2026-08-01T12:00:00.001Z',
+    }
+    await db.expenses.add(after)
+
+    expect(await unbackedSince(cursor)).toEqual({ count: 1, oldestAt: after.createdAt })
+  })
+
+  // Two entries past the cursor with distinct createdAt, inserted newest
+  // first so table order is the reverse of createdAt order: oldestAt must
+  // come from the createdAt index, not from insertion or primary-key order
+  // (the id is a random uuid, so toArray() order is arbitrary).
+  it('returns the older of two entries past the cursor, not the one inserted first', async () => {
+    const cursor = '2026-08-01T00:00:00.000Z'
+    const newer = {
+      id: 'newer',
+      amount: 200,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-03',
+      createdAt: '2026-08-03T00:00:00.000Z',
+    }
+    const older = {
+      id: 'older',
+      amount: 100,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-08-02',
+      createdAt: '2026-08-02T00:00:00.000Z',
+    }
+    await db.expenses.add(newer)
+    await db.expenses.add(older)
+
+    const { count, oldestAt } = await unbackedSince(cursor)
+    expect(count).toBe(2)
+    expect(oldestAt).toBe(older.createdAt)
+  })
 })
