@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { exportTextFile } from './exportFile'
 
-const share = vi.hoisted(() => vi.fn())
+// Typed against the real signature so a typo'd outcome string (e.g.
+// 'canceled') fails to type-check instead of silently skipping the branch
+// it was meant to exercise — that discriminator is load-bearing for the
+// cancelled-share tests below.
+const share = vi.hoisted(() => vi.fn<typeof exportTextFile>())
 const isNative = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('./exportFile', () => ({ exportTextFile: share }))

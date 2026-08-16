@@ -9,7 +9,7 @@ import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Ask WebKit not to evict IndexedDB under storage pressure. Fire-and-forget:
-// granted or not, the daily auto-backup stays the real safety net.
+// granted or not, the export-staleness nudge stays the real safety net.
 void navigator.storage?.persist?.().catch(() => {})
 
 createRoot(document.getElementById('root')!).render(

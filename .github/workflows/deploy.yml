@@ -36,6 +36,9 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+      # Must run last: both scripts write dist with emptyOutDir, and dist is
+      # what upload-pages-artifact ships — swapping the order silently
+      # deploys root-base assets that 404 on Pages.
       - run: npm run build:pwa
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

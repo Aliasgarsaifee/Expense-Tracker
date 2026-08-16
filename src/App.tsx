@@ -79,9 +79,13 @@ export default function App() {
   // Prefs are not reactive, so the last-export timestamp lives here and the
   // drawer reports back when an export succeeds.
   const [lastExport, setLastExport] = useState(() => getPref(PREFS.lastExport, ''))
+  // Staleness is a function of elapsed time, not of data changing, so resuming
+  // after days away has to re-run the check — nothing else would trigger it on
+  // the PWA, where runAutoBackupIfDue is a no-op.
+  const [resumeTick, setResumeTick] = useState(0)
   const unbacked = useLiveQuery(
     () => unbackedSince(lastExport === '' ? null : lastExport),
-    [lastExport],
+    [lastExport, resumeTick],
   )
   const backupStale = assessBackupHealth({
     unbackedCount: unbacked?.count ?? 0,
@@ -91,14 +95,19 @@ export default function App() {
 
   useEffect(() => {
     // Fire-and-forget: a failed snapshot only shows up as a stale
-    // "last snapshot" date in Settings, never as a launch blocker. Also runs
-    // on foreground (visibilitychange fires in WKWebView on app resume), so
-    // the daily snapshot isn't limited to cold starts.
+    // "last snapshot" date in Settings, never as a launch blocker. Runs on
+    // foreground too (visibilitychange fires in WKWebView on app resume): on
+    // native that catches a snapshot a cold-start-only check would miss; on
+    // the PWA the snapshot call is a no-op, and this is what bumps
+    // resumeTick so the staleness check re-runs instead.
     const run = () =>
       runAutoBackupIfDue().catch((err) => console.error('auto-backup failed', err))
     run()
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') run()
+      if (document.visibilityState === 'visible') {
+        run()
+        setResumeTick((tick) => tick + 1)
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)

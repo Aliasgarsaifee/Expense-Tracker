@@ -17,6 +17,13 @@ export interface BackupHealth {
 // for hours, and the nudge should stay quiet. The same rule absorbs the
 // never-exported case with no branch: every entry is unbacked, so the clock
 // starts at the oldest one.
+//
+// Blind spot: unbackedSince ranges over createdAt, and updateExpense
+// deliberately preserves it, so edits and deletions are invisible to this
+// rule — a stretch of pure corrections and deletions with no new entries
+// produces no nudge, even though those changes exist in no backup. Properly
+// closing that needs an updatedAt field, i.e. a Dexie version(5) migration;
+// deliberately out of scope for now.
 export function assessBackupHealth({
   unbackedCount,
   oldestUnbackedAt,
@@ -28,6 +35,10 @@ export function assessBackupHealth({
   now: string
   staleAfterDays?: number
 }): BackupHealth {
+  // The two inputs should always agree (one is zero/null iff the other is).
+  // If a caller ever passes them out of sync, answering "nothing to report"
+  // is the right call — fail quiet rather than warn on input that shouldn't
+  // be possible, and never surface the caller's count with no date behind it.
   if (unbackedCount === 0 || oldestUnbackedAt === null) {
     return { unbackedCount: 0, atRiskDays: null, stale: false }
   }
