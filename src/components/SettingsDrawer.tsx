@@ -33,6 +33,7 @@ interface Props {
   onClose: () => void
   onDefaultCurrencyChange?: (code: string) => void
   onJumpToHistory: (jump: HistoryJump) => void
+  onExported?: () => void
 }
 
 export function SettingsDrawer({ open, ...body }: Props) {
@@ -172,6 +173,7 @@ function DrawerBody({
   onClose,
   onDefaultCurrencyChange,
   onJumpToHistory,
+  onExported,
 }: Omit<Props, 'open'>) {
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
@@ -428,7 +430,7 @@ function DrawerBody({
           </button>
         </section>
 
-        <BackupSection showAlert={showAlert} askConfirm={askConfirm} />
+        <BackupSection showAlert={showAlert} askConfirm={askConfirm} onExported={onExported} />
 
         <section className="drawer-section">
           <h3 className="drawer-title">About</h3>

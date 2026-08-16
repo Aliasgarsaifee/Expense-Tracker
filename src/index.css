@@ -169,6 +169,20 @@ body::after {
   background: var(--chip);
 }
 
+/* Ambient, not alarming: a dot the owner sees daily without it ever
+   interrupting an entry. aria-label carries the same fact for screen
+   readers, so this is never a colour-only signal. */
+.menu-btn.is-stale::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
 .eyebrow {
   margin: 0 0 4px;
   font-size: 11px;
