@@ -76,7 +76,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
       // spurious nudge; under-reporting silently marks an entry safe when no
       // file contains it.
       const stampedAt = new Date().toISOString()
-      await exportTextFile(
+      const outcome = await exportTextFile(
         `expense-backup-${todayISO()}.json`,
         backupToJson({
           expenses: await listExpenses(),
@@ -85,6 +85,9 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
         }),
         'application/json',
       )
+      // A dismissed share sheet saves nothing, so it must not clear the
+      // warning — that is the same false reassurance CSV is barred from.
+      if (outcome === 'cancelled') return
       // Only a JSON export counts: it is the only artefact importBackup can
       // read back, and only reached here, after the write actually succeeded.
       setPref(PREFS.lastExport, stampedAt)

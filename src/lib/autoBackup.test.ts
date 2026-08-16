@@ -21,6 +21,9 @@ import { writePreImportSnapshot } from './autoBackup'
 
 beforeEach(async () => {
   share.mockReset()
+  // Mirrors exportTextFile's real contract (a resolved call means delivery);
+  // tests that need cancellation/failure override this per-call below.
+  share.mockResolvedValue('saved')
   isNative.mockReturnValue(false)
   await db.expenses.clear()
 })
@@ -41,6 +44,16 @@ describe('writePreImportSnapshot off-native', () => {
   it('writes nothing when there is no ledger to protect', async () => {
     await writePreImportSnapshot()
     expect(share).not.toHaveBeenCalled()
+  })
+
+  // A declined safety copy still lets the already-confirmed import proceed:
+  // writePreImportSnapshot ignores the outcome entirely, so a cancelled
+  // share must resolve exactly like a saved one, not reject or hang.
+  it('resolves even when the share sheet is cancelled', async () => {
+    await addExpense({ amount: 250, category: 'Food', spentOn: '2026-08-16' })
+    share.mockResolvedValueOnce('cancelled')
+
+    await expect(writePreImportSnapshot()).resolves.toBeUndefined()
   })
 
   // Pins the contract: a failed copy propagates, and SettingsDrawer's own
