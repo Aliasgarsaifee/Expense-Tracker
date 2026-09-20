@@ -1,7 +1,10 @@
 /* ————————————————————————————————————————————————
    Pocket ledger: sage paper, ink, sage-green. Clay (#B5542F light /
    #E0A47F dark) is a warm brand accent used as a fill only, never as text
-   (it can't hold 4.5:1 on paper, and would muddle with the red --danger): it
+   (4.09 on light paper — it fails AA there while its dark cut passes at 8.16,
+   and a hue that clears in one theme but not the other is the most dangerous
+   kind, because whoever adds it only ever looks at one; it would also muddle
+   with the red --danger): it
    is the app icon/splash, and --now, the lone non-text highlight on the
    current-period trend bar. Clay and sage share a luminance (≈1.2:1), so --now
    may only mark a bar already set apart by position — never a second series.
@@ -13,6 +16,17 @@
    light danger on #f5f4ec surface (5.4) · dark danger on #21231a (4.8)
    danger on the .backup-warning tint (danger 4% + surface): 5.1 / 4.6 dark —
    the tightest pair here; raising that 4% fails AA in dark (8% measures 4.38)
+   Money semantics (added with the Pocket scales below; see the Pocket design
+   system for the full derivation). --positive and --negative alias --accent
+   and --danger, so they inherit those measurements:
+   light caution #7a5a12 on #ebebe0 (5.3) · dark caution #d6b45e on #191a14 (8.8)
+   light pending #4a6272 on #ebebe0 (5.3) · dark pending #9db8c8 on #191a14 (8.4)
+   Each semantic hue on its own 4% tint over --surface, light / dark:
+   positive 5.2 / 7.7 · caution 5.5 / 7.4 · pending 5.5 / 7.1 · negative 5.1 /
+   4.6 — negative/dark is the floor, and it is the same wall .backup-warning
+   hit, found again independently: at 8% it measures 4.37 and fails. Do not
+   deepen a tint. The tints are the ONLY use of these hues as a ground; as
+   text they sit on --bg and --surface, measured above.
    Calendar spend-heat once lived here as four background tints and no longer
    does: the day number sits inside the cell, so ink legibility capped the
    ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
@@ -33,6 +47,74 @@
   --danger: #b3372b;
   --now: #b5542f;
   --scrim: rgba(35, 35, 28, 0.45);
+
+  /* Money semantics. --positive and --negative are aliases, not copies: they
+     resolve through --accent/--danger so they follow the theme with no second
+     declaration, and can be given their own hue later without touching a call
+     site. They are NOT interchangeable with what they alias — --danger is an
+     action you might regret, --negative is a fact about a number. */
+  --positive: var(--accent);
+  --negative: var(--danger);
+  --caution: #7a5a12;
+  --pending: #4a6272;
+
+  /* Status grounds, all mixed at 4% over --surface. That number is a floor,
+     not a taste: --negative on --negative-tint is the tightest pair here
+     (5.1 light / 4.6 dark) and an 8% tint measures 4.38 in dark and fails. */
+  --positive-tint: #eeefe6;
+  --negative-tint: #f2ece4;
+  --caution-tint: #f0eee3;
+  --pending-tint: #eeeee7;
+
+  /* Spacing, named by its own pixel value so nothing has to be decoded.
+     Existing rules keep their hand-tuned literals; these are for new work. */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-56: 56px;
+
+  /* Radii as shipped. The menu button's 13px is the one value not represented:
+     it folds into --radius-md for anything new. */
+  --radius-xs: 4px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-pill: 999px;
+
+  /* Density. --row-compact is pointer-only and deliberately below --tap-min:
+     34px is fine for a mouse and wrong for a thumb. */
+  --row-touch: 48px;
+  --row-compact: 34px;
+  --tap-min: 44px;
+  --control-min: 48px;
+  --measure: 560px;
+
+  /* The only three shadows, and they all mean lifted off the page. Everything
+     else separates with --line. --shadow-raise stays a color-mix on --accent
+     rather than a literal so the accent remains the single source of truth. */
+  --shadow-raise: 0 2px 10px color-mix(in srgb, var(--accent) 28%, transparent);
+  --shadow-toast: 0 6px 20px rgba(10, 6, 0, 0.22);
+  --shadow-sheet: 0 -12px 40px rgba(10, 6, 0, 0.25);
+
+  /* The layer ladder, previously literals at each call site. A new layer takes
+     an existing rung or this list grows — never an ad-hoc number. */
+  --z-tabbar: 20;
+  --z-float: 30;
+  --z-sheet: 40;
+  --z-drawer: 50;
+  --z-dialog: 60;
+  --z-grain: 9999;
+
   --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --font-body: 'Atkinson Hyperlegible', -apple-system, 'Segoe UI', sans-serif;
   color-scheme: light dark;
@@ -52,6 +134,16 @@
     --danger: #e06a5e;
     --now: #e0a47f;
     --scrim: rgba(5, 6, 2, 0.6);
+
+    /* Only the theme-dependent half repeats here. --positive/--negative are
+       aliases and follow --accent/--danger on their own; the spacing, radius,
+       density, shadow and layer scales are theme-independent by definition. */
+    --caution: #d6b45e;
+    --pending: #9db8c8;
+    --positive-tint: #26291f;
+    --negative-tint: #29261d;
+    --caution-tint: #28291d;
+    --pending-tint: #262921;
   }
 }
 
