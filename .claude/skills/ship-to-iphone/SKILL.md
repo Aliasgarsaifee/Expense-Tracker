@@ -83,3 +83,9 @@ These are the paths a browser cannot verify — walk them after every install:
   Xcode 27 made the UIScene life cycle mandatory — the frame was
   `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`; fixed by
   Capacitor 8.5's SceneDelegate.)
+- "Cannot find 'X' in scope" for a Capacitor API right after a Capacitor
+  upgrade, though the package resolved to the new version → Xcode reused a
+  stale precompiled module: the new xcframework keeps its release-date file
+  times, which look *older* than the module built from the previous version.
+  Product → Clean Build Folder (⇧⌘K), then Run. (Hit on 8.4.1 → 8.5.2 with
+  `SceneDelegateProxy`; a fresh DerivedData never shows it.)
