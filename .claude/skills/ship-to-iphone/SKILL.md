@@ -70,3 +70,16 @@ These are the paths a browser cannot verify — walk them after every install:
   Caches, then reopen.
 - The phone must be unlocked and "Trust This Computer"-ed for Xcode to list
   it as a target.
+- "Xcode cannot launch App … because the device is locked" → the install
+  already succeeded; Xcode just can't start the app on a locked phone, and
+  Auto-Lock is shorter than a build. Keep the screen awake while it builds.
+  Beware: this message stops Xcode before launch, so it hides a launch crash —
+  if tapping the icon then does nothing, it is a crash, not the lock.
+- App opens and instantly closes after a Mac/Xcode upgrade → a re-sign is a
+  recompile against the new SDK, and Apple gates behavior changes on the SDK
+  the app was linked with. Read the crash log before touching code:
+  `xcrun devicectl device info files --device <id> --domain-type systemCrashLogs`,
+  copy the newest `App-*.ips`, and look at the top UIKit frame. (Sept 2026:
+  Xcode 27 made the UIScene life cycle mandatory — the frame was
+  `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`; fixed by
+  Capacitor 8.5's SceneDelegate.)

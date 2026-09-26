@@ -32,7 +32,8 @@ expense-tracker/
 │   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / paymentMeta   # platform adapters
 │   └── test/setup.ts           # fake-indexeddb → Dexie runs unmodified in Node
 ├── ios/App/                    # Capacitor Xcode project (SPM mode: CapApp-SPM package, no Pods)
-│   └── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
+│   ├── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
+│   └── App/SceneDelegate.swift # + Info.plist's UIApplicationSceneManifest: without both, an iOS 27 SDK build dies at launch
 ├── assets/                     # icon/splash source SVGs (sage "pocket ledger" mark; light + dark variants)
 ├── capacitor.config.ts         # appId com.saifee.expenses, webDir dist
 ├── vite.config.ts              # vitest (node env) + __APP_VERSION__ from package.json
