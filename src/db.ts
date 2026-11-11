@@ -92,13 +92,12 @@ export function isBuiltinCategoryId(id: string): boolean {
   return BUILTIN_CATEGORY_IDS.has(id)
 }
 
-// Absent `fixed` falls back to this default instead of being seeded, so no
-// device needs a migration and a later change to the defaults reaches
-// every install that never made its own choice.
-const DEFAULT_FIXED_IDS = new Set(['cat-rent', 'cat-utilities'])
-
+// Nothing is fixed until the owner marks it: what counts as a fixed cost is
+// theirs to decide. An absent `fixed` therefore means "everyday", which is
+// also why the field needed no migration and no seed. This stays the one
+// place fixedness is read, so a default could return without touching callers.
 export function isFixedCategory(category: Pick<Category, 'id' | 'fixed'>): boolean {
-  return category.fixed ?? DEFAULT_FIXED_IDS.has(category.id)
+  return category.fixed === true
 }
 
 export type NewExpense = Omit<Expense, 'id' | 'createdAt' | 'currency'> & {

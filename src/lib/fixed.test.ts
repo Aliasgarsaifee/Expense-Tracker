@@ -37,9 +37,10 @@ function line(overrides: Partial<FixedLine>): FixedLine {
 describe('fixedLabels / splitFixed', () => {
   it('splits by label, archived categories included, unknown labels everyday', () => {
     const labels = fixedLabels([
-      cat('cat-rent', 'Rent'),
-      cat('cat-utilities', 'Utilities', { archived: true }),
+      cat('cat-rent', 'Rent', { fixed: true }),
+      cat('cat-utilities', 'Utilities', { fixed: true, archived: true }),
       cat('cat-food', 'Food'),
+      cat('cat-health', 'Health', { fixed: false }),
       cat('cat-gym', 'Gym', { fixed: true }),
     ])
     expect(labels).toEqual(new Set(['Rent', 'Utilities', 'Gym']))
@@ -51,8 +52,14 @@ describe('fixedLabels / splitFixed', () => {
     expect(everyday.map((e) => e.category)).toEqual(['Food', 'Deleted'])
   })
 
-  it('keeps a renamed fixed category fixed (id-derived default follows the new label)', () => {
-    expect(fixedLabels([cat('cat-rent', 'Housing')])).toEqual(new Set(['Housing']))
+  it('keeps a renamed fixed category fixed (the flag is on the record, so it follows the new label)', () => {
+    expect(fixedLabels([cat('cat-rent', 'Housing', { fixed: true })])).toEqual(new Set(['Housing']))
+  })
+
+  it('has no fixed labels until a category is marked', () => {
+    expect(fixedLabels([cat('cat-rent', 'Rent'), cat('cat-utilities', 'Utilities')])).toEqual(
+      new Set(),
+    )
   })
 
   // The year has no usual to judge by, so any fixed spend at all splits it.

@@ -52,6 +52,8 @@ describe('checkBudgetAfterSave', () => {
     await db.paymentMethods.bulkAdd(DEFAULT_PAYMENT_METHODS)
     await db.categories.clear()
     await db.categories.bulkAdd(DEFAULT_CATEGORIES)
+    // Nothing is fixed out of the box; these tests need one fixed cost.
+    await setCategoryFixed('cat-rent', true)
   })
 
   it('alerts over when a new entry crosses the line', async () => {
@@ -194,6 +196,7 @@ describe('checkBudgetAfterSave, against the year', () => {
     await db.expenses.clear()
     await db.categories.clear()
     await db.categories.bulkAdd(DEFAULT_CATEGORIES)
+    await setCategoryFixed('cat-rent', true)
   })
 
   it('carries what the earlier months left in hand', async () => {

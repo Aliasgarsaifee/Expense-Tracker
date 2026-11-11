@@ -35,8 +35,8 @@ date, and a free-text note.
   previous period, biggest spend, busiest day/month), an "over time" trend
   chart, and a category chart and by-payment breakdown that tap through to
   the matching History slice.
-  Summary also separates **fixed costs** (rent, utilities — mark any category
-  fixed) from **everyday** spending, and you can set a monthly everyday
+  Summary also separates **fixed costs** (rent, bills — whichever categories
+  you mark as fixed) from **everyday** spending, and you can set a monthly everyday
   **budget**: a heads-up at 80%, an alert the moment a save crosses it, and
   a year view showing which months ran over and what is in hand.
 - **Settings drawer** (☰) — a collapsible group tree of payment methods and

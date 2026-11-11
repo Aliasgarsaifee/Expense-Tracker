@@ -709,11 +709,12 @@ describe('categories', () => {
 })
 
 describe('category fixed flag', () => {
-  it('treats Rent and Utilities as fixed until told otherwise', () => {
-    expect(isFixedCategory({ id: 'cat-rent' })).toBe(true)
-    expect(isFixedCategory({ id: 'cat-utilities' })).toBe(true)
+  it('treats no category as fixed until the owner says so', () => {
+    expect(isFixedCategory({ id: 'cat-rent' })).toBe(false)
+    expect(isFixedCategory({ id: 'cat-utilities' })).toBe(false)
     expect(isFixedCategory({ id: 'cat-food' })).toBe(false)
     expect(isFixedCategory({ id: 'cat-rent', fixed: false })).toBe(false)
+    expect(isFixedCategory({ id: 'cat-rent', fixed: true })).toBe(true)
     expect(isFixedCategory({ id: 'custom-1', fixed: true })).toBe(true)
   })
 

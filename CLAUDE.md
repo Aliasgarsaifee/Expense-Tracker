@@ -120,11 +120,11 @@ Dependency direction is one-way: `screens/components → db.ts + lib/ → Dexie/
   Never change or reuse a seeded id — `pm-upi` stopped being seeded in v4
   (UPI is a group, not an instrument), but its id stays reserved: pre-v4
   backups may resurrect it as an ordinary, deletable-when-unreferenced method.
-- Fixedness (rent-like, recurring) is read only through `isFixedCategory`: the
-  default for `cat-rent` / `cat-utilities` is derived, never stored, which is
-  why there was no migration. The monthly budget is a device pref
-  (`PREFS.monthlyBudgets`) by design — it is not in backups, and changing it
-  re-judges earlier months.
+- Fixedness (rent-like, recurring) is read only through `isFixedCategory`.
+  Nothing is fixed by default — the owner marks categories in the Budget
+  sheet — so an absent `fixed` means everyday, which is why there was no
+  migration. The monthly budget is a device pref (`PREFS.monthlyBudgets`) by
+  design — it is not in backups, and changing it re-judges earlier months.
 
 ### Migrations (the most dangerous code in the repo)
 
@@ -145,7 +145,7 @@ archive-if-referenced) — migrations may simplify, never just accrete.
   methods/categories from a different install merge by label — re-importing
   must never duplicate.
 - v3 category rows may carry an optional boolean `fixed`. Absent must stay
-  absent on parse and export (the default is derived — see `isFixedCategory`),
+  absent on parse and export (absent means everyday — see `isFixedCategory`),
   and an import never clears a local `fixed` the file does not mention.
 - CSV export: fixed column order, formula-injection escaping, BOM for Excel.
 - `autoBackup.ts` prunes only files matching the exact `auto-backup-` prefix
