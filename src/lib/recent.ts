@@ -1,5 +1,7 @@
 import type { Expense } from '../db'
+import { shortDayMonth } from './dates'
 import { formatTotals, type MoneyByCurrency } from './history'
+import { formatMoney } from './money'
 
 // Newest-first entries worth offering as a one-tap refill: distinct by what
 // would be typed again, and only those that could be saved today — an
@@ -37,4 +39,20 @@ export function todaySoFar(expenses: Expense[], primary: string): string {
   const totals: MoneyByCurrency = {}
   for (const x of expenses) totals[x.currency] = (totals[x.currency] ?? 0) + x.amount
   return `Today so far · ${formatTotals(totals, primary)}`
+}
+
+// The Add button names what a tap will save, so the owner never has to
+// reconstruct it from fields scrolled out of view. The date only appears when
+// it is not today — the common case stays short.
+export function addButtonLabel(
+  amount: number | null,
+  currency: string,
+  category: string,
+  spentOn: string,
+  today: string,
+): string {
+  if (amount === null) return 'Add to ledger'
+  const parts = [`Add ${formatMoney(amount, currency)}`, category]
+  if (spentOn !== today) parts.push(shortDayMonth(spentOn))
+  return parts.join(' · ')
 }

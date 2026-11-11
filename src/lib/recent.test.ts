@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Expense } from '../db'
+import { shortDayMonth } from './dates'
 import { formatTotals } from './history'
-import { logAgainChoices, todaySoFar } from './recent'
+import { formatMoney } from './money'
+import { addButtonLabel, logAgainChoices, todaySoFar } from './recent'
 
 // `in` check, not `??`: paymentMethodId: undefined must really mean "no method".
 const e = (overrides: Partial<Expense> = {}): Expense => ({
@@ -67,5 +69,22 @@ describe('todaySoFar', () => {
     expect(todaySoFar([e({ amount: 400 }), e({ amount: 12, currency: 'USD' })], 'INR')).toBe(
       `Today so far · ${formatTotals({ INR: 400, USD: 12 }, 'INR')}`,
     )
+  })
+})
+
+describe('addButtonLabel', () => {
+  it('names the amount and category it will add', () => {
+    expect(addButtonLabel(280, 'INR', 'Food', '2026-11-11', '2026-11-11')).toBe('Add ₹280 · Food')
+  })
+  it('adds the date when it is not today', () => {
+    expect(addButtonLabel(280, 'INR', 'Food', '2026-11-05', '2026-11-11'))
+      .toBe(`Add ₹280 · Food · ${shortDayMonth('2026-11-05')}`)
+  })
+  it('keeps the plain label until there is an amount', () => {
+    expect(addButtonLabel(null, 'INR', 'Food', '2026-11-11', '2026-11-11')).toBe('Add to ledger')
+  })
+  it('formats in the entry currency', () => {
+    expect(addButtonLabel(12.5, 'USD', 'Travel', '2026-11-11', '2026-11-11'))
+      .toBe(`Add ${formatMoney(12.5, 'USD')} · Travel`)
   })
 })

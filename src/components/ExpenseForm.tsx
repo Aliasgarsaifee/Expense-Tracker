@@ -33,7 +33,15 @@ export interface ExpenseFormValues {
 
 interface Props {
   initial?: Partial<ExpenseFormValues>
-  submitLabel: string
+  /** A function lets the button name what it will save (Add screen). */
+  submitLabel:
+    | string
+    | ((draft: {
+        amount: number | null
+        currency: string
+        category: string
+        spentOn: string
+      }) => string)
   onSubmit: (values: ExpenseFormValues) => Promise<void> | void
   /** Add screen: clear amount + note after submit, keep category and date. */
   autoReset?: boolean
@@ -214,18 +222,6 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
           />
         </div>
 
-        <label className="field">
-          <span>What was it?</span>
-          <input
-            type="text"
-            placeholder="e.g. auto to office"
-            maxLength={120}
-            enterKeyHint="done"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </label>
-
         <div className="field">
           <span>Category</span>
           <div className="chip-grid" role="group" aria-label="Category">
@@ -268,12 +264,28 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
           />
         </div>
 
+        {/* Last on purpose: its Done key saves, so everything that gets saved
+            (category, method, date) must already be in view above the keyboard. */}
+        <label className="field">
+          <span>What was it?</span>
+          <input
+            type="text"
+            placeholder="e.g. auto to office"
+            maxLength={120}
+            enterKeyHint="done"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+
         <button
           className="btn-primary"
           type="submit"
           disabled={amount === null || submitting}
         >
-          {submitLabel}
+          {typeof submitLabel === 'function'
+            ? submitLabel({ amount, currency, category, spentOn })
+            : submitLabel}
         </button>
 
         {logAgain.length > 0 && (

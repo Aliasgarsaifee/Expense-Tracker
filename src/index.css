@@ -674,6 +674,11 @@ button {
   border-radius: 14px;
   box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 28%, transparent);
   transition: transform 0.06s ease, opacity 0.12s ease;
+  /* One line: a long label ends in an ellipsis; digits keep their width. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .btn-primary:active {

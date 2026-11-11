@@ -16,7 +16,7 @@ import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
 import { todayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
 import { formatMoney } from '../lib/money'
-import { todaySoFar } from '../lib/recent'
+import { addButtonLabel, todaySoFar } from '../lib/recent'
 import { useToday } from '../lib/useToday'
 import { useDialog } from '../lib/useDialog'
 import { getPref, PREFS, setPref } from '../lib/prefs'
@@ -99,7 +99,7 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
         </div>
       </header>
       <ExpenseForm
-        submitLabel="Add to ledger"
+        submitLabel={(d) => addButtonLabel(d.amount, d.currency, d.category, d.spentOn, today)}
         onSubmit={add}
         autoReset
         recent={recent}
