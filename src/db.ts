@@ -1,4 +1,13 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { roundHome } from './lib/money'
+
+// What was actually handed over, when it was not the home currency. Present
+// only on an entry whose `amount`/`currency` hold the converted home value.
+export interface Paid {
+  amount: number // in `currency` units, above zero
+  currency: string // never equal to the entry's own `currency`
+  byHand?: true // the home value was typed in, not computed from a rate
+}
 
 export interface Expense {
   id: string // uuid
@@ -9,6 +18,7 @@ export interface Expense {
   note?: string
   paymentMethodId?: string // references paymentMethods; absent on pre-v2 entries
   createdAt: string // ISO timestamp
+  paid?: Paid // absent for home-currency entries and for foreign ones still waiting
 }
 
 export interface PaymentMethod {
@@ -206,10 +216,17 @@ function sortNewestFirst(expenses: Expense[]): Expense[] {
   )
 }
 
+function assertPaid(paid: Paid | undefined): void {
+  if (paid && !(Number.isFinite(paid.amount) && paid.amount > 0)) {
+    throw new Error('Paid amount must be a positive number')
+  }
+}
+
 export async function addExpense(input: NewExpense): Promise<Expense> {
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error('Amount must be a positive number')
   }
+  assertPaid(input.paid)
   const expense: Expense = {
     ...input,
     currency: input.currency ?? 'INR',
@@ -268,7 +285,47 @@ export async function updateExpense(
   ) {
     throw new Error('Amount must be a positive number')
   }
+  assertPaid(changes.paid)
   await db.expenses.update(id, changes)
+}
+
+// A foreign entry whose home value is not known yet. Derived, never stored:
+// the moment `paid` is written the entry stops matching.
+function isWaiting(e: Expense, home: string): boolean {
+  return (e.currency ?? 'INR') !== home && e.paid === undefined
+}
+
+// Newest first, up to and including `upTo` (today), so a future-dated entry
+// is not asked for a rate that does not exist yet.
+export async function listWaiting(home: string, upTo: string): Promise<Expense[]> {
+  const rows = await db.expenses
+    .where('spentOn')
+    .belowOrEqual(upTo)
+    .filter((e) => isWaiting(e, home))
+    .toArray()
+  return sortNewestFirst(rows)
+}
+
+// Turns a waiting entry into a home-currency one, keeping what was paid. The
+// row is re-read inside the transaction so a stale list (or a double tap)
+// cannot convert twice or overwrite an entry edited in the meantime.
+export async function convertExpense(
+  id: string,
+  rate: number,
+  home: string,
+): Promise<boolean> {
+  if (!Number.isFinite(rate) || rate <= 0) return false
+  return db.transaction('rw', db.expenses, async () => {
+    const row = await db.expenses.get(id)
+    if (!row || !isWaiting(row, home)) return false
+    await db.expenses.put({
+      ...row,
+      amount: roundHome(row.amount * rate),
+      currency: home,
+      paid: { amount: row.amount, currency: row.currency ?? 'INR' },
+    })
+    return true
+  })
 }
 
 export async function deleteExpense(id: string): Promise<void> {

@@ -9,6 +9,7 @@ import {
   db,
   DEFAULT_CATEGORIES,
   DEFAULT_PAYMENT_METHODS,
+  convertExpense,
   deleteCategory,
   deleteExpense,
   deletePaymentMethod,
@@ -18,6 +19,7 @@ import {
   listExpenses,
   listExpensesBetween,
   listLatestExpenses,
+  listWaiting,
   listPaymentMethods,
   methodRecency,
   PAYMENT_GROUPS,
@@ -924,5 +926,66 @@ describe('listLatestExpenses', () => {
     await at('d', 40, '2026-11-10', '2026-11-10T08:00:00.000Z')
     const latest = await listLatestExpenses(3)
     expect(latest.map((e) => e.amount)).toEqual([30, 20, 40])
+  })
+})
+
+describe('converted entries', () => {
+  const aed = { amount: 120, currency: 'AED', category: 'Food', spentOn: '2026-11-06' }
+
+  it('stores what was paid beside the home value', async () => {
+    const e = await addExpense({ amount: 3076, currency: 'INR', category: 'Food',
+      spentOn: '2026-11-06', paid: { amount: 120, currency: 'AED' } })
+    expect((await db.expenses.get(e.id))!.paid).toEqual({ amount: 120, currency: 'AED' })
+  })
+
+  it('rejects a paid amount that is not above zero', async () => {
+    await expect(addExpense({ ...aed, currency: 'INR', paid: { amount: 0, currency: 'AED' } }))
+      .rejects.toThrow('Paid amount must be a positive number')
+    const e = await addExpense(aed)
+    await expect(updateExpense(e.id, { paid: { amount: NaN, currency: 'AED' } }))
+      .rejects.toThrow('Paid amount must be a positive number')
+  })
+
+  it('drops paid when an edit sets it to undefined', async () => {
+    const e = await addExpense({ amount: 3076, currency: 'INR', category: 'Food',
+      spentOn: '2026-11-06', paid: { amount: 120, currency: 'AED' } })
+    await updateExpense(e.id, { amount: 500, currency: 'INR', paid: undefined })
+    expect((await db.expenses.get(e.id))!.paid).toBeUndefined()
+  })
+
+  it('lists foreign entries with no home value, up to a date', async () => {
+    const waiting = await addExpense(aed)
+    await addExpense({ ...aed, spentOn: '2026-11-20' }) // after upTo
+    await addExpense({ amount: 400, category: 'Food', spentOn: '2026-11-06' }) // home
+    await addExpense({ amount: 3076, currency: 'INR', category: 'Food',
+      spentOn: '2026-11-06', paid: { amount: 120, currency: 'AED' } }) // converted
+    expect((await listWaiting('INR', '2026-11-11')).map((e) => e.id)).toEqual([waiting.id])
+  })
+
+  it('converts a waiting entry and keeps everything else about it', async () => {
+    const e = await addExpense({ ...aed, note: 'dinner', paymentMethodId: CASH_METHOD_ID })
+    expect(await convertExpense(e.id, 25.635, 'INR')).toBe(true)
+    expect(await db.expenses.get(e.id)).toEqual({
+      ...e, amount: 3076, currency: 'INR', paid: { amount: 120, currency: 'AED' },
+    })
+  })
+
+  it('keeps two decimals on a small converted value', async () => {
+    const e = await addExpense({ ...aed, amount: 2 })
+    await convertExpense(e.id, 25.635, 'INR')
+    expect((await db.expenses.get(e.id))!.amount).toBe(51.27)
+  })
+
+  it('refuses rows that are not waiting, and bad rates', async () => {
+    const home = await addExpense({ amount: 400, category: 'Food', spentOn: '2026-11-06' })
+    const waiting = await addExpense(aed)
+    expect(await convertExpense(home.id, 25.635, 'INR')).toBe(false)
+    expect(await convertExpense('no-such-id', 25.635, 'INR')).toBe(false)
+    expect(await convertExpense(waiting.id, 0, 'INR')).toBe(false)
+    expect(await convertExpense(waiting.id, NaN, 'INR')).toBe(false)
+    expect(await convertExpense(waiting.id, 25.635, 'INR')).toBe(true)
+    expect(await convertExpense(waiting.id, 30, 'INR')).toBe(false) // already converted
+    expect((await db.expenses.get(waiting.id))!.amount).toBe(3076)
+    expect(await db.expenses.get(home.id)).toEqual(home)
   })
 })

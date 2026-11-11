@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney, formatShare, parseAmount } from './money'
+import { formatMoney, formatShare, parseAmount, roundHome } from './money'
 
 // Shared by the Add form and the budget prompt, so a figure typed in one is
 // accepted by the other.
@@ -128,5 +128,17 @@ describe('formatShare', () => {
   it('does not divide by zero', () => {
     expect(formatShare(0, 0)).toBe('0%')
     expect(formatShare(5, 0)).toBe('0%')
+  })
+})
+
+describe('roundHome', () => {
+  it('rounds to a whole unit at 100 and above', () => {
+    expect(roundHome(3076.2)).toBe(3076)
+    expect(roundHome(3076.5)).toBe(3077)
+    expect(roundHome(100)).toBe(100)
+  })
+  it('keeps two decimals below 100', () => {
+    expect(roundHome(51.27)).toBe(51.27)
+    expect(roundHome(99.994)).toBe(99.99)
   })
 })

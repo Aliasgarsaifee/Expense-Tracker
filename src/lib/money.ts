@@ -32,6 +32,11 @@ function formatterFor(currency: string, digits: number): Intl.NumberFormat | nul
 // to minor units, never raw sums.
 export const toMinorUnits = (n: number) => Math.round(n * 100) / 100
 
+// A computed home value. A reference rate is an estimate, so paise on a
+// converted figure would be false precision: whole units once it reaches 100,
+// two decimals only below that, where a whole unit would be a real error.
+export const roundHome = (n: number) => (n >= 100 ? Math.round(n) : toMinorUnits(n))
+
 // Whole amounts show clean (₹450); fractions only when present (₹450.50).
 export function formatMoney(amount: number, currency = 'INR'): string {
   const digits = Number.isInteger(amount) ? 0 : 2
