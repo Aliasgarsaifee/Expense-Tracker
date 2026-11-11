@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PaymentMethod } from '../db'
-import { filterByLabel, groupEmoji, orderByRecency } from '../lib/paymentMeta'
+import { PICKER_SECTION_THRESHOLD, groupEmoji, pickerSections } from '../lib/paymentMeta'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { CheckIcon, ChevronRightIcon, SearchIcon } from './icons'
 
@@ -12,18 +12,26 @@ interface Props {
   onAddNew: () => void
 }
 
-// Above this many methods the sheet shows a search field.
-const SEARCH_THRESHOLD = 5
+// Under Recent and in an untitled run the group is the sub-line; under a type
+// heading only the archived tag remains.
+function subLine(title: string, m: PaymentMethod): string {
+  const parts = title === '' || title === 'Recent' ? [m.group] : []
+  if (m.archived) parts.push('archived')
+  return parts.join(' · ')
+}
 
 // The "Paid with" row of the details group: it shows the current method and
-// opens one sheet listing every method, most-recently-used first, with the
-// group as each row's sub-line. A long list gains a search field (the app's
-// standard search-in-sheet pattern, see CurrencySheet).
+// opens one sheet listing every method. A long list gains a search field (the
+// app's standard search-in-sheet pattern, see CurrencySheet) and is sectioned:
+// the last-used few, then every method under its type in a fixed A–Z order.
 export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew }: Props) {
-  const ordered = useMemo(() => orderByRecency(methods, recency), [methods, recency])
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const listRef = useRef<HTMLUListElement>(null)
+  const sections = useMemo(
+    () => pickerSections(methods, recency, query),
+    [methods, recency, query],
+  )
+  const listRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
 
   // A stale query would greet the next open with a filtered list.
@@ -39,8 +47,7 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
   useKeyboardInset(sheetRef, open)
 
   const selected = methods.find((m) => m.id === selectedId)
-  const searchable = methods.length > SEARCH_THRESHOLD
-  const visible = filterByLabel(ordered, query)
+  const searchable = methods.length > PICKER_SECTION_THRESHOLD
 
   return (
     <>
@@ -109,39 +116,46 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
                 )}
               </label>
             )}
-            <ul className="pick-list" ref={listRef}>
-              {visible.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    className="pick-row"
-                    aria-pressed={m.id === selectedId}
-                    onClick={() => {
-                      onSelect(m.id)
-                      setOpen(false)
-                    }}
-                  >
-                    <span className="pick-text">
-                      <span className="pick-primary">
-                        <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
-                      </span>
-                      <span className="pick-sub">
-                        {m.group}
-                        {m.archived ? ' · archived' : ''}
-                      </span>
-                    </span>
-                    {m.id === selectedId && (
-                      <span className="pick-check" aria-hidden="true">
-                        <CheckIcon size={18} />
-                      </span>
-                    )}
-                  </button>
-                </li>
+            <div className="pick-list" ref={listRef}>
+              {sections.map((section) => (
+                <div key={section.title}>
+                  {section.title !== '' && <h3 className="pick-section">{section.title}</h3>}
+                  <ul aria-label={section.title || 'Payment methods'}>
+                    {section.methods.map((m) => (
+                      <li key={m.id}>
+                        <button
+                          type="button"
+                          className="pick-row"
+                          aria-pressed={m.id === selectedId}
+                          onClick={() => {
+                            onSelect(m.id)
+                            setOpen(false)
+                          }}
+                        >
+                          <span className="pick-text">
+                            <span className="pick-primary">
+                              <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
+                            </span>
+                            {/* Under a type heading the group would only repeat it. */}
+                            {subLine(section.title, m) !== '' && (
+                              <span className="pick-sub">{subLine(section.title, m)}</span>
+                            )}
+                          </span>
+                          {m.id === selectedId && (
+                            <span className="pick-check" aria-hidden="true">
+                              <CheckIcon size={18} />
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-              {visible.length === 0 && (
-                <li className="pick-none">Nothing matches “{query.trim()}”</li>
+              {sections.length === 0 && (
+                <p className="pick-none">Nothing matches “{query.trim()}”</p>
               )}
-            </ul>
+            </div>
             <button
               type="button"
               className="btn-ghost"

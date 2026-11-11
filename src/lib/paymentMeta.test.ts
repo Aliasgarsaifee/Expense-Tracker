@@ -6,6 +6,7 @@ import {
   groupChoices,
   groupEmoji,
   orderByRecency,
+  pickerSections,
   toggleGroup,
   toggleMethod,
 } from './paymentMeta'
@@ -190,5 +191,68 @@ describe('filterByLabel', () => {
     const before = cards.map((m) => m.id)
     filterByLabel(cards, 'amazon')
     expect(cards.map((m) => m.id)).toEqual(before)
+  })
+})
+
+const m = (id: string, label: string, group: string): PaymentMethod => ({
+  id,
+  label,
+  group,
+  createdAt: '2026-07-01T00:00:00.000Z',
+})
+
+describe('pickerSections', () => {
+  const few = [m('a', 'Cash', 'Cash'), m('b', 'GPay', 'UPI'), m('c', 'HDFC Regalia', 'Credit card')]
+  const many = [
+    m('cash', 'Cash', 'Cash'),
+    m('gpay', 'GPay', 'UPI'),
+    m('phonepe', 'PhonePe', 'UPI'),
+    m('regalia', 'HDFC Regalia', 'Credit card'),
+    m('amex', 'amex Platinum', 'Credit card'),
+    m('magnus', 'Axis Magnus', 'Credit card'),
+    m('savings', 'HDFC Savings', 'Debit card'),
+  ]
+  const used = new Map([
+    ['regalia', '2026-11-11T09:00:00.000Z'],
+    ['gpay', '2026-11-10T09:00:00.000Z'],
+    ['amex', '2026-11-09T09:00:00.000Z'],
+    ['cash', '2026-11-08T09:00:00.000Z'],
+    ['savings', '2026-11-07T09:00:00.000Z'],
+  ])
+
+  it('keeps a short list as one untitled section, recent first', () => {
+    const out = pickerSections(few, new Map([['b', '2026-11-11T09:00:00.000Z']]), '')
+    expect(out).toHaveLength(1)
+    expect(out[0].title).toBe('')
+    expect(out[0].methods.map((x) => x.id)).toEqual(['b', 'a', 'c'])
+  })
+  it('leads a long list with the four most recently used', () => {
+    const out = pickerSections(many, used, '')
+    expect(out[0].title).toBe('Recent')
+    expect(out[0].methods.map((x) => x.id)).toEqual(['regalia', 'gpay', 'amex', 'cash'])
+  })
+  it('then groups every method by type, A–Z within a type', () => {
+    const out = pickerSections(many, used, '').slice(1)
+    expect(out.map((s) => s.title)).toEqual(bucketize(many).map((b) => b.group))
+    const credit = out.find((s) => s.title === 'Credit card')!
+    expect(credit.methods.map((x) => x.label)).toEqual(['amex Platinum', 'Axis Magnus', 'HDFC Regalia'])
+    expect(out.flatMap((s) => s.methods)).toHaveLength(many.length)
+  })
+  it('has no Recent section until something has been used', () => {
+    expect(pickerSections(many, new Map(), '')[0].title).not.toBe('Recent')
+  })
+  it('flattens to A–Z matches when searching', () => {
+    const out = pickerSections(many, used, 'hdfc')
+    expect(out).toHaveLength(1)
+    expect(out[0].title).toBe('')
+    expect(out[0].methods.map((x) => x.label)).toEqual(['HDFC Regalia', 'HDFC Savings'])
+    expect(pickerSections(many, used, 'zzz')).toEqual([])
+  })
+  it('honours a custom recent limit', () => {
+    expect(pickerSections(many, used, '', 2)[0].methods.map((x) => x.id)).toEqual(['regalia', 'gpay'])
+  })
+  it('ignores recency for methods that are not in the list', () => {
+    const out = pickerSections(many, new Map([['gone', '2026-11-12T09:00:00.000Z']]), '')
+    expect(out[0].title).not.toBe('Recent')
   })
 })

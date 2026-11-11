@@ -2457,6 +2457,26 @@ button {
   margin-bottom: -1px;
 }
 
+.pick-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Same look as .field > span. Scrolls with its rows (not sticky). */
+.pick-section {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.pick-list > :first-child > .pick-section {
+  margin-top: 0;
+}
+
 .pick-none {
   padding: 24px 4px;
   font-size: 15px;
@@ -2468,6 +2488,7 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 48px; /* rows without a sub-line must not shrink below the touch floor */
   padding: 12px 4px;
   border: 0;
   border-bottom: 1px solid var(--line);

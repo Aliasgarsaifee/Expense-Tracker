@@ -78,6 +78,41 @@ export function filterByLabel(
   return members.filter((m) => m.label.toLowerCase().includes(q))
 }
 
+// Above this many methods the Paid-with sheet gains search and sections.
+export const PICKER_SECTION_THRESHOLD = 5
+
+export interface PickerSection {
+  title: string // '' = no heading
+  methods: PaymentMethod[]
+}
+
+const byLabel = (a: PaymentMethod, b: PaymentMethod) =>
+  a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+
+// What the Paid-with sheet shows. Searching flattens to A–Z matches; a short
+// list stays one recent-first run; a long list leads with the last-used few,
+// then lists every method under its type in a fixed A–Z order so a card sits
+// in the same place every time. A method in Recent also appears under its type.
+export function pickerSections(
+  methods: PaymentMethod[],
+  recency: Map<string, string>,
+  query: string,
+  recentLimit = 4,
+): PickerSection[] {
+  if (query.trim() !== '') {
+    const hits = filterByLabel(methods, query)
+    return hits.length === 0 ? [] : [{ title: '', methods: [...hits].sort(byLabel) }]
+  }
+  const ordered = orderByRecency(methods, recency)
+  if (methods.length <= PICKER_SECTION_THRESHOLD) return [{ title: '', methods: ordered }]
+  const recent = ordered.filter((m) => recency.has(m.id)).slice(0, recentLimit)
+  const sections: PickerSection[] = recent.length > 0 ? [{ title: 'Recent', methods: recent }] : []
+  for (const b of bucketize(methods)) {
+    sections.push({ title: b.group, methods: [...b.members].sort(byLabel) })
+  }
+  return sections
+}
+
 // ——— History method-filter selection ———
 
 // What the History filter sheet manipulates: whole groups plus individual
