@@ -4,14 +4,19 @@ import { BudgetAlertSheet } from './components/BudgetAlertSheet'
 import { BudgetSheet } from './components/BudgetSheet'
 import { ChartIcon, MenuIcon, PlusIcon, ReceiptIcon } from './components/icons'
 import { SettingsDrawer } from './components/SettingsDrawer'
-import { unbackedSince } from './db'
+import { Toast } from './components/Toast'
+import { listWaiting, unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
 import { assessBackupHealth } from './lib/backupHealth'
 import { budgetFor, readBudgets, withBudget } from './lib/budget'
 import type { BudgetAlert } from './lib/budgetCheck'
+import { convertedMessage } from './lib/conversion'
+import { fillMissingRates } from './lib/fillRates'
 import { warnFeedback } from './lib/haptics'
 import type { HistoryJump } from './lib/history'
 import { getPref, PREFS, setPref } from './lib/prefs'
+import { useToast } from './lib/useToast'
+import { useToday } from './lib/useToday'
 import { AddScreen } from './screens/AddScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { SummaryScreen } from './screens/SummaryScreen'
@@ -147,9 +152,42 @@ export default function App() {
         setResumeTick((tick) => tick + 1)
       }
     }
+    // Coming back online is when a rate fetch that failed can succeed, so it
+    // re-runs the fill-in below the same way a resume does.
+    const onOnline = () => setResumeTick((tick) => tick + 1)
     document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
+    window.addEventListener('online', onOnline)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('online', onOnline)
+    }
   }, [])
+
+  // Foreign entries still waiting for their home value. The count, not the
+  // rows, so the effect below re-runs only when it changes.
+  const today = useToday()
+  const waiting = useLiveQuery(
+    () => listWaiting(defaultCurrency, today).then((rows) => rows.length),
+    [defaultCurrency, today],
+  )
+  const { toast, show } = useToast()
+  // The effect below must not re-run just because `show` is a new function on
+  // every render, so it reads the latest one through a ref.
+  const showRef = useRef(show)
+  showRef.current = show
+  // Cannot loop: a pass that converts nothing changes no dependency, and one
+  // that converts something lowers `waiting` (to zero, or to the entries that
+  // still have no rate, which then wait for the next resume or online event).
+  useEffect(() => {
+    if (!waiting) return
+    let cancelled = false
+    void fillMissingRates(defaultCurrency, today).then((n) => {
+      if (n > 0 && !cancelled) showRef.current({ message: convertedMessage(n, defaultCurrency) })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [waiting, defaultCurrency, today, resumeTick])
 
   return (
     <div className="app">
@@ -199,6 +237,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      <Toast state={toast} />
       <SettingsDrawer
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
