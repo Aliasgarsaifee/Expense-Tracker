@@ -61,6 +61,11 @@ describe('usualAmount', () => {
     expect(usualAmount([1000, 3000])).toBe(2000)
     expect(usualAmount([32000, 31000, 40000])).toBe(32000)
   })
+
+  it('rounds a two-month median to a whole amount', () => {
+    expect(usualAmount([33000, 33999])).toBe(33500)
+    expect(usualAmount([1000, 1999])).toBe(1500)
+  })
 })
 
 describe('fixedLines', () => {

@@ -303,8 +303,9 @@ export function SummaryScreen({
   // just equals the total — suppress both degenerate ends.
   const showPace =
     containsToday && dataPeriod.kind !== 'all' && elapsed >= 2 && elapsed < spanDays
-  // Second tile without the split. With it the grid is always four, and pace
-  // takes the fourth slot, where Busiest day stands when there is no pace.
+  // Without the split, pace is the second tile and Busiest day comes after
+  // Biggest. With it the grid is always four, led by pace — or by Busiest day
+  // in the same slot when there is no pace to show.
   const paceTile = showPace && bounds && (
     <div className="stat-tile">
       <p className="stat-label">On pace for</p>
@@ -314,6 +315,23 @@ export function SummaryScreen({
         {splitActive && ' · fixed counted once'}
       </p>
     </div>
+  )
+  const busiestTile = !singleDay && busiest && (
+    <button
+      type="button"
+      className="stat-tile stat-tile-btn"
+      aria-label={`See ${shortDayMonth(busiest.date)} entries in History`}
+      onClick={() => onDrill({ from: busiest.date, to: busiest.date })}
+    >
+      <p className="stat-label">Busiest day</p>
+      <p className="stat-value money">{formatMoney(busiest.total, currency)}</p>
+      <p className="stat-sub">
+        {shortDayMonth(busiest.date)}
+        <span className="stat-go" aria-hidden="true">
+          ›
+        </span>
+      </p>
+    </button>
   )
 
   // A tapped trend bucket drills to its span clipped to the viewed period; a
@@ -418,6 +436,7 @@ export function SummaryScreen({
 
       {entryCount > 0 && bounds && (
         <section className="stat-grid" aria-label="Period statistics">
+          {splitActive && (showPace ? paceTile : busiestTile)}
           {!singleDay && (
             <div className="stat-tile">
               <p className="stat-label">
@@ -471,24 +490,7 @@ export function SummaryScreen({
               </p>
             </button>
           )}
-          {splitActive && paceTile}
-          {!singleDay && busiest && !(splitActive && showPace) && (
-            <button
-              type="button"
-              className="stat-tile stat-tile-btn"
-              aria-label={`See ${shortDayMonth(busiest.date)} entries in History`}
-              onClick={() => onDrill({ from: busiest.date, to: busiest.date })}
-            >
-              <p className="stat-label">Busiest day</p>
-              <p className="stat-value money">{formatMoney(busiest.total, currency)}</p>
-              <p className="stat-sub">
-                {shortDayMonth(busiest.date)}
-                <span className="stat-go" aria-hidden="true">
-                  ›
-                </span>
-              </p>
-            </button>
-          )}
+          {!splitActive && busiestTile}
           {busiestM && (
             <button
               type="button"
