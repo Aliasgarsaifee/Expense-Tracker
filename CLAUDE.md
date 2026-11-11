@@ -23,14 +23,14 @@ expense-tracker/
 │   ├── db.ts                   # Dexie schema (v4) + migrations + every persistence/domain op
 │   ├── db.test.ts              # includes fresh-install seed and v1→v4 upgrade-path tests
 │   ├── screens/                # AddScreen, HistoryScreen, SummaryScreen
-│   ├── components/             # shared UI: ExpenseForm, sheets, pickers, chart, drawer
+│   ├── components/             # shared UI: ExpenseForm, EntryRow, PeriodPager, sheets, pickers, chart, drawer; icons.tsx = every interface glyph
 │   ├── lib/                    # helpers; pure ones have co-located *.test.ts
-│   │   ├── money / dates / period / summarize / history / currencies / fixed / budget   # pure, fully tested
+│   │   ├── money / dates / period / summarize / history / recent / currencies / fixed / budget   # pure, fully tested
 │   │   ├── backup.ts           # JSON backup (v3) + CSV export; imports v1–v3
 │   │   ├── prefs.ts            # localStorage wrapper (et-pref:*), deliberately outside Dexie
 │   │   ├── autoBackup.ts       # daily snapshot → Documents/Backups, keeps last 7
 │   │   ├── budgetCheck.ts      # judges a just-saved entry against the month's budget (reads db.ts; tested)
-│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / paymentMeta   # platform adapters
+│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / useToday / paymentMeta   # platform adapters + hooks
 │   └── test/setup.ts           # fake-indexeddb → Dexie runs unmodified in Node
 ├── ios/App/                    # Capacitor Xcode project (SPM mode: CapApp-SPM package, no Pods)
 │   ├── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
@@ -166,6 +166,8 @@ theme via `prefers-color-scheme`. The look is "warm paper, ink, ledger-green".
   runtime network fetches, ever.
 - Interaction vocabulary: chips, bottom sheets, a toast-with-Undo after save
   (plus a haptic tick on device), single column capped at 560px, bottom tabs.
+  Interface glyphs come from `components/icons.tsx`; emoji are only category
+  and payment marks.
 
 ## Coding principles
 

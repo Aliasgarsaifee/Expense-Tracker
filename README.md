@@ -16,16 +16,21 @@ date, and a free-text note.
 
 ## The screens
 
-- **Add** — amount with a currency picker, "paid with" as one chip per
-  payment group (a group with several cards opens a picker; last-used
-  remembered), category chips with inline "+" to add one, a friendly
-  "12 July 2026" date field, note. New cards can be added inline too.
+- **Add** — a header that says what is logged today, amount with a currency
+  picker, category chips with inline "+" to add one, then one bordered group:
+  "Paid with" (tap for a picker — recent first, a search field and per-type
+  sections once you have more than five methods; last-used remembered) and a
+  friendly "Today, 11 Nov" date row, then the note. The button says what it
+  adds ("Add ₹280 · Food"), and "Log again" offers your latest distinct
+  entries to refill the form. New cards can be added from the picker.
   Each save confirms with a toast (plus a haptic tick on the phone) that
   offers a few seconds of **Undo**.
-- **History** — month pager or all-time view with sticky month sections;
-  a filter sheet slices by any mix of payment methods, whole payment groups,
-  categories, and a date range (OR within each dimension, AND across), plus
-  note/amount search — every active filter shows as a dismissible chip. Built
+- **History** — the same period control as Summary (‹ › step, tap the title
+  for a day, month, year, all time or a range), with compact search, filter
+  and sort buttons; all-time and year views get sticky month sections. The
+  filter sheet slices by any mix of payment methods, whole payment groups and
+  categories (OR within each dimension, AND across), plus note/amount search
+  — every active filter shows as a dismissible chip. Built
   for reconciling against card/UPI statements: pick a month + a card, compare.
 - **Summary** — totals per currency for any window: a day, a month, a year,
   all time, or any range, stepped with ‹ › or picked on a calendar jump sheet
