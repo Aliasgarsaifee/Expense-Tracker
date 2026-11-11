@@ -180,13 +180,12 @@ export default function App() {
   // still have no rate, which then wait for the next resume or online event).
   useEffect(() => {
     if (!waiting) return
-    let cancelled = false
+    // No cancel flag: each conversion lowers `waiting` and so supersedes this
+    // effect mid-pass, while the pass itself (guarded against overlap) is the
+    // one that knows the count. A finished pass always says so.
     void fillMissingRates(defaultCurrency, today).then((n) => {
-      if (n > 0 && !cancelled) showRef.current({ message: convertedMessage(n, defaultCurrency) })
+      if (n > 0) showRef.current({ message: convertedMessage(n, defaultCurrency) })
     })
-    return () => {
-      cancelled = true
-    }
   }, [waiting, defaultCurrency, today, resumeTick])
 
   return (
@@ -237,7 +236,7 @@ export default function App() {
           </button>
         ))}
       </nav>
-      <Toast state={toast} />
+      <Toast state={toast} raised />
       <SettingsDrawer
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

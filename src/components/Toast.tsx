@@ -4,12 +4,14 @@ import type { ShownToast } from '../lib/useToast'
 // It sits at z-index 30, below every sheet scrim (40). Mostly a toast is shown
 // after its sheet has closed; the one sheet that opens over a live toast is
 // the budget alert, which covers it on purpose and offers its own Undo.
-export function Toast({ state }: { state: ShownToast | null }) {
+// `raised` lifts the app-level notice above where screen toasts sit, so it can
+// never cover a save toast's Undo.
+export function Toast({ state, raised }: { state: ShownToast | null; raised?: boolean }) {
   if (!state) return null
   const { message, detail, onUndo, leaving } = state
   return (
     <output
-      className="toast"
+      className={raised ? 'toast toast-raised' : 'toast'}
       aria-live="polite"
       data-detail={detail ? '' : undefined}
       data-leaving={leaving ? '' : undefined}

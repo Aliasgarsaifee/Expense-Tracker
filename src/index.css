@@ -1199,6 +1199,13 @@ button {
   animation: toast-in 0.25s cubic-bezier(0.32, 0.72, 0.3, 1);
 }
 
+/* The app-level notice sits above where screen toasts appear, so it can never
+   cover a save toast's Undo. The offset is a two-line screen toast's height
+   (the budget heads-up, measured 57.2px at 375 wide) plus an 8px gap, rounded up. */
+.toast-raised {
+  bottom: calc(env(safe-area-inset-bottom) + 92px + 66px);
+}
+
 /* At two lines a full pill's half-round ends crowd the text's corners, so the
    heads-up toast takes the sheet-corner radius instead. */
 .toast[data-detail] {
