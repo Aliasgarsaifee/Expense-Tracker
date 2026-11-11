@@ -2,8 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useMemo, useState } from 'react'
 import { BreakdownList, type BreakdownRow } from '../components/BreakdownList'
 import { BudgetCard, YearBudgetCard } from '../components/BudgetCard'
-import { Pager } from '../components/Pager'
-import { PeriodSheet } from '../components/PeriodSheet'
+import { PeriodPager } from '../components/PeriodPager'
 import { TrendChart } from '../components/TrendChart'
 import { YearLedger } from '../components/YearLedger'
 import {
@@ -54,9 +53,7 @@ import {
   emptyPeriodPhrase,
   initialPeriod,
   periodBounds,
-  periodLabel,
   periodWindows,
-  shiftPeriod,
   trendUnit,
   type Period,
 } from '../lib/period'
@@ -104,7 +101,6 @@ export function SummaryScreen({
     initialPeriod(getPref(PREFS.summaryPeriod, 'month'), today),
   )
   const [chosenCurrency, setChosenCurrency] = useState('INR')
-  const [sheetOpen, setSheetOpen] = useState(false)
 
   // One read for both windows. Two separate live queries resolved at two
   // different moments, so a month switch briefly rendered this period's total
@@ -377,8 +373,6 @@ export function SummaryScreen({
 
   // shiftPeriod preserves the kind, so periodBounds is non-null for any non-all
   // period; › is capped so it can't page past the newest data (or today).
-  const nextDisabled =
-    period.kind === 'all' || periodBounds(shiftPeriod(period, 1))!.from > maxAnchor
 
   const avgSub = ((): string => {
     if (isAggregateSpan)
@@ -460,9 +454,6 @@ export function SummaryScreen({
     setPeriod(p)
     if (p.kind !== 'custom') setPref(PREFS.summaryPeriod, p.kind)
   }
-  function openSheet() {
-    setSheetOpen(true)
-  }
 
   return (
     // data-loading blanks every figure below the pager while the next period
@@ -475,15 +466,12 @@ export function SummaryScreen({
         <h1 className="sr-only">Summary</h1>
       </header>
 
-      <Pager
-        label={periodLabel(period, today)}
-        hint="tap to jump"
-        labelAriaLabel={`Showing ${periodLabel(period, today)} — tap to choose a period`}
-        onLabelClick={openSheet}
-        onPrev={() => setPeriod(shiftPeriod(period, -1))}
-        onNext={() => setPeriod(shiftPeriod(period, 1))}
-        prevDisabled={period.kind === 'all'}
-        nextDisabled={nextDisabled}
+      <PeriodPager
+        period={period}
+        onChange={applyPeriod}
+        today={today}
+        maxAnchor={maxAnchor}
+        currency={currency}
       />
 
       {buckets.length > 1 && (
@@ -763,18 +751,6 @@ export function SummaryScreen({
         </section>
       )}
 
-      {sheetOpen && (
-        <PeriodSheet
-          period={period}
-          maxAnchor={maxAnchor}
-          currency={currency}
-          onApply={(p) => {
-            applyPeriod(p)
-            setSheetOpen(false)
-          }}
-          onClose={() => setSheetOpen(false)}
-        />
-      )}
     </div>
   )
 }

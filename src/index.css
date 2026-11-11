@@ -817,9 +817,10 @@ button {
 
 .month-label-btn {
   flex: 1;
-  display: grid;
-  justify-items: center;
-  gap: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 0;
   background: none;
   color: var(--ink);
@@ -836,19 +837,11 @@ button {
   font-size: 26px;
 }
 
-.month-label-hint {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.month-label-btn svg {
   color: var(--ink-3);
+  flex: none;
 }
 
-.month-switch h1 {
-  flex: 1;
-  text-align: center;
-  font-size: 27px;
-}
 
 .month-arrow {
   width: 44px;

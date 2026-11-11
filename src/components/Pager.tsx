@@ -1,6 +1,7 @@
+import { ChevronLeftIcon, ChevronRightIcon } from './icons'
+
 interface Props {
   label: string
-  hint?: string // shown under a clickable label
   labelAriaLabel?: string // accessible name when the label is a button
   onPrev: () => void
   onNext: () => void
@@ -14,7 +15,6 @@ interface Props {
 // stepping/toggling logic lives at the call site, so one pager serves both.
 export function Pager({
   label,
-  hint,
   labelAriaLabel,
   onPrev,
   onNext,
@@ -31,7 +31,7 @@ export function Pager({
         disabled={prevDisabled}
         onClick={onPrev}
       >
-        ‹
+        <ChevronLeftIcon />
       </button>
       {onLabelClick ? (
         <button
@@ -41,7 +41,6 @@ export function Pager({
           onClick={onLabelClick}
         >
           <span className="display">{label}</span>
-          {hint && <span className="month-label-hint">{hint}</span>}
         </button>
       ) : (
         <h1 className="display">{label}</h1>
@@ -53,7 +52,7 @@ export function Pager({
         disabled={nextDisabled}
         onClick={onNext}
       >
-        ›
+        <ChevronRightIcon />
       </button>
     </div>
   )

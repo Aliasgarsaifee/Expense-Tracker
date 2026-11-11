@@ -119,6 +119,17 @@ function rangeLabel(from: string, to: string): string {
   return `${shortDay(from, !sameYear)} – ${shortDay(to, true)}`
 }
 
+// Forward is blocked once the next period would start after the last selectable
+// day (today, or a future-dated entry); all time has no next.
+export function canStepForward(p: Period, maxAnchor: string): boolean {
+  return p.kind !== 'all' && periodBounds(shiftPeriod(p, 1))!.from <= maxAnchor
+}
+
+// A calendar pick of one date is a day, not a one-day "range".
+export function rangePeriod(from: string, to: string): Period {
+  return from === to ? { kind: 'day', date: from } : { kind: 'custom', from, to }
+}
+
 export function periodLabel(p: Period, today: string): string {
   switch (p.kind) {
     case 'day':

@@ -368,7 +368,6 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
 
       <Pager
         label={month === null ? 'All time' : monthLabel(month)}
-        hint={month === null ? 'tap for monthly' : 'tap for all time'}
         labelAriaLabel={
           month === null
             ? 'Showing all time — switch to one month'

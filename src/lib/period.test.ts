@@ -3,6 +3,7 @@ import {
   bucketBounds,
   bucketKeyOf,
   bucketKeysBetween,
+  canStepForward,
   comparisonLabel,
   comparisonSlice,
   daysBetween,
@@ -12,6 +13,7 @@ import {
   periodBounds,
   periodLabel,
   periodWindows,
+  rangePeriod,
   shiftPeriod,
   trendUnit,
   weekStartOf,
@@ -347,5 +349,29 @@ describe('bucketKeysBetween', () => {
       '2026',
       '2027',
     ])
+  })
+})
+
+describe('canStepForward', () => {
+  it('never steps past all time', () => {
+    expect(canStepForward({ kind: 'all' }, '2026-11-11')).toBe(false)
+  })
+  it('stops at the period that holds the last selectable day', () => {
+    expect(canStepForward({ kind: 'month', month: '2026-11' }, '2026-11-11')).toBe(false)
+    expect(canStepForward({ kind: 'month', month: '2026-10' }, '2026-11-11')).toBe(true)
+  })
+  it('reaches a future-dated entry', () => {
+    expect(canStepForward({ kind: 'month', month: '2026-11' }, '2026-12-03')).toBe(true)
+    expect(canStepForward({ kind: 'day', date: '2026-12-03' }, '2026-12-03')).toBe(false)
+  })
+})
+
+describe('rangePeriod', () => {
+  it('is a day when both ends are the same date', () => {
+    expect(rangePeriod('2026-11-04', '2026-11-04')).toEqual({ kind: 'day', date: '2026-11-04' })
+  })
+  it('is a custom range otherwise', () => {
+    expect(rangePeriod('2026-11-02', '2026-11-08'))
+      .toEqual({ kind: 'custom', from: '2026-11-02', to: '2026-11-08' })
   })
 })
