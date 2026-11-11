@@ -260,13 +260,21 @@ export async function importBackup(
       data.paymentMethods,
       await db.paymentMethods.toArray(),
     )
-    const categoryRemap = labelRemap(data.categories, await db.categories.toArray())
-    const localCategoryLabels = new Map(
-      (await db.categories.toArray()).map((c) => [c.id, c.label]),
-    )
+    const localCategories = await db.categories.toArray()
+    const categoryRemap = labelRemap(data.categories, localCategories)
+    const localCategoryById = new Map(localCategories.map((c) => [c.id, c]))
 
     const methods = data.paymentMethods.filter((m) => !methodRemap.has(m.id))
-    const categories = data.categories.filter((c) => !categoryRemap.has(c.id))
+    // bulkPut replaces a same-id row whole, and a file exported before
+    // categories could be fixed says nothing about it: keep the local choice
+    // rather than reset it. The stored field is copied as-is (absent stays
+    // absent); deciding fixedness stays with isFixedCategory.
+    const categories = data.categories
+      .filter((c) => !categoryRemap.has(c.id))
+      .map((c) => {
+        const localFixed = localCategoryById.get(c.id)?.fixed
+        return c.fixed === undefined && localFixed !== undefined ? { ...c, fixed: localFixed } : c
+      })
 
     // Category labels are what expenses store, so a merged category may mean
     // an incoming expense's category string should follow the survivor.
@@ -274,7 +282,7 @@ export async function importBackup(
     const relabel = new Map<string, string>()
     for (const [fromId, toId] of categoryRemap) {
       const from = incomingCategoryLabel.get(fromId)
-      const to = localCategoryLabels.get(toId)
+      const to = localCategoryById.get(toId)?.label
       if (from !== undefined && to !== undefined && from !== to) relabel.set(from, to)
     }
 

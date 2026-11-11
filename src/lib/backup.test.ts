@@ -395,6 +395,40 @@ describe('importBackup', () => {
     expect(await db.categories.get('other-install-food')).toBeUndefined()
   })
 
+  // Every file exported before categories could be fixed says nothing about
+  // it — every auto-backup and pre-import copy already on the phone included.
+  it('keeps local fixed choices on built-ins when the file predates them', async () => {
+    await db.categories.update('cat-food', { fixed: true })
+    await db.categories.update('cat-rent', { fixed: false })
+
+    await importBackup(parseBackupJson(v3Json([], [], DEFAULT_CATEGORIES)))
+
+    expect(await db.categories.get('cat-food')).toMatchObject({ fixed: true })
+    expect(await db.categories.get('cat-rent')).toMatchObject({ fixed: false })
+    // No choice on either side: absent stays absent, so the default still applies.
+    expect('fixed' in (await db.categories.get('cat-utilities'))!).toBe(false)
+    expect('fixed' in (await db.categories.get('cat-transport'))!).toBe(false)
+  })
+
+  it('keeps a custom category marked fixed when the file predates the mark', async () => {
+    await db.categories.add({ ...catPets, emoji: '🐈', fixed: true })
+
+    await importBackup(parseBackupJson(v3Json([], [], [catPets])))
+
+    // The rest of the row still comes from the file.
+    expect(await db.categories.get(catPets.id)).toMatchObject({ emoji: '🐕', fixed: true })
+  })
+
+  it('lets a file that carries the fixed flag win', async () => {
+    await db.categories.update('cat-food', { fixed: true })
+
+    await importBackup(
+      parseBackupJson(v3Json([], [], [{ ...DEFAULT_CATEGORIES[0], fixed: false }])),
+    )
+
+    expect(await db.categories.get('cat-food')).toMatchObject({ fixed: false })
+  })
+
   it('merges an incoming category with a new id onto an existing same-label category', async () => {
     await db.categories.add({
       id: 'local-pets',
