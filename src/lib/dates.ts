@@ -93,6 +93,17 @@ export function yesterdayISO(): string {
   return localISO(d)
 }
 
+// The Add/Edit date row's text: relative for the two days people actually
+// log, the long date otherwise. `today` is a parameter so the function stays
+// pure (and testable across month boundaries).
+export function dateRowLabel(iso: string, today: string): string {
+  if (iso === today) return `Today, ${shortDayMonth(iso)}`
+  const d = dateOfDay(today)
+  d.setDate(d.getDate() - 1)
+  if (iso === localISO(d)) return `Yesterday, ${shortDayMonth(iso)}`
+  return formatDateLong(iso)
+}
+
 // Cells of a 'YYYY-MM' month for a 7-column Monday-first grid: leading nulls
 // align the 1st to its weekday (Monday matches weekStartOf in lib/period);
 // the tail stays ragged — a CSS grid row just ends short.

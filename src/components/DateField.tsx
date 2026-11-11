@@ -1,4 +1,4 @@
-import { formatDateLong, todayISO } from '../lib/dates'
+import { dateRowLabel, todayISO } from '../lib/dates'
 import { ChevronRightIcon } from './icons'
 
 interface Props {
@@ -10,14 +10,10 @@ interface Props {
 // (transparent) date input covers the whole row, so tapping anywhere still
 // opens the native iOS date wheel. The native control's own text is hidden.
 export function DateField({ value, onChange }: Props) {
-  const isToday = value === todayISO()
   return (
     <label className="detail-row detail-date">
       <span className="detail-label">Date</span>
-      <span className="detail-value">
-        {formatDateLong(value)}
-        {isToday && <span className="date-today"> · Today</span>}
-      </span>
+      <span className="detail-value">{dateRowLabel(value, todayISO())}</span>
       <ChevronRightIcon size={18} />
       <input
         type="date"

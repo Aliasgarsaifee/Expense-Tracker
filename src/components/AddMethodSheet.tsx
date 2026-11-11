@@ -15,7 +15,7 @@ interface Props {
 }
 
 // One sheet for "I got a new card / wallet". Reachable from the Add form's
-// group picker and from Settings, so a new method never interrupts logging
+// Paid with sheet and from Settings, so a new method never interrupts logging
 // an expense for long.
 export function AddMethodSheet({ open, ...rest }: Props) {
   if (!open) return null

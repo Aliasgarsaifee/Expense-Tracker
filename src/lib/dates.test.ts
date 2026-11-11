@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addMonths,
+  dateRowLabel,
   daysSince,
   formatDateLong,
   monthGrid,
@@ -183,5 +184,21 @@ describe('daysSince across a DST boundary', () => {
       if (originalTZ === undefined) delete process.env.TZ
       else process.env.TZ = originalTZ
     }
+  })
+})
+
+describe('dateRowLabel', () => {
+  it('says Today and Yesterday with the short date', () => {
+    expect(dateRowLabel('2026-11-11', '2026-11-11')).toBe('Today, 11 Nov')
+    expect(dateRowLabel('2026-11-10', '2026-11-11')).toBe('Yesterday, 10 Nov')
+  })
+
+  it('falls back to the long date for anything older or later', () => {
+    expect(dateRowLabel('2026-11-09', '2026-11-11')).toBe(formatDateLong('2026-11-09'))
+    expect(dateRowLabel('2026-11-12', '2026-11-11')).toBe(formatDateLong('2026-11-12'))
+  })
+
+  it('finds yesterday across a month boundary', () => {
+    expect(dateRowLabel('2026-10-31', '2026-11-01')).toBe('Yesterday, 31 Oct')
   })
 })

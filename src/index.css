@@ -561,7 +561,7 @@ h1.display {
   transition: background-color 0.12s ease;
 }
 
-.detail-row + .detail-row {
+.detail-group > .detail-row:not(:first-child) {
   border-top: 1px solid var(--line);
 }
 
@@ -586,11 +586,6 @@ h1.display {
 
 .detail-empty {
   color: var(--ink-3);
-}
-
-.date-today {
-  color: var(--ink-3);
-  font-size: 13px;
 }
 
 /* The real control sits invisibly over the whole row so the native wheel

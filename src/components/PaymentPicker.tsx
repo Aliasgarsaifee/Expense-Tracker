@@ -57,7 +57,11 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
             {selected.archived && <span className="chip-tag">archived</span>}
           </span>
         ) : (
-          <span className="detail-value detail-empty">Not recorded</span>
+          // Empty while a chosen method's liveQuery is still resolving: only
+          // an entry with no method at all reads "Not recorded".
+          <span className="detail-value detail-empty">
+            {selectedId ? '' : 'Not recorded'}
+          </span>
         )}
         <ChevronRightIcon size={18} />
       </button>
