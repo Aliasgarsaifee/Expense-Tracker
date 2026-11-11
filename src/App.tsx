@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { BudgetAlertSheet } from './components/BudgetAlertSheet'
 import { BudgetSheet } from './components/BudgetSheet'
+import { ChartIcon, MenuIcon, PlusIcon, ReceiptIcon } from './components/icons'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
@@ -14,40 +15,6 @@ import { getPref, PREFS, setPref } from './lib/prefs'
 import { AddScreen } from './screens/AddScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { SummaryScreen } from './screens/SummaryScreen'
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.6" />
-      <path d="M12 8.4v7.2M8.4 12h7.2" />
-    </svg>
-  )
-}
-
-function ReceiptIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6.5 3.5h11v16.4l-2.2-1.5-2.1 1.5-1.2-.9-1.2.9-2.1-1.5-2.2 1.5z" />
-      <path d="M9.4 8h5.2M9.4 11.2h5.2M9.4 14.4h3" />
-    </svg>
-  )
-}
-
-function ChartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <path d="M5.5 19.5v-6M12 19.5V4.5M18.5 19.5v-10" />
-    </svg>
-  )
-}
-
-function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <path d="M4.5 7h15M4.5 12h11.5M4.5 17h15" />
-    </svg>
-  )
-}
 
 const TABS = [
   { id: 'add', label: 'Add', Icon: PlusIcon },
