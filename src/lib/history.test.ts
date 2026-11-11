@@ -180,6 +180,18 @@ describe('filterExpenses', () => {
       }),
     ).toEqual([hit])
   })
+
+  describe('what was paid', () => {
+    const trip = exp({ id: 't', amount: 3076, paid: { amount: 120.5, currency: 'AED' } })
+    const home = exp({ id: 'h', amount: 400 })
+
+    it('finds a trip by the currency that was paid', () => {
+      expect(filterExpenses([trip, home], { query: 'aed' }).map((x) => x.id)).toEqual(['t'])
+    })
+    it('finds an entry by the amount that was paid', () => {
+      expect(filterExpenses([trip, home], { query: '120.5' }).map((x) => x.id)).toEqual(['t'])
+    })
+  })
 })
 
 describe('groupByDay', () => {

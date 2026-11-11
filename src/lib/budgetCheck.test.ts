@@ -172,6 +172,25 @@ describe('checkBudgetAfterSave', () => {
     expect(await save({ amount: 14.21 }, TODAY, { INR: 687.79 })).toBeNull()
   })
 
+  // Characterisation: follows from the stored shape (a converted entry is a
+  // home-currency entry), pinned so a trip keeps counting against the rupee budget.
+  it('judges a converted entry in the home currency', async () => {
+    await seedEveryday(24000)
+    const saved = await addExpense({
+      amount: 3076,
+      currency: 'INR',
+      category: 'Food',
+      spentOn: '2026-11-24',
+      paid: { amount: 120, currency: 'AED' },
+    })
+    expect((await checkBudgetAfterSave(saved, null, BUDGETS, TODAY))?.kind).toBe('over')
+  })
+
+  it('leaves an entry still waiting for a rate out of the home budget', async () => {
+    await seedEveryday(24000)
+    expect(await save({ amount: 5000, currency: 'AED' })).toBeNull()
+  })
+
   it('says nothing when an edit lowers or re-files the entry', async () => {
     await addExpense({ amount: 23000, category: 'Transport', spentOn: '2026-11-03' })
     const previous = await addExpense({ amount: 3000, category: 'Food', spentOn: '2026-11-20' })

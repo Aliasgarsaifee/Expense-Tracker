@@ -31,6 +31,11 @@ describe('logAgainChoices', () => {
     ]
     expect(logAgainChoices(latest, cats, methods).map((x) => x.id)).toEqual(['a', 'c', 'd'])
   })
+  it('treats two entries paid alike as one choice, whatever the rate did', () => {
+    const a = e({ id: 'a', amount: 3076, paid: { amount: 120, currency: 'AED' } })
+    const b = e({ id: 'b', amount: 3080, paid: { amount: 120, currency: 'AED' } })
+    expect(logAgainChoices([a, b], cats, methods).map((x) => x.id)).toEqual(['a'])
+  })
   it('treats a different method or currency as a different entry', () => {
     const latest = [
       e({ id: 'a' }),

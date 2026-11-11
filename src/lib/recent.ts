@@ -1,5 +1,6 @@
 import type { Expense } from '../db'
 import { shortDayMonth } from './dates'
+import { paidOf } from './conversion'
 import { formatTotals, type MoneyByCurrency } from './history'
 import { formatMoney } from './money'
 
@@ -19,11 +20,13 @@ export function logAgainChoices(
     if (!activeCategories.includes(x.category)) continue
     // An absent method (pre-v2 entry) is fine; a present but inactive one is not.
     if (x.paymentMethodId && !activeMethodIds.includes(x.paymentMethodId)) continue
+    // What was typed, not what it converted to: the rate moves between trips.
+    const paid = paidOf(x)
     const key = JSON.stringify([
       (x.note ?? '').trim().toLowerCase(),
       x.category,
-      x.amount,
-      x.currency,
+      paid.amount,
+      paid.currency,
       x.paymentMethodId,
     ])
     if (seen.has(key)) continue
@@ -33,7 +36,8 @@ export function logAgainChoices(
   return out
 }
 
-// The Add screen's eyebrow. Amounts stay per currency — no FX, by design.
+// The Add screen's eyebrow. A converted entry already counts in the home
+// currency; only entries still waiting for a rate stay in their own.
 export function todaySoFar(expenses: Expense[], primary: string): string {
   if (expenses.length === 0) return 'Nothing logged today'
   const totals: MoneyByCurrency = {}

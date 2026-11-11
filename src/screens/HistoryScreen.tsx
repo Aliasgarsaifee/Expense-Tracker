@@ -18,6 +18,7 @@ import {
 } from '../db'
 import { budgetHeadsUp, type Budgets } from '../lib/budget'
 import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
+import { paidLabel } from '../lib/conversion'
 import {
   monthLabel,
   monthOf,
@@ -87,7 +88,7 @@ function LedgerRow({
   date?: string
   onEdit: (e: Expense) => void
 }) {
-  const sub = [date, expense.note ? expense.category : null, methodLabel]
+  const sub = [date, expense.note ? expense.category : null, methodLabel, paidLabel(expense)]
     .filter(Boolean)
     .join(' · ')
   return (

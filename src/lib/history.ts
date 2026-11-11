@@ -55,8 +55,9 @@ export function historyCountLine(count: number, sort: HistorySort): string {
 }
 
 // A stable total order per mode. Amount modes rank by the raw number across
-// currencies — there is no FX in this app, so a mixed-currency ranking is not
-// value-accurate; acceptable because the ledger is effectively single-currency.
+// currencies. A converted entry already is a home-currency entry, so only the
+// few still waiting for a rate sit apart; a mixed ranking is not value-accurate,
+// which is acceptable because the ledger is effectively single-currency.
 // Every mode breaks ties down to createdAt so the order never wobbles between
 // renders. Returns a new array; never mutates the input (it is a live-query result).
 export function sortExpenses(expenses: Expense[], sort: HistorySort): Expense[] {
@@ -85,6 +86,7 @@ export function filterExpenses(expenses: Expense[], f: HistoryFilter): Expense[]
     if (f.to && e.spentOn > f.to) return false
     if (q) {
       const haystacks = [e.note ?? '', e.category, String(e.amount)]
+      if (e.paid) haystacks.push(e.paid.currency, String(e.paid.amount))
       if (!haystacks.some((h) => h.toLowerCase().includes(q))) return false
     }
     return true

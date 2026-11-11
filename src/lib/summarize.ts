@@ -40,7 +40,8 @@ function comparePaymentIds(a: string | null, b: string | null): number {
 }
 
 // Amounts are summed as-is: callers must pass a single-currency list
-// (see splitByCurrency).
+// (see splitByCurrency). A converted entry is already in the home currency;
+// only entries still waiting for a rate form another bucket.
 export function summarize(expenses: Expense[]): MonthSummary {
   let total = 0
   const categories = new Map<string, CategoryTotal>()
