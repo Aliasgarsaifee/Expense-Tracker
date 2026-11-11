@@ -1,4 +1,5 @@
 import { yearLedgerCopy, type YearLine } from '../lib/budget'
+import { ChevronRightIcon } from './icons'
 
 interface Props {
   lines: YearLine[]
@@ -41,18 +42,9 @@ export function YearLedger({ lines, budget, currency, today, onSelectMonth }: Pr
                 </span>
                 <span className="pay-sub">{row.balance}</span>
               </span>
-              <svg
-                className="ledger-go"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <span className="ledger-go">
+                <ChevronRightIcon size={16} />
+              </span>
             </button>
           </li>
         ))}

@@ -3,6 +3,7 @@ import { listCategories, listExpenses, listPaymentMethods } from '../db'
 import { backupToJson } from '../lib/backup'
 import { todayISO } from '../lib/dates'
 import { exportTextFile } from '../lib/exportFile'
+import { CloseIcon } from './icons'
 
 interface Props {
   children: ReactNode
@@ -52,7 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="screen">
             <div className="empty" role="alert">
               <p className="empty-mark display" aria-hidden="true">
-                ✕
+                <CloseIcon size={56} />
               </p>
               <p className="empty-title">Something went wrong</p>
               <p className="empty-sub">

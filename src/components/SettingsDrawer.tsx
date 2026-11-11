@@ -28,6 +28,15 @@ import { AddMethodSheet } from './AddMethodSheet'
 import { BackupSection } from './BackupSection'
 import { CurrencySheet } from './CurrencySheet'
 import { Dialog } from './Dialog'
+import {
+  ArchiveIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  PencilIcon,
+  PlusIcon,
+  RestoreIcon,
+} from './icons'
 
 interface Props {
   open: boolean
@@ -76,7 +85,7 @@ function GroupToggle({
         <span className="group-label">{label}</span>
         <span className="group-count">{count}</span>
         <span className="group-caret" aria-hidden="true">
-          {expanded ? '▾' : '▸'}
+          {expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
         </span>
       </button>
       {onRename && (
@@ -86,7 +95,7 @@ function GroupToggle({
           aria-label={`Rename the ${label} group`}
           onClick={onRename}
         >
-          ✎
+          <PencilIcon size={16} />
         </button>
       )}
     </div>
@@ -146,7 +155,7 @@ function ItemRow({
           aria-label={`Rename ${label}`}
           onClick={onRename}
         >
-          ✎
+          <PencilIcon size={16} />
         </button>
         <button
           type="button"
@@ -154,7 +163,7 @@ function ItemRow({
           aria-label={archived ? `Restore ${label}` : `Archive ${label}`}
           onClick={onToggleArchived}
         >
-          {archived ? '↩' : '⤓'}
+          {archived ? <RestoreIcon size={16} /> : <ArchiveIcon size={16} />}
         </button>
         {!builtIn && (
           <button
@@ -163,7 +172,7 @@ function ItemRow({
             aria-label={`Delete ${label}`}
             onClick={onDelete}
           >
-            ✕
+            <CloseIcon size={16} />
           </button>
         )}
       </span>
@@ -340,7 +349,7 @@ function DrawerBody({
             aria-label="Close settings"
             onClick={onClose}
           >
-            ✕
+            <CloseIcon size={18} />
           </button>
         </header>
 
@@ -385,7 +394,7 @@ function DrawerBody({
           </ul>
           <button type="button" className="btn-ghost" onClick={() => setAddingMethod(true)}>
             <span>Add card or method</span>
-            <span aria-hidden="true">+</span>
+            <PlusIcon size={18} />
           </button>
         </section>
 
@@ -418,7 +427,7 @@ function DrawerBody({
           )}
           <button type="button" className="btn-ghost" onClick={() => setAddingCategory(true)}>
             <span>Add category</span>
-            <span aria-hidden="true">+</span>
+            <PlusIcon size={18} />
           </button>
         </section>
 

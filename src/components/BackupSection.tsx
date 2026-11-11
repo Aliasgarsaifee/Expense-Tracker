@@ -8,6 +8,7 @@ import { assessBackupHealth } from '../lib/backupHealth'
 import { todayISO } from '../lib/dates'
 import { exportTextFile } from '../lib/exportFile'
 import { getPref, PREFS, setPref } from '../lib/prefs'
+import { ArrowDownIcon, ArrowUpRightIcon } from './icons'
 
 interface Props {
   showAlert: (title: string, message?: string) => Promise<void>
@@ -185,7 +186,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           </p>
           <button type="button" className="btn-ghost" disabled={exporting} onClick={exportJson}>
             <span>Save backup</span>
-            <span aria-hidden="true">↗</span>
+            <ArrowUpRightIcon size={18} />
           </button>
         </div>
       )}
@@ -213,7 +214,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           onClick={exportCsv}
         >
           <span>Export CSV · spreadsheet archive</span>
-          <span aria-hidden="true">↗</span>
+          <ArrowUpRightIcon size={18} />
         </button>
         <button
           type="button"
@@ -222,7 +223,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           onClick={exportJson}
         >
           <span>Export JSON · full backup</span>
-          <span aria-hidden="true">↗</span>
+          <ArrowUpRightIcon size={18} />
         </button>
         <button
           type="button"
@@ -230,7 +231,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           onClick={() => fileInput.current?.click()}
         >
           <span>Import JSON backup</span>
-          <span aria-hidden="true">↓</span>
+          <ArrowDownIcon size={18} />
         </button>
         <input
           ref={fileInput}

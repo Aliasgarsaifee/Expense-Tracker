@@ -1309,6 +1309,9 @@ button {
 }
 
 .currency-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1357,6 +1360,9 @@ button {
   color: var(--ink-2);
   font-weight: 700;
   min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chip-caret {
@@ -1444,8 +1450,8 @@ button {
 
 .sort-option-check {
   margin-left: auto;
+  display: flex;
   color: var(--accent);
-  font-weight: 700;
 }
 
 /* ——— summary period sheet ——— */
@@ -1895,6 +1901,8 @@ button {
 }
 
 .stat-go {
+  display: inline-flex;
+  vertical-align: -0.15em;
   color: var(--ink-3);
   margin-left: 5px;
 }
@@ -2202,8 +2210,7 @@ button {
 
 .ledger-go {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  display: flex;
   color: var(--ink-3);
 }
 
@@ -2516,9 +2523,8 @@ button {
 
 .pick-check {
   margin-left: auto;
+  display: flex;
   color: var(--accent);
-  font-weight: 700;
-  font-size: 17px;
 }
 
 .pick-row[aria-pressed='true'] .pick-primary {
@@ -2646,8 +2652,8 @@ button {
 }
 
 .group-caret {
+  display: flex;
   color: var(--ink-3);
-  font-size: 11px;
 }
 
 /* Members sit inside their group: a gentle indent keeps the tree readable
@@ -2721,8 +2727,6 @@ button {
   border-radius: 10px;
   background: none;
   color: var(--ink-2);
-  font-size: 14px;
-  line-height: 1;
 }
 
 /* Painted 34px, tappable 44px: an invisible halo keeps the settings rows

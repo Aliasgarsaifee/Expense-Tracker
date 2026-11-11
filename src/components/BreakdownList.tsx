@@ -1,5 +1,6 @@
 import type { Badge } from '../lib/fixed'
 import { formatMoney, formatShare } from '../lib/money'
+import { ChevronRightIcon } from './icons'
 
 export interface BreakdownRow {
   key: string
@@ -67,7 +68,7 @@ export function BreakdownList({
               >
                 {inner}
                 <span className="stat-go" aria-hidden="true">
-                  ›
+                  <ChevronRightIcon size={14} />
                 </span>
               </button>
             ) : (

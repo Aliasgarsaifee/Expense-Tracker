@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type CSSProperties } from 'react'
 import { budgetAlertCopy } from '../lib/budget'
 import type { BudgetAlert } from '../lib/budgetCheck'
+import { ChevronRightIcon } from './icons'
 
 interface Props {
   alert: BudgetAlert | null
@@ -90,17 +91,7 @@ function SheetBody({
             }}
           >
             <span>See what made it up</span>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
+            <ChevronRightIcon size={18} />
           </button>
           {onUndo && (
             <button

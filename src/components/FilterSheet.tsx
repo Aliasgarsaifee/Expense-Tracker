@@ -6,6 +6,7 @@ import {
   toggleMethod,
   type MethodSelection,
 } from '../lib/paymentMeta'
+import { CloseIcon } from './icons'
 
 interface Props {
   open: boolean
@@ -124,7 +125,7 @@ export function FilterSheet({
 
         <button type="button" className="btn-ghost" disabled={!anyActive} onClick={onClearAll}>
           <span>Clear all filters</span>
-          <span aria-hidden="true">✕</span>
+          <CloseIcon size={18} />
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CURRENCIES, filterCurrencies } from '../lib/currencies'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
+import { CheckIcon, SearchIcon } from './icons'
 
 interface Props {
   open: boolean
@@ -51,7 +52,7 @@ export function CurrencySheet({ open, selected, onSelect, onClose }: Props) {
         </header>
         {/* label, not div: a tap anywhere on the field focuses the input */}
         <label className="search-field">
-          <span aria-hidden="true">🔎</span>
+          <SearchIcon size={18} />
           <input
             type="search"
             placeholder={`Search ${CURRENCIES.length} currencies…`}
@@ -90,7 +91,7 @@ export function CurrencySheet({ open, selected, onSelect, onClose }: Props) {
                 </span>
                 {c.code === selected && (
                   <span className="pick-check" aria-hidden="true">
-                    ✓
+                    <CheckIcon size={18} />
                   </span>
                 )}
               </button>

@@ -21,6 +21,7 @@ import { CurrencySheet } from './CurrencySheet'
 import { DateField } from './DateField'
 import { EntryRow } from './EntryRow'
 import { PaymentPicker } from './PaymentPicker'
+import { ChevronDownIcon, PlusIcon } from './icons'
 
 export interface ExpenseFormValues {
   amount: number
@@ -208,7 +209,8 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
               {currencySymbol(currency)}
             </span>
             <span className="currency-code" aria-hidden="true">
-              {currency} ▾
+              {currency}
+              <ChevronDownIcon size={12} />
             </span>
           </button>
           <input
@@ -242,7 +244,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
               aria-label="Add a category"
               onClick={() => setAddingCategory(true)}
             >
-              +
+              <PlusIcon size={18} />
             </button>
           </div>
         </div>

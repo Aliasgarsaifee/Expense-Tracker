@@ -71,6 +71,7 @@ import {
   trendBuckets,
   type CategoryTotal,
 } from '../lib/summarize'
+import { ChevronRightIcon } from '../components/icons'
 
 // A month averages ≈ 30.44 days; the year/all "a month" figure is approximate
 // by design, and the tile says so.
@@ -405,7 +406,7 @@ export function SummaryScreen({
       <p className="stat-sub">
         {shortDayMonth(busiest.date)}
         <span className="stat-go" aria-hidden="true">
-          ›
+          <ChevronRightIcon size={14} />
         </span>
       </p>
     </button>
@@ -581,7 +582,7 @@ export function SummaryScreen({
               <p className="stat-sub">
                 {biggest.note || biggest.category}
                 <span className="stat-go" aria-hidden="true">
-                  ›
+                  <ChevronRightIcon size={14} />
                 </span>
               </p>
             </button>
@@ -602,7 +603,7 @@ export function SummaryScreen({
                 {shortMonthYear(busiestM.month)}
                 {yearSplit && ' · all spending'}
                 <span className="stat-go" aria-hidden="true">
-                  ›
+                  <ChevronRightIcon size={14} />
                 </span>
               </p>
             </button>

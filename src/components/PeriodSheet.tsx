@@ -13,6 +13,7 @@ import {
 } from '../lib/dates'
 import { initialPeriod, periodBounds, periodLabel, type Period } from '../lib/period'
 import { getPref, PREFS, setPref } from '../lib/prefs'
+import { ArrowRightIcon, CloseIcon } from './icons'
 
 // Monday-first, matching monthGrid and weekStartOf.
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -261,7 +262,7 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
               aria-label="Clear selection"
               onClick={() => setSel(null)}
             >
-              ✕
+              <CloseIcon size={18} />
             </button>
             <span className="cal-footer-label">{periodLabel(pendingPeriod, today)}</span>
             <button
@@ -270,7 +271,7 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
               onClick={() => onApply(pendingPeriod)}
             >
               <span>Apply</span>
-              <span aria-hidden="true">→</span>
+              <ArrowRightIcon size={18} />
             </button>
           </footer>
         )}

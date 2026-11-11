@@ -1,4 +1,5 @@
 import type { HistorySort } from '../lib/history'
+import { CheckIcon } from './icons'
 
 const OPTIONS: { value: HistorySort; label: string; hint: string }[] = [
   { value: 'newest', label: 'Newest first', hint: 'Most recent day on top' },
@@ -53,7 +54,7 @@ export function SortSheet({ open, sort, onSortChange, onClose }: Props) {
                 </span>
                 {sort === o.value && (
                   <span className="sort-option-check" aria-hidden="true">
-                    ✓
+                    <CheckIcon size={18} />
                   </span>
                 )}
               </button>

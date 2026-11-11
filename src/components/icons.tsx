@@ -148,3 +148,38 @@ export function ArrowUpRightIcon(props: IconProps) {
     </Icon>
   )
 }
+
+export function ArrowDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 4.5v15M6.5 14l5.5 5.5 5.5-5.5" />
+    </Icon>
+  )
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 19l.9-3.9L15.6 5.4a1.8 1.8 0 012.5 0l.5.5a1.8 1.8 0 010 2.5L8.9 18.1z" />
+      <path d="M13.8 7.3l3 3" />
+    </Icon>
+  )
+}
+
+export function ArchiveIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 8h15v10.5h-15zM3.5 4.5h17V8h-17z" />
+      <path d="M10 12.2h4" />
+    </Icon>
+  )
+}
+
+export function RestoreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 8.5L5 12.5l4 4" />
+      <path d="M5 12.5h9.5a4.5 4.5 0 010 9" transform="translate(0 -4.5)" />
+    </Icon>
+  )
+}
