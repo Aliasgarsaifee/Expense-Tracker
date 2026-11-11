@@ -8,11 +8,10 @@ wrapped with Capacitor 8 (SPM mode, no CocoaPods) → built in Xcode → install
 on your iPhone with a free Apple ID.
 
 **What it tracks per entry:** amount + currency (every active ISO 4217
-currency, searchable; INR default; no FX conversion — foreign spends stay in
-their own currency), payment method (grouped as Cash / UPI / Credit card /
-Debit card, plus custom groups; Cash is the one built-in method — add your
-own cards and UPI apps), a category (8 built in, add your own with an emoji),
-date, and a free-text note.
+currency, searchable; INR default), payment method (grouped as Cash / UPI /
+Credit card / Debit card, plus custom groups; Cash is the one built-in method
+— add your own cards and UPI apps), a category (8 built in, add your own with
+an emoji), date, and a free-text note.
 
 ## The screens
 
@@ -25,6 +24,10 @@ date, and a free-text note.
   entries to refill the form. New cards can be added from the picker.
   Each save confirms with a toast (plus a haptic tick on the phone) that
   offers a few seconds of **Undo**.
+  **Foreign currency:** a spend in another currency counts in your default
+  currency at the rate of its date, shown right under the amount; tap it to
+  type what your card charged. History keeps what you paid in the small line.
+  With no signal the entry saves anyway and is converted later.
 - **History** — the same period control as Summary (‹ › step, tap the title
   for a day, month, year, all time or a range), with compact search, filter
   and sort buttons; all-time and year views get sticky month sections. The
@@ -67,7 +70,9 @@ money/date/summary/history helpers are all unit-tested. UI lives in
 
 Everything is stored in IndexedDB (`ExpenseTrackerDB`, schema v4: `expenses` +
 `paymentMethods` + `categories`) inside the app's own WKWebView sandbox —
-durable, offline, private. Nothing ever leaves the phone unless you export it.
+durable, offline, private. No entry, amount or note ever leaves the phone
+unless you export it; a foreign entry asks a public service for that day's
+exchange rate (two currency codes and a date).
 
 **Backup discipline (non-negotiable):** a lost or reset phone = lost data
 unless you exported. From the Settings drawer (☰):

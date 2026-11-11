@@ -1,7 +1,6 @@
 # ADR 0002: Exchange rates fetched over the network
 
-**Date:** 2026-11-11 · **Status:** proposed (accepted when the currency
-conversion feature merges)
+**Date:** 2026-11-11 · **Status:** accepted
 
 ## Context
 

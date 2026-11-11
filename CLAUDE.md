@@ -25,12 +25,14 @@ expense-tracker/
 │   ├── screens/                # AddScreen, HistoryScreen, SummaryScreen
 │   ├── components/             # shared UI: ExpenseForm, EntryRow, PeriodPager, sheets, pickers, chart, drawer; icons.tsx = every interface glyph
 │   ├── lib/                    # helpers; pure ones have co-located *.test.ts
-│   │   ├── money / dates / period / summarize / history / recent / currencies / fixed / budget   # pure, fully tested
+│   │   ├── money / dates / period / summarize / history / recent / currencies / fixed / budget / conversion   # pure, fully tested
 │   │   ├── backup.ts           # JSON backup (v3) + CSV export; imports v1–v3
 │   │   ├── prefs.ts            # localStorage wrapper (et-pref:*), deliberately outside Dexie
 │   │   ├── autoBackup.ts       # daily snapshot → Documents/Backups, keeps last 7
 │   │   ├── budgetCheck.ts      # judges a just-saved entry against the month's budget (reads db.ts; tested)
-│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / useToday / paymentMeta   # platform adapters + hooks
+│   │   ├── rates.ts            # the only network call (best-effort, injected fetch); see ADR 0002
+│   │   ├── fillRates.ts        # quiet background conversion of waiting entries (reads db.ts; tested)
+│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / useToday / paymentMeta / useRate   # platform adapters + hooks
 │   └── test/setup.ts           # fake-indexeddb → Dexie runs unmodified in Node
 ├── ios/App/                    # Capacitor Xcode project (SPM mode: CapApp-SPM package, no Pods)
 │   ├── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
@@ -107,9 +109,15 @@ Dependency direction is one-way: `screens/components → db.ts + lib/ → Dexie/
 
 - All dates/timestamps are ISO strings; sorting relies on lexicographic ==
   chronological. Never store Date objects or locale strings.
-- Amounts are plain numbers in their own currency; there is **no FX
-  conversion** by design — per-currency values are kept separate everywhere
-  (see `splitByCurrency`).
+- Amounts are plain numbers in their own currency. An entry is in one of
+  three states: **home** (the home currency, no `paid`), **converted** (stored
+  in the home currency, with a `paid` memo of what was actually paid) or
+  **waiting** (a foreign currency, no `paid`: it keeps its own bucket, see
+  `splitByCurrency`, until a rate arrives). "Waiting" is derived, never
+  stored. `paid.currency` never equals `currency`. Nothing reads `paid` except
+  through `lib/conversion.ts`. `convertExpense` is the only thing that turns a
+  waiting entry into a converted one outside the form, and the home value of a
+  stored entry is never recomputed from a new rate.
 - `expenses.category` stores the category **label**, not the id — it is a
   foreign key by label. `renameCategory` relabels history in a transaction;
   anything touching category identity must preserve that.
@@ -147,7 +155,10 @@ archive-if-referenced) — migrations may simplify, never just accrete.
 - v3 category rows may carry an optional boolean `fixed`. Absent must stay
   absent on parse and export (absent means everyday — see `isFixedCategory`),
   and an import never clears a local `fixed` the file does not mention.
+- v3 expense rows may carry an optional `paid`. Absent stays absent on parse
+  and export; files without it import as they always did.
 - CSV export: fixed column order, formula-injection escaping, BOM for Excel.
+  The last two columns are `paidAmount,paidCurrency`.
 - `autoBackup.ts` prunes only files matching the exact `auto-backup-` prefix
   (keeps 7); `pre-import-*.json` safety copies are never pruned. Users' own
   files in that folder must never be touched.
@@ -162,8 +173,9 @@ theme via `prefers-color-scheme`. The look is "warm paper, ink, ledger-green".
   the validated pairs are documented in the file's header comment — update it.
 - Type: Fraunces Variable for display and money (`.money` = tabular-nums;
   display uses `font-variation-settings` SOFT/WONK), Atkinson Hyperlegible for
-  body. Fonts ship in the bundle; the app must render identically offline — no
-  runtime network fetches, ever.
+  body. Fonts ship in the bundle; rendering and every flow work identically
+  offline. The one request (`lib/rates.ts`) is best-effort data, never awaited
+  by a save or a render; see ADR 0002.
 - Interaction vocabulary: chips, bottom sheets, a toast-with-Undo after save
   (plus a haptic tick on device), single column capped at 560px, bottom tabs.
   Interface glyphs come from `components/icons.tsx`; emoji are only category
