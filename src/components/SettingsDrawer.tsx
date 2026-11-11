@@ -5,7 +5,6 @@ import {
   deleteCategory,
   deletePaymentMethod,
   isBuiltinCategoryId,
-  isFixedCategory,
   listCategories,
   listExpenses,
   listPaymentMethods,
@@ -20,6 +19,7 @@ import {
 } from '../db'
 import { currencySymbol } from '../lib/currencies'
 import type { HistoryJump } from '../lib/history'
+import { formatMoney } from '../lib/money'
 import { bucketize, groupEmoji } from '../lib/paymentMeta'
 import { getPref, PREFS, setPref } from '../lib/prefs'
 import { useDialog } from '../lib/useDialog'
@@ -34,6 +34,8 @@ interface Props {
   onClose: () => void
   onDefaultCurrencyChange?: (code: string) => void
   onJumpToHistory: (jump: HistoryJump) => void
+  /** The default currency's budget; the row opens the sheet for that currency. */
+  budget: number | null
   onOpenBudget: () => void
   onExported?: () => void
 }
@@ -175,6 +177,7 @@ function DrawerBody({
   onClose,
   onDefaultCurrencyChange,
   onJumpToHistory,
+  budget,
   onOpenBudget,
   onExported,
 }: Omit<Props, 'open'>) {
@@ -318,7 +321,6 @@ function DrawerBody({
     }
   }
 
-  const fixedCount = (categories ?? []).filter((c) => !c.archived && isFixedCategory(c)).length
   const entryCount = expenses?.length ?? 0
 
   return (
@@ -423,14 +425,12 @@ function DrawerBody({
         <section className="drawer-section">
           <h3 className="drawer-title">Preferences</h3>
           <button type="button" className="btn-ghost" onClick={onOpenBudget}>
-            <span>Fixed costs</span>
-            <span>
-              {fixedCount === 0
-                ? 'None'
-                : fixedCount === 1
-                  ? '1 category'
-                  : `${fixedCount} categories`}
-            </span>
+            <span>Budget</span>
+            {budget === null ? (
+              <span>Not set</span>
+            ) : (
+              <span className="money">{formatMoney(budget, defaultCurrency)}</span>
+            )}
           </button>
           <button
             type="button"

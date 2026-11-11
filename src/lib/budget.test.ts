@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   budgetBadge,
+  budgetCardCopy,
   budgetCrossing,
   budgetFor,
   budgetLevel,
+  budgetReference,
   budgetStatus,
   readBudgets,
+  withBudget,
 } from './budget'
 
 describe('budget maths', () => {
@@ -60,5 +63,48 @@ describe('budget maths', () => {
       .toEqual({ tone: 'caution', text: 'Close' })
     expect(budgetBadge(budgetStatus(26150, 25000, 24, 30), 'INR'))
       .toEqual({ tone: 'negative', text: 'Over by ₹1,150' })
+  })
+
+  it('sets, changes and removes one currency without touching the rest', () => {
+    const start = { INR: 25000 }
+    expect(withBudget(start, 'USD', 500)).toEqual({ INR: 25000, USD: 500 })
+    expect(start).toEqual({ INR: 25000 }) // a fresh map, never mutated
+    expect(withBudget({ INR: 25000, USD: 500 }, 'INR', 30000))
+      .toEqual({ INR: 30000, USD: 500 })
+    expect(withBudget({ INR: 25000, USD: 500 }, 'INR', null)).toEqual({ USD: 500 })
+    expect(withBudget({ INR: 25000 }, 'INR', 0)).toEqual({}) // read back as none anyway
+  })
+
+  it('draws the daily allowance as a chart reference', () => {
+    expect(budgetReference(25000, 30, 'INR'))
+      .toEqual({ value: 25000 / 30, label: '₹833 a day keeps the budget' })
+    expect(budgetReference(25000, 31, 'INR').label).toBe('₹806 a day keeps the budget')
+    expect(budgetReference(600, 30, 'USD').label).toBe('$20 a day keeps the budget')
+  })
+
+  it('words the card while under, with the bar said in words', () => {
+    expect(budgetCardCopy(budgetStatus(8730, 25000, 11, 30), 25000, 19, 'INR')).toEqual({
+      amount: '₹16,270',
+      of: 'left of ₹25,000',
+      perDay: '₹856 a day for the next 19 days',
+      bar: '35% of the budget used; even pace today is 37%',
+    })
+  })
+
+  it('words the card once over, with the real share rather than a full bar', () => {
+    expect(budgetCardCopy(budgetStatus(26150, 25000, 24, 30), 25000, 6, 'INR')).toEqual({
+      amount: '₹1,150',
+      of: 'over ₹25,000',
+      perDay: null,
+      bar: '105% of the budget used; even pace today is 80%',
+    })
+  })
+
+  it('says nothing per day once the month or the money has run out', () => {
+    const at = (spent: number, elapsed: number, daysLeft: number) =>
+      budgetCardCopy(budgetStatus(spent, 25000, elapsed, 30), 25000, daysLeft, 'INR')
+    expect(at(8730, 30, 0).perDay).toBeNull() // a past month, or its last day
+    expect(at(25000, 11, 19)).toMatchObject({ amount: '₹0', of: 'left of ₹25,000', perDay: null })
+    expect(at(8730, 29, 1).perDay).toBe('₹16,270 for the last day')
   })
 })

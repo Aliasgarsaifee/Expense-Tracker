@@ -15,6 +15,8 @@ export interface PromptOptions {
   placeholder?: string
   confirmLabel?: string
   maxLength?: number
+  /** 'decimal' raises the number pad for an amount; text otherwise. */
+  inputMode?: 'text' | 'decimal'
 }
 
 export interface DialogState {
@@ -28,6 +30,7 @@ export interface DialogState {
     initialValue: string
     placeholder?: string
     maxLength?: number
+    inputMode?: 'text' | 'decimal'
   }
   settle: (result: boolean | string | null) => void
 }
@@ -94,6 +97,7 @@ export function useDialog() {
         initialValue: o.initialValue ?? '',
         placeholder: o.placeholder,
         maxLength: o.maxLength,
+        inputMode: o.inputMode,
       },
     }) as Promise<string | null>
   }

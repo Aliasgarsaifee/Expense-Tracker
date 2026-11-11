@@ -5,8 +5,9 @@ import { SettingsDrawer } from './components/SettingsDrawer'
 import { unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
 import { assessBackupHealth } from './lib/backupHealth'
+import { budgetFor, readBudgets, withBudget } from './lib/budget'
 import type { HistoryJump } from './lib/history'
-import { getPref, PREFS } from './lib/prefs'
+import { getPref, PREFS, setPref } from './lib/prefs'
 import { AddScreen } from './screens/AddScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { SummaryScreen } from './screens/SummaryScreen'
@@ -58,7 +59,9 @@ type Tab = (typeof TABS)[number]['id']
 export default function App() {
   const [tab, setTab] = useState<Tab>('add')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [budgetOpen, setBudgetOpen] = useState(false)
+  // Whose budget the sheet is editing, and whether it is open at all: Summary
+  // opens it for the currency on screen, Settings for the default one.
+  const [budgetSheetFor, setBudgetSheetFor] = useState<string | null>(null)
   const [historyJump, setHistoryJump] = useState<HistoryJump | null>(null)
 
   // A settings row was tapped: close the drawer, land on History, filter to
@@ -77,6 +80,19 @@ export default function App() {
   const [defaultCurrency, setDefaultCurrency] = useState(() =>
     getPref(PREFS.defaultCurrency, 'INR'),
   )
+
+  // Prefs are not reactive, so the budgets live here like the default
+  // currency, and the sheet reports every change back. setPref is best-effort:
+  // if storage refuses, the change still holds for this session.
+  const [budgets, setBudgets] = useState(() =>
+    readBudgets(getPref(PREFS.monthlyBudgets, {})),
+  )
+  function saveBudget(currency: string, amount: number | null) {
+    const next = withBudget(budgets, currency, amount)
+    setPref(PREFS.monthlyBudgets, next)
+    setBudgets(next)
+  }
+  const sheetCurrency = budgetSheetFor ?? defaultCurrency
 
   // Prefs are not reactive, so the last-export timestamp lives here and the
   // drawer reports back when an export succeeds.
@@ -133,7 +149,12 @@ export default function App() {
           <HistoryScreen jump={historyJump} />
         </section>
         <section hidden={tab !== 'summary'}>
-          <SummaryScreen onDrill={jumpToHistory} onAddNew={() => setTab('add')} />
+          <SummaryScreen
+            budgets={budgets}
+            onDrill={jumpToHistory}
+            onAddNew={() => setTab('add')}
+            onOpenBudget={(currency) => setBudgetSheetFor(currency)}
+          />
         </section>
       </main>
       <nav className="tabbar" aria-label="Screens">
@@ -154,14 +175,21 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onDefaultCurrencyChange={setDefaultCurrency}
         onJumpToHistory={jumpToHistory}
+        budget={budgetFor(budgets, defaultCurrency)}
         // Close the drawer first: a sheet sits under the drawer's z-index.
         onOpenBudget={() => {
           setSettingsOpen(false)
-          setBudgetOpen(true)
+          setBudgetSheetFor(defaultCurrency)
         }}
         onExported={() => setLastExport(getPref(PREFS.lastExport, ''))}
       />
-      <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} />
+      <BudgetSheet
+        open={budgetSheetFor !== null}
+        onClose={() => setBudgetSheetFor(null)}
+        currency={sheetCurrency}
+        budget={budgetFor(budgets, sheetCurrency)}
+        onBudgetChange={(amount) => saveBudget(sheetCurrency, amount)}
+      />
     </div>
   )
 }

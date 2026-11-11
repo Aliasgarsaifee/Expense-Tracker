@@ -83,3 +83,62 @@ export function budgetBadge(status: BudgetStatus, currency: string): Badge {
       return { tone: 'negative', text: `Over by ${formatMoney(-status.left, currency)}` }
   }
 }
+
+// The map with one currency's budget set, changed or removed. A fresh object,
+// because App holds it in state; a non-amount removes, as readBudgets would
+// drop it on the next launch anyway.
+export function withBudget(
+  budgets: Budgets,
+  currency: string,
+  amount: number | null,
+): Budgets {
+  const next = { ...budgets }
+  if (isAmount(amount)) next[currency] = amount
+  else delete next[currency]
+  return next
+}
+
+// The budget spread evenly over the month, for the dashed line on the daily
+// chart. The value stays exact so the line sits true; only the label rounds.
+export function budgetReference(
+  budget: number,
+  totalDays: number,
+  currency: string,
+): { value: number; label: string } {
+  const value = budget / totalDays
+  return { value, label: `${formatMoney(Math.round(value), currency)} a day keeps the budget` }
+}
+
+export interface BudgetCardCopy {
+  amount: string // the figure, set large: "₹16,270"
+  of: string // what follows it: "left of ₹25,000" | "over ₹25,000"
+  perDay: string | null
+  bar: string // the bar and its even-pace tick, for VoiceOver
+}
+
+const percent = (share: number) => `${Math.round(share * 100)}%`
+
+export function budgetCardCopy(
+  status: BudgetStatus,
+  budget: number,
+  daysLeft: number,
+  currency: string,
+): BudgetCardCopy {
+  const over = status.left < 0
+  let perDay: string | null = null
+  if (status.perDay !== null) {
+    const each = formatMoney(status.perDay, currency)
+    perDay =
+      daysLeft === 1 ? `${each} for the last day` : `${each} a day for the next ${daysLeft} days`
+  }
+  return {
+    amount: formatMoney(Math.abs(status.left), currency),
+    of: `${over ? 'over' : 'left of'} ${formatMoney(budget, currency)}`,
+    perDay,
+    // usedShare is clamped for the bar's width; the words give the real share,
+    // so a month 5% over does not read as exactly spent.
+    bar:
+      `${percent((budget - status.left) / budget)} of the budget used; ` +
+      `even pace today is ${percent(status.evenShare)}`,
+  }
+}

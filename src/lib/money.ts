@@ -50,3 +50,13 @@ export function formatShare(part: number, whole: number): string {
   const oneDp = Math.round(pct * 10) / 10
   return oneDp >= 10 || oneDp === 0 ? `${Math.round(pct)}%` : `${oneDp}%`
 }
+
+// What a typed amount means: grouping, a pasted symbol and stray spaces are
+// ignored; anything that is not a number above zero is no amount at all.
+// One parser for the Add form and the budget prompt, so a figure that one
+// accepts the other does too.
+export function parseAmount(text: string): number | null {
+  const n = Number(text.replace(/[^0-9.]/g, ''))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round(n * 100) / 100 // clamp to minor units
+}

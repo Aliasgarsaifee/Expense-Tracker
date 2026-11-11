@@ -92,6 +92,7 @@ function DialogBody({ state, onClose }: { state: DialogState; onClose: Props['on
               <input
                 ref={inputRef}
                 type="text"
+                inputMode={state.field.inputMode}
                 enterKeyHint="done"
                 value={value}
                 placeholder={state.field.placeholder}

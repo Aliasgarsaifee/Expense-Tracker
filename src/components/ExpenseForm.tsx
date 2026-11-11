@@ -11,6 +11,7 @@ import {
 } from '../db'
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
+import { parseAmount } from '../lib/money'
 import { AddCategorySheet } from './AddCategorySheet'
 import { AddMethodSheet } from './AddMethodSheet'
 import { CurrencySheet } from './CurrencySheet'
@@ -32,12 +33,6 @@ interface Props {
   onSubmit: (values: ExpenseFormValues) => Promise<void> | void
   /** Add screen: clear amount + note after submit, keep category and date. */
   autoReset?: boolean
-}
-
-function parseAmount(text: string): number | null {
-  const n = Number(text.replace(/[^0-9.]/g, ''))
-  if (!Number.isFinite(n) || n <= 0) return null
-  return Math.round(n * 100) / 100 // clamp to minor units
 }
 
 export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props) {

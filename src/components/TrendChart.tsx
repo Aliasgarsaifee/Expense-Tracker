@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Bar, BarChart, Cell, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts'
 import { narrowMonth, narrowWeekday, shortDayMonth, shortMonthYear } from '../lib/dates'
 import { formatMoney } from '../lib/money'
 import type { TrendUnit } from '../lib/period'
@@ -75,6 +75,9 @@ interface Props {
   currency: string
   currentKey?: string
   onSelect?: (key: string) => void
+  /** A dashed line at this value, named by a key under the chart. Callers
+      must memoize it, as with onSelect, or the memo below is defeated. */
+  reference?: { value: number; label: string }
 }
 
 // The expensive half — ~213 DOM nodes, the heaviest thing on Summary against
@@ -89,6 +92,7 @@ const TrendChartBody = memo(function TrendChartBody({
   currency,
   currentKey,
   onSelect,
+  reference,
 }: Props & { width: number }) {
   return (
     <BarChart
@@ -134,6 +138,16 @@ const TrendChartBody = memo(function TrendChartBody({
           <Cell key={b.key} className={b.key === currentKey ? 'bar-now' : undefined} />
         ))}
       </Bar>
+      {/* extendDomain: in a quiet month every bar sits under the line, and the
+         default (discard) would drop the line rather than make room for it. */}
+      {reference && (
+        <ReferenceLine
+          y={reference.value}
+          ifOverflow="extendDomain"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+        />
+      )}
     </BarChart>
   )
 })
@@ -143,21 +157,42 @@ const TrendChartBody = memo(function TrendChartBody({
 // unhidden — memoizing here would swallow exactly that render and leave the
 // chart stuck at width 0 on any engine whose ResizeObserver never fires (the
 // case that hook exists for). Everything costly sits behind TrendChartBody.
-export function TrendChart({ buckets, unit, currency, currentKey, onSelect }: Props) {
+export function TrendChart({
+  buckets,
+  unit,
+  currency,
+  currentKey,
+  onSelect,
+  reference,
+}: Props) {
   const [wrapRef, width] = useMeasuredWidth()
 
   return (
-    <div className="trend-chart" ref={wrapRef} data-clickable={onSelect ? '' : undefined}>
-      {width > 0 && (
-        <TrendChartBody
-          width={width}
-          buckets={buckets}
-          unit={unit}
-          currency={currency}
-          currentKey={currentKey}
-          onSelect={onSelect}
-        />
+    <>
+      <div className="trend-chart" ref={wrapRef} data-clickable={onSelect ? '' : undefined}>
+        {width > 0 && (
+          <TrendChartBody
+            width={width}
+            buckets={buckets}
+            unit={unit}
+            currency={currency}
+            currentKey={currentKey}
+            onSelect={onSelect}
+            reference={reference}
+          />
+        )}
+      </div>
+      {/* A key under the plot, not a label on the line: the label measures
+         ~145px, half of the 297px plot at 375px, so riding the line it would
+         sit across the bars of any day that went over. */}
+      {reference && (
+        <p className="trend-ref">
+          <svg viewBox="0 0 16 4" aria-hidden="true">
+            <path d="M0 2h16" />
+          </svg>
+          {reference.label}
+        </p>
       )}
-    </div>
+    </>
   )
 }

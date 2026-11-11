@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useMemo, useState } from 'react'
 import { BreakdownList } from '../components/BreakdownList'
+import { BudgetCard } from '../components/BudgetCard'
 import { Pager } from '../components/Pager'
 import { PeriodSheet } from '../components/PeriodSheet'
 import { TrendChart } from '../components/TrendChart'
@@ -14,6 +15,7 @@ import {
   type Expense,
   type PaymentMethod,
 } from '../db'
+import { budgetFor, budgetReference, budgetStatus, type Budgets } from '../lib/budget'
 import { currencySymbol } from '../lib/currencies'
 import { shortDayMonth, shortMonthYear, todayISO } from '../lib/dates'
 import {
@@ -73,11 +75,15 @@ function drillBounds(p: Period): Pick<HistoryJump, 'month' | 'from' | 'to'> {
 }
 
 export function SummaryScreen({
+  budgets,
   onDrill,
   onAddNew,
+  onOpenBudget,
 }: {
+  budgets: Budgets
   onDrill: (jump: HistoryJump) => void
   onAddNew: () => void
+  onOpenBudget: (currency: string) => void
 }) {
   const today = todayISO()
   const [period, setPeriod] = useState<Period>(() =>
@@ -275,6 +281,22 @@ export function SummaryScreen({
     [everyday, bounds, trendUnitOf],
   )
 
+  // The budget is a monthly line for everyday spending in one currency, so it
+  // appears on the month view only, for the currency on screen. Everyday is
+  // everything when nothing is fixed, so the card needs no split to work.
+  const budget = dataPeriod.kind === 'month' ? budgetFor(budgets, currency) : null
+  const budgetNow =
+    budget === null ? null : budgetStatus(everydaySummary.total, budget, elapsed, spanDays)
+  // Memoized: TrendChart is memo'd, and a fresh object each render would
+  // rebuild it every time this screen re-rendered.
+  const reference = useMemo(
+    () =>
+      budget !== null && spanDays > 0
+        ? budgetReference(budget, spanDays, currency)
+        : undefined,
+    [budget, spanDays, currency],
+  )
+
   const delta =
     prevTotal !== null && prevTotal > 0
       ? Math.round(((everydaySummary.total - prevTotal) / prevTotal) * 100)
@@ -434,6 +456,27 @@ export function SummaryScreen({
         )}
       </section>
 
+      {budget !== null && budgetNow ? (
+        <BudgetCard
+          status={budgetNow}
+          budget={budget}
+          currency={currency}
+          daysLeft={spanDays - elapsed}
+          carried={null}
+          onEdit={() => onOpenBudget(currency)}
+        />
+      ) : (
+        dataPeriod.kind === 'month' && (
+          <button
+            type="button"
+            className="btn-text btn-text-tap budget-set"
+            onClick={() => onOpenBudget(currency)}
+          >
+            Set a monthly budget
+          </button>
+        )
+      )}
+
       {entryCount > 0 && bounds && (
         <section className="stat-grid" aria-label="Period statistics">
           {splitActive && (showPace ? paceTile : busiestTile)}
@@ -529,6 +572,7 @@ export function SummaryScreen({
             currency={currency}
             currentKey={currentBucketKey}
             onSelect={onBucketSelect}
+            reference={reference}
           />
         </section>
       )}

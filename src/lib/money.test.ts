@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { formatMoney, formatShare } from './money'
+import { formatMoney, formatShare, parseAmount } from './money'
+
+// Shared by the Add form and the budget prompt, so a figure typed in one is
+// accepted by the other.
+describe('parseAmount', () => {
+  it('reads plain and grouped amounts, with or without a symbol', () => {
+    expect(parseAmount('25000')).toBe(25000)
+    expect(parseAmount('25,000')).toBe(25000)
+    expect(parseAmount('₹ 25,000')).toBe(25000)
+    expect(parseAmount('450.5')).toBe(450.5)
+  })
+
+  it('clamps to minor units', () => {
+    expect(parseAmount('1234.567')).toBe(1234.57)
+  })
+
+  it('rejects anything that is not a number above zero', () => {
+    for (const text of ['', '   ', 'abc', '0', '0.00', '1.2.3', '.', '9'.repeat(400)]) {
+      expect(parseAmount(text)).toBeNull()
+    }
+  })
+})
 
 describe('formatMoney', () => {
   it('defaults to INR and formats whole rupees without decimals', () => {

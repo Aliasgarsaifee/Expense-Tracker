@@ -31,7 +31,11 @@
    Where each tone-on-tint pair is used: .status-pill, and only there
    (data-tone picks --<tone> on --<tone>-tint). Summary's Fixed costs card
    wears positive ("As usual"), caution ("₹X above usual") and pending ("₹X
-   to come", "Not logged yet"); negative is validated but no pill wears it yet.
+   to come", "Not logged yet"); the Everyday budget card wears positive ("On
+   track"), caution ("Close") and negative ("Over by ₹X"). That card's bar
+   fill takes its pill's tone as a non-text fill on a --line track, under the
+   word and never instead of it, so it adds no text pair; its even-pace tick
+   is --ink.
    Calendar spend-heat once lived here as four background tints and no longer
    does: the day number sits inside the cell, so ink legibility capped the
    ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
@@ -893,6 +897,34 @@ button {
   font-size: 11px;
 }
 
+/* The budget's daily allowance: dashed because it is a line to stay under,
+   not data, and in muted ink so it never reads as a second series. */
+.trend-chart .recharts-reference-line-line {
+  stroke: var(--ink-3);
+}
+
+/* The key naming that line, set under the plot (see TrendChart). Its swatch
+   is the same dash at the same weight. */
+.trend-ref {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: var(--space-6) 0 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink-3);
+}
+
+.trend-ref svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 4px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
 .chart-tip {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1639,7 +1671,13 @@ button {
 .screen[data-loading] .stat-sub,
 .screen[data-loading] .trend-chart,
 .screen[data-loading] .pay-list,
-.screen[data-loading] .card-note {
+.screen[data-loading] .card-note,
+.screen[data-loading] .budget-card .status-pill,
+.screen[data-loading] .budget-left,
+.screen[data-loading] .budget-bar,
+.screen[data-loading] .budget-perday,
+.screen[data-loading] .budget-set,
+.screen[data-loading] .trend-ref {
   visibility: hidden;
 }
 
@@ -1837,6 +1875,227 @@ button {
 .pay-text .status-pill {
   justify-self: start;
   margin-top: var(--space-2);
+}
+
+/* ——— budget ——— */
+
+/* A text button that stands alone as an action ("Set a monthly budget",
+   "Remove the budget") needs a whole thumb target and a press; the inline
+   .btn-text in sheet heads keeps its own size. */
+.btn-text-tap {
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-10);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.12s ease;
+}
+
+.btn-text-tap:active {
+  background: var(--chip);
+}
+
+.budget-set {
+  display: block;
+  margin: 0 auto 18px;
+}
+
+/* Summary's month budget. The whole card opens the Budget sheet, so it is one
+   button and presses like the drill tiles. */
+.budget-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin-bottom: 18px;
+  padding: var(--space-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.06s ease, background-color 0.12s ease;
+}
+
+.budget-card:active {
+  transform: scale(0.98);
+  background: var(--chip);
+}
+
+.budget-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.budget-head .stat-label {
+  margin: 0;
+}
+
+.budget-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-8);
+}
+
+.budget-amount {
+  font-size: 31px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.budget-of {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+/* 10px of bar, then one 11px line for the even-pace label under it. --used
+   and --even are shares of the month's budget and of its days (BudgetCard). */
+.budget-bar {
+  position: relative;
+  height: 34px;
+}
+
+/* The empty bar is the budget's whole length, so it has to show. --line, not
+   --chip: chip measures 1.05:1 on the dark card and the bar's end vanished;
+   line holds 1.29 light / 1.21 dark, and stays visible on the pressed card. */
+.budget-track {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.budget-fill {
+  display: block;
+  width: calc(var(--used) * 100%);
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.budget-fill[data-tone='positive'] {
+  background: var(--positive);
+}
+
+.budget-fill[data-tone='caution'] {
+  background: var(--caution);
+}
+
+.budget-fill[data-tone='negative'] {
+  background: var(--negative);
+}
+
+.budget-tick {
+  position: absolute;
+  top: -3px;
+  left: calc(var(--even) * 100%);
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--ink);
+  transform: translateX(-50%);
+}
+
+/* Follows the tick without ever hanging off the card: shifted back by the
+   same share of its own width, its left edge meets the tick on the 1st and its
+   right edge meets it on the last day. */
+.budget-tick-label {
+  position: absolute;
+  top: 18px;
+  left: calc(var(--even) * 100%);
+  transform: translateX(calc(var(--even) * -100%));
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.budget-perday {
+  font-size: 15px;
+}
+
+/* ——— Budget sheet ——— */
+
+.budget-intro {
+  margin: 0 0 20px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.budget-section {
+  margin-bottom: 20px;
+}
+
+/* Label and rule on the left, the amount on the right like a ledger column,
+   a chevron because it opens the amount prompt. */
+.budget-row {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8) 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.budget-row:active {
+  background: var(--chip);
+}
+
+.budget-row-text {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.budget-row-label {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.budget-row-sub {
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--ink-3);
+}
+
+.budget-row-value {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.budget-row-value .money {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.budget-row-unset {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.budget-row-value svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ink-3);
+}
+
+.budget-section .btn-text-tap {
+  margin-top: var(--space-4);
 }
 
 /* ——— picker sheets (currency) ——— */

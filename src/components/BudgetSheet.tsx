@@ -1,21 +1,44 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { isFixedCategory, listCategories, setCategoryFixed } from '../db'
+import { formatMoney, parseAmount } from '../lib/money'
+import { useDialog } from '../lib/useDialog'
+import { Dialog } from './Dialog'
 
 interface Props {
   open: boolean
   onClose: () => void
+  currency: string
+  budget: number | null
+  onBudgetChange: (amount: number | null) => void
 }
 
-export function BudgetSheet({ open, onClose }: Props) {
+export function BudgetSheet({ open, ...body }: Props) {
   if (!open) return null
-  return <SheetBody onClose={onClose} />
+  return <SheetBody {...body} />
 }
 
 // Changes save on tap — the live query repaints the chips and every other
-// reader (Settings count, Summary split) from the same write, so there is no
-// draft state to confirm or discard.
-function SheetBody({ onClose }: Omit<Props, 'open'>) {
+// reader (Summary split) from the same write, and the budget goes straight
+// back to App, so there is no draft state to confirm or discard.
+function SheetBody({ onClose, currency, budget, onBudgetChange }: Omit<Props, 'open'>) {
   const categories = useLiveQuery(() => listCategories())
+  const { dialog, close, showAlert, askPrompt } = useDialog()
+
+  async function editBudget() {
+    const text = await askPrompt({
+      title: 'Monthly budget',
+      label: `Everyday spending in ${currency}`,
+      initialValue: budget === null ? '' : String(budget),
+      inputMode: 'decimal',
+    })
+    if (text === null) return
+    const amount = parseAmount(text)
+    if (amount === null) {
+      await showAlert('Enter an amount above zero')
+      return
+    }
+    onBudgetChange(amount)
+  }
 
   return (
     <div className="sheet-scrim" onClick={onClose}>
@@ -23,38 +46,90 @@ function SheetBody({ onClose }: Omit<Props, 'open'>) {
         className="sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Fixed costs"
+        aria-label="Budget"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-handle" aria-hidden="true" />
         <header className="sheet-head">
-          <h2 className="display">Fixed costs</h2>
+          <h2 className="display">Budget</h2>
           <button className="btn-text" type="button" onClick={onClose}>
             Close
           </button>
         </header>
-        <p className="drawer-note">Counted once a month and kept out of everyday spending.</p>
-        <div className="chip-grid" role="group" aria-label="Fixed cost categories">
-          {(categories ?? []).map((c) => {
-            const fixed = isFixedCategory(c)
-            return (
-              <button
-                key={c.id}
-                type="button"
-                className="chip chip-tall"
-                aria-pressed={fixed}
-                onClick={() =>
-                  setCategoryFixed(c.id, !fixed).catch((err) =>
-                    console.error('could not save fixed flag', err),
-                  )
-                }
+        <p className="budget-intro">
+          One line for the month. You hear about it twice: a heads-up at 80%, and once
+          when an entry takes you past it.
+        </p>
+
+        <section className="budget-section">
+          <h3 className="drawer-title">Monthly budget</h3>
+          <button
+            type="button"
+            className="budget-row"
+            aria-haspopup="dialog"
+            onClick={() => void editBudget()}
+          >
+            <span className="budget-row-text">
+              <span className="budget-row-label">Everyday spending</span>
+              <span className="budget-row-sub">Everything not marked fixed</span>
+            </span>
+            <span className="budget-row-value">
+              {budget === null ? (
+                <span className="budget-row-unset">Not set</span>
+              ) : (
+                <span className="money">{formatMoney(budget, currency)}</span>
+              )}
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <span aria-hidden="true">{c.emoji}</span> {c.label}
-              </button>
-            )
-          })}
-        </div>
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </span>
+          </button>
+          {/* No confirm: setting it again is one tap and a number away. */}
+          {budget !== null && (
+            <button
+              type="button"
+              className="btn-text btn-text-tap"
+              onClick={() => onBudgetChange(null)}
+            >
+              Remove the budget
+            </button>
+          )}
+        </section>
+
+        <section className="budget-section">
+          <h3 className="drawer-title">Fixed costs</h3>
+          <p className="drawer-note">Counted once a month and kept out of everyday spending.</p>
+          <div className="chip-grid" role="group" aria-label="Fixed cost categories">
+            {(categories ?? []).map((c) => {
+              const fixed = isFixedCategory(c)
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="chip chip-tall"
+                  aria-pressed={fixed}
+                  onClick={() =>
+                    setCategoryFixed(c.id, !fixed).catch((err) =>
+                      console.error('could not save fixed flag', err),
+                    )
+                  }
+                >
+                  <span aria-hidden="true">{c.emoji}</span> {c.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
       </div>
+      <Dialog state={dialog} onClose={close} />
     </div>
   )
 }
