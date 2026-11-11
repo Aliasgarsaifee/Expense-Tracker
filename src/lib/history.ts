@@ -1,4 +1,6 @@
 import type { Expense } from '../db'
+import { monthOf } from './dates'
+import type { Bounds, Period } from './period'
 import { formatMoney } from './money'
 
 export interface MoneyByCurrency {
@@ -19,7 +21,6 @@ export interface MonthGroup {
 }
 
 export interface HistoryFilter {
-  month?: string | null
   paymentMethodIds?: readonly string[] | null // OR within; empty/null = all
   categories?: readonly string[] | null       // OR within; empty/null = all
   from?: string | null // inclusive ISO date bound
@@ -27,15 +28,18 @@ export interface HistoryFilter {
   query?: string
 }
 
-// A cross-screen jump into History. A settings-row tap sends just a method or
-// category (→ All time); a Summary drill also sends the period as month OR
-// from/to (never both, preserving History's pager-XOR-range invariant).
+// A cross-screen jump into History. An absent period means all time, so a
+// settings-row tap sends just a method or category.
 export interface HistoryJump {
   paymentMethodId?: string | null
   category?: string | null
-  month?: string | null
-  from?: string | null
-  to?: string | null
+  period?: Period
+}
+
+// Whether a period's entries cross a month boundary (null bounds = all time),
+// which decides month headings over day headings.
+export function spansMonths(bounds: Bounds | null): boolean {
+  return bounds === null || monthOf(bounds.from) !== monthOf(bounds.to)
 }
 
 export type HistorySort = 'newest' | 'oldest' | 'largest' | 'smallest'
@@ -70,7 +74,6 @@ export function filterExpenses(expenses: Expense[], f: HistoryFilter): Expense[]
   const methodIds = f.paymentMethodIds?.length ? new Set(f.paymentMethodIds) : null
   const categories = f.categories?.length ? new Set(f.categories) : null
   return expenses.filter((e) => {
-    if (f.month && !e.spentOn.startsWith(`${f.month}-`)) return false
     if (methodIds && (!e.paymentMethodId || !methodIds.has(e.paymentMethodId))) return false
     if (categories && !categories.has(e.category)) return false
     if (f.from && e.spentOn < f.from) return false

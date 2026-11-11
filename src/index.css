@@ -850,8 +850,6 @@ button {
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 24px;
   line-height: 1;
   padding-bottom: 4px;
   transition: transform 0.06s ease;
@@ -1325,25 +1323,6 @@ button {
 .filter-groups {
   display: grid;
   gap: 12px;
-}
-
-.filter-dates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.date-display.date-empty {
-  color: var(--ink-3);
-}
-
-/* Sits above the transparent native date input so it stays tappable, and
-   fills the 48px field height so the thumb target is real. */
-.date-clear {
-  position: relative;
-  z-index: 1;
-  align-self: stretch;
-  padding: 6px 12px;
 }
 
 .currency-row {

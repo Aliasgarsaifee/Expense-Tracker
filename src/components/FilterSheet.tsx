@@ -6,7 +6,6 @@ import {
   toggleMethod,
   type MethodSelection,
 } from '../lib/paymentMeta'
-import { RangeDateField } from './RangeDateField'
 
 interface Props {
   open: boolean
@@ -16,9 +15,6 @@ interface Props {
   onSelectionChange: (sel: MethodSelection) => void
   catFilters: string[]
   onCatFiltersChange: (labels: string[]) => void
-  from: string | null
-  to: string | null
-  onRangeChange: (from: string | null, to: string | null) => void
   onClearAll: () => void
   onClose: () => void
 }
@@ -33,9 +29,6 @@ export function FilterSheet({
   onSelectionChange,
   catFilters,
   onCatFiltersChange,
-  from,
-  to,
-  onRangeChange,
   onClearAll,
   onClose,
 }: Props) {
@@ -44,9 +37,7 @@ export function FilterSheet({
   const anyActive =
     selection.methodIds.length > 0 ||
     selection.groups.length > 0 ||
-    catFilters.length > 0 ||
-    from !== null ||
-    to !== null
+    catFilters.length > 0
 
   return (
     <div className="sheet-scrim" onClick={onClose}>
@@ -128,14 +119,6 @@ export function FilterSheet({
                 {c.archived && <span className="chip-tag">archived</span>}
               </button>
             ))}
-          </div>
-        </div>
-
-        <div className="field">
-          <span>Between</span>
-          <div className="filter-dates">
-            <RangeDateField label="Start" value={from} onChange={(v) => onRangeChange(v, to)} />
-            <RangeDateField label="End" value={to} onChange={(v) => onRangeChange(from, v)} />
           </div>
         </div>
 

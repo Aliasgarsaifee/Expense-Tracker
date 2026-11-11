@@ -54,6 +54,7 @@ import {
   initialPeriod,
   periodBounds,
   periodWindows,
+  rangePeriod,
   trendUnit,
   type Period,
 } from '../lib/period'
@@ -74,16 +75,6 @@ import {
 // A month averages ≈ 30.44 days; the year/all "a month" figure is approximate
 // by design, and the tile says so.
 const DAYS_PER_MONTH = 30.44
-
-// Turn the viewed period into a History slice: a month drill carries the month
-// (History shows its day groups); week/year/custom carry inclusive bounds; all
-// time carries neither, so the drill lands on the full ledger for that thing.
-function drillBounds(p: Period): Pick<HistoryJump, 'month' | 'from' | 'to'> {
-  if (p.kind === 'month') return { month: p.month }
-  if (p.kind === 'all') return {}
-  const b = periodBounds(p)!
-  return { from: b.from, to: b.to }
-}
 
 export function SummaryScreen({
   budgets,
@@ -273,7 +264,7 @@ export function SummaryScreen({
       total: c.total,
       count: c.count,
       selectLabel: `See ${c.category} entries in History`,
-      onSelect: () => onDrill({ category: c.category, ...drillBounds(dataPeriod) }),
+      onSelect: () => onDrill({ category: c.category, period: dataPeriod }),
     }))
 
   const biggest = useMemo(() => biggestExpense(everyday ?? []), [everyday])
@@ -371,9 +362,6 @@ export function SummaryScreen({
   const usualSum = usualTotal(lines)
   const cmpLabel = comparisonLabel(period)
 
-  // shiftPeriod preserves the kind, so periodBounds is non-null for any non-all
-  // period; › is capped so it can't page past the newest data (or today).
-
   const avgSub = ((): string => {
     if (isAggregateSpan)
       return `≈ ${formatMoney(Math.round(avg * DAYS_PER_MONTH), currency)} a month`
@@ -411,7 +399,7 @@ export function SummaryScreen({
       type="button"
       className="stat-tile stat-tile-btn"
       aria-label={`See ${shortDayMonth(busiest.date)} entries in History`}
-      onClick={() => onDrill({ from: busiest.date, to: busiest.date })}
+      onClick={() => onDrill({ period: rangePeriod(busiest.date, busiest.date) })}
     >
       <p className="stat-label">Busiest day</p>
       <p className="stat-value money">{formatMoney(busiest.total, currency)}</p>
@@ -432,17 +420,19 @@ export function SummaryScreen({
   const onBucketSelect = useCallback(
     (key: string) => {
       if (!bounds) {
-        onDrill({ from: key, to: key })
+        onDrill({ period: rangePeriod(key, key) })
         return
       }
       const b = bucketBounds(key, trendUnitOf)
       if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
-        onDrill({ month: key })
+        onDrill({ period: { kind: 'month', month: key } })
         return
       }
       onDrill({
-        from: b.from < bounds.from ? bounds.from : b.from,
-        to: b.to > bounds.to ? bounds.to : b.to,
+        period: rangePeriod(
+          b.from < bounds.from ? bounds.from : b.from,
+          b.to > bounds.to ? bounds.to : b.to,
+        ),
       })
     },
     [bounds, trendUnitOf, onDrill],
@@ -583,7 +573,7 @@ export function SummaryScreen({
               type="button"
               className="stat-tile stat-tile-btn"
               aria-label={`See the ${biggest.note || biggest.category} entry in History`}
-              onClick={() => onDrill({ from: biggest.spentOn, to: biggest.spentOn })}
+              onClick={() => onDrill({ period: rangePeriod(biggest.spentOn, biggest.spentOn) })}
             >
               <p className="stat-label">
                 {splitActive ? 'Biggest everyday' : 'Biggest spend'}
@@ -603,7 +593,7 @@ export function SummaryScreen({
               type="button"
               className="stat-tile stat-tile-btn"
               aria-label={`See ${shortMonthYear(busiestM.month)} entries in History`}
-              onClick={() => onDrill({ month: busiestM.month })}
+              onClick={() => onDrill({ period: { kind: 'month', month: busiestM.month } })}
             >
               <p className="stat-label">Busiest month</p>
               <p className="stat-value money">{formatMoney(busiestM.total, currency)}</p>
@@ -687,7 +677,7 @@ export function SummaryScreen({
                 fixedSummary.byCategory.find((c) => c.category === l.category)?.count ?? 0,
               badge: fixedBadge(l, currency) ?? undefined,
               selectLabel: `See ${l.category} entries in History`,
-              onSelect: () => onDrill({ category: l.category, ...drillBounds(dataPeriod) }),
+              onSelect: () => onDrill({ category: l.category, period: dataPeriod }),
             }))}
           />
         </section>
@@ -742,7 +732,7 @@ export function SummaryScreen({
                   ? () =>
                       onDrill({
                         paymentMethodId: p.paymentMethodId,
-                        ...drillBounds(dataPeriod),
+                        period: dataPeriod,
                       })
                   : undefined,
               }

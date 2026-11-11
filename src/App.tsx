@@ -164,6 +164,7 @@ export default function App() {
           <HistoryScreen
             jump={historyJump}
             budgets={budgets}
+            defaultCurrency={defaultCurrency}
             onBudgetAlert={raiseBudgetAlert}
           />
         </section>
@@ -216,7 +217,7 @@ export default function App() {
       <BudgetAlertSheet
         alert={budgetAlert?.alert ?? null}
         onClose={() => setBudgetAlert(null)}
-        onSeeEntries={() => budgetAlert && jumpToHistory({ month: budgetAlert.alert.month })}
+        onSeeEntries={() => budgetAlert && jumpToHistory({ period: { kind: 'month', month: budgetAlert.alert.month } })}
         onUndo={budgetAlert?.undo}
       />
     </div>

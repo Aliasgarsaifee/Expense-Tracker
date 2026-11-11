@@ -7,6 +7,7 @@ import {
   groupByMonth,
   sortExpenses,
   isGroupedSort,
+  spansMonths,
 } from './history'
 import { formatMoney } from './money'
 
@@ -30,7 +31,6 @@ describe('filterExpenses', () => {
     expect(filterExpenses(rows, {})).toEqual(rows)
     expect(
       filterExpenses(rows, {
-        month: null,
         paymentMethodIds: null,
         categories: null,
         from: null,
@@ -42,11 +42,11 @@ describe('filterExpenses', () => {
     expect(filterExpenses(rows, { query: '   ' })).toEqual(rows)
   })
 
-  it('keeps only expenses whose spentOn starts with the month', () => {
+  it('keeps only expenses inside the month bounds', () => {
     const july12 = exp({ spentOn: '2026-07-12' })
     const july1 = exp({ spentOn: '2026-07-01' })
     const june30 = exp({ spentOn: '2026-06-30' })
-    expect(filterExpenses([july12, july1, june30], { month: '2026-07' })).toEqual([
+    expect(filterExpenses([july12, july1, june30], { from: '2026-07-01', to: '2026-07-31' })).toEqual([
       july12,
       july1,
     ])
@@ -124,7 +124,8 @@ describe('filterExpenses', () => {
     })
     expect(
       filterExpenses([hit, wrongCategory], {
-        month: '2026-07',
+        from: '2026-07-01',
+        to: '2026-07-31',
         paymentMethodIds: [CASH_METHOD_ID],
         categories: ['Food'],
         query: 'chai',
@@ -336,5 +337,16 @@ describe('isGroupedSort', () => {
     expect(isGroupedSort('oldest')).toBe(true)
     expect(isGroupedSort('largest')).toBe(false)
     expect(isGroupedSort('smallest')).toBe(false)
+  })
+})
+
+describe('spansMonths', () => {
+  it('is false inside one calendar month', () => {
+    expect(spansMonths({ from: '2026-11-01', to: '2026-11-30' })).toBe(false)
+    expect(spansMonths({ from: '2026-11-04', to: '2026-11-04' })).toBe(false)
+  })
+  it('is true across a month boundary and for all time', () => {
+    expect(spansMonths({ from: '2026-10-28', to: '2026-11-03' })).toBe(true)
+    expect(spansMonths(null)).toBe(true)
   })
 })

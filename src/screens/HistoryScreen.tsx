@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { EditSheet } from '../components/EditSheet'
 import { FilterSheet } from '../components/FilterSheet'
-import { Pager } from '../components/Pager'
+import { PeriodPager } from '../components/PeriodPager'
 import { SortSheet } from '../components/SortSheet'
 import { Toast } from '../components/Toast'
 import {
@@ -16,7 +16,7 @@ import {
 } from '../db'
 import { budgetHeadsUp, type Budgets } from '../lib/budget'
 import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
-import { addMonths, monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
+import { monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
 import {
   filterExpenses,
@@ -25,6 +25,7 @@ import {
   groupByMonth,
   isGroupedSort,
   sortExpenses,
+  spansMonths,
   type DayGroup,
   type HistoryJump,
   type HistorySort,
@@ -32,6 +33,7 @@ import {
 } from '../lib/history'
 import { formatMoney } from '../lib/money'
 import { groupEmoji, type MethodSelection } from '../lib/paymentMeta'
+import { emptyPeriodPhrase, periodBounds, type Period } from '../lib/period'
 import { getPref, PREFS, setPref } from '../lib/prefs'
 import { useToast } from '../lib/useToast'
 
@@ -144,17 +146,19 @@ interface Props {
   budgets: Budgets
   /** An edit took the month past its budget. Edits pass no undo. */
   onBudgetAlert: (alert: BudgetAlert, undo?: () => void) => void
+  defaultCurrency: string
 }
 
-export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
+export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }: Props) {
   const expenses = useLiveQuery(listExpenses)
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
-  const [month, setMonth] = useState<string | null>(monthOf(todayISO()))
+  const [period, setPeriod] = useState<Period>(() => ({
+    kind: 'month',
+    month: monthOf(todayISO()),
+  }))
   const [selection, setSelection] = useState<MethodSelection>({ methodIds: [], groups: [] })
   const [catFilters, setCatFilters] = useState<string[]>([])
-  const [from, setFrom] = useState<string | null>(null)
-  const [to, setTo] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sort, setSortState] = useState<HistorySort>(readSort)
   const [sortOpen, setSortOpen] = useState(false)
@@ -162,24 +166,20 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
   const [editing, setEditing] = useState<Expense | null>(null)
   const { toast, show } = useToast()
 
-  // A settings-row tap resets the whole view to that method/category: All
-  // time, no search, nothing else filtered — the ledger slice for one thing.
+  // A jump resets the whole view to its slice: the jump's period (absent = All
+  // time), no search, nothing else filtered — the ledger slice for one thing.
   // App sends a fresh object per tap, so re-tapping the same row re-applies.
   useEffect(() => {
     if (!jump) return
-    // month and from/to arrive mutually exclusive (a Summary drill sends one or
-    // the other; a settings tap sends neither → All time), so setting all three
-    // preserves the pager-XOR-range invariant.
-    setMonth(jump.month ?? null)
+    setPeriod(jump.period ?? { kind: 'all' })
     setQuery('')
     setSelection({
       methodIds: jump.paymentMethodId ? [jump.paymentMethodId] : [],
       groups: [],
     })
     setCatFilters(jump.category ? [jump.category] : [])
-    setFrom(jump.from ?? null)
-    setTo(jump.to ?? null)
     setSheetOpen(false)
+    setSortOpen(false)
   }, [jump])
 
   const labels = useMemo(
@@ -248,17 +248,17 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
     return [...ids]
   }, [selection, filterChips])
 
+  const bounds = useMemo(() => periodBounds(period), [period])
   const filtered = useMemo(
     () =>
       filterExpenses(expenses ?? [], {
-        month,
         paymentMethodIds: effectiveMethodIds,
         categories: catFilters,
-        from,
-        to,
+        from: bounds?.from,
+        to: bounds?.to,
         query,
       }),
-    [expenses, month, effectiveMethodIds, catFilters, from, to, query],
+    [expenses, bounds, effectiveMethodIds, catFilters, query],
   )
 
   const totals = useMemo(() => {
@@ -267,37 +267,23 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
     return out
   }, [filtered])
 
-  // ‹ › should reach any month that actually has data, even future-dated.
-  const maxMonth = useMemo(() => {
-    const current = monthOf(todayISO())
-    const newest = expenses?.[0] ? monthOf(expenses[0].spentOn) : current
-    return newest > current ? newest : current
-  }, [expenses])
+  // ‹ › should reach any period that actually has data, even future-dated.
+  const today = todayISO()
+  const maxAnchor = expenses?.[0] && expenses[0].spentOn > today ? expenses[0].spentOn : today
+  const containsToday = bounds !== null && today >= bounds.from && today <= bounds.to
 
   const grouped = isGroupedSort(sort)
   const sorted = useMemo(() => sortExpenses(filtered, sort), [filtered, sort])
+  const byMonth = spansMonths(bounds)
   const dayGroups = useMemo(
-    () => (month === null || !grouped ? [] : groupByDay(sorted)),
-    [sorted, month, grouped],
+    () => (byMonth || !grouped ? [] : groupByDay(sorted)),
+    [sorted, byMonth, grouped],
   )
   const monthGroups = useMemo(
-    () => (month === null && grouped ? groupByMonth(sorted) : []),
-    [sorted, month, grouped],
+    () => (byMonth && grouped ? groupByMonth(sorted) : []),
+    [sorted, byMonth, grouped],
   )
 
-  // The pager and the date range both slice time — the last one touched wins,
-  // so they never silently intersect to an empty list.
-  function changeMonth(next: string | null) {
-    setFrom(null)
-    setTo(null)
-    setMonth(next)
-  }
-  function applyRange(nextFrom: string | null, nextTo: string | null) {
-    if (nextFrom && nextTo && nextFrom > nextTo) [nextFrom, nextTo] = [nextTo, nextFrom]
-    setFrom(nextFrom)
-    setTo(nextTo)
-    if (nextFrom !== null || nextTo !== null) setMonth(null)
-  }
   function changeSort(next: HistorySort) {
     setSortState(next)
     setPref(PREFS.historySort, next)
@@ -305,8 +291,6 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
   function clearFilters() {
     setSelection({ methodIds: [], groups: [] })
     setCatFilters([])
-    setFrom(null)
-    setTo(null)
   }
 
   // Mirrors the Add screen's added-toast, in reverse. The record is held in the
@@ -341,23 +325,9 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
 
   const hasAnything = expenses.length > 0
   const hasMatches = filtered.length > 0
-  const rangeActive = from !== null || to !== null
   const activeChipCount =
-    selection.groups.length +
-    selection.methodIds.length +
-    catFilters.length +
-    (rangeActive ? 1 : 0)
+    selection.groups.length + selection.methodIds.length + catFilters.length
   const filtersActive = activeChipCount > 0 || query.trim() !== ''
-  const rangeChipLabel =
-    from && to
-      ? from === to
-        ? shortDate(from) // a single-day slice (e.g. a Summary biggest/busiest drill)
-        : `${shortDate(from)} – ${shortDate(to)}`
-      : from
-        ? `from ${shortDate(from)}`
-        : to
-          ? `until ${shortDate(to)}`
-          : ''
 
   return (
     <div className="screen">
@@ -366,18 +336,12 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
         <h1 className="sr-only">History</h1>
       </header>
 
-      <Pager
-        label={month === null ? 'All time' : monthLabel(month)}
-        labelAriaLabel={
-          month === null
-            ? 'Showing all time — switch to one month'
-            : `Showing ${monthLabel(month)} — switch to all time`
-        }
-        onLabelClick={() => changeMonth(month === null ? monthOf(todayISO()) : null)}
-        onPrev={() => month && changeMonth(addMonths(month, -1))}
-        onNext={() => month && changeMonth(addMonths(month, 1))}
-        prevDisabled={month === null}
-        nextDisabled={month === null || month >= maxMonth}
+      <PeriodPager
+        period={period}
+        onChange={setPeriod}
+        today={today}
+        maxAnchor={maxAnchor}
+        currency={defaultCurrency}
       />
 
       {hasMatches && (
@@ -479,20 +443,6 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
                   </span>
                 </button>
               ))}
-              {rangeActive && (
-                <button
-                  type="button"
-                  className="chip"
-                  aria-pressed="true"
-                  aria-label="Clear date range filter"
-                  onClick={() => applyRange(null, null)}
-                >
-                  <span aria-hidden="true">📅</span> {rangeChipLabel}
-                  <span className="chip-caret" aria-hidden="true">
-                    ✕
-                  </span>
-                </button>
-              )}
               {activeChipCount >= 2 && (
                 <button type="button" className="btn-text" onClick={clearFilters}>
                   Clear all
@@ -541,9 +491,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
           <p className="empty-sub">
             {filtersActive
               ? 'No entries match these filters.'
-              : month
-                ? `Nothing logged in ${monthLabel(month)}.`
-                : 'Nothing logged yet.'}
+              : `Nothing logged ${emptyPeriodPhrase(period, containsToday)}.`}
           </p>
           {filtersActive && (
             <button
@@ -571,7 +519,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
             />
           ))}
         </ul>
-      ) : month === null ? (
+      ) : byMonth ? (
         monthGroups.map((g) => (
           <section key={g.month} className="month-group">
             <div className="month-head">
@@ -589,6 +537,18 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
             ))}
           </section>
         ))
+      ) : period.kind === 'day' ? (
+        <ul className="entries">
+          {sorted.map((e) => (
+            <EntryRow
+              key={e.id}
+              expense={e}
+              emoji={emojiFor(e.category)}
+              methodLabel={e.paymentMethodId ? labels.get(e.paymentMethodId) : undefined}
+              onEdit={setEditing}
+            />
+          ))}
+        </ul>
       ) : (
         dayGroups.map((d) => (
           <DaySection
@@ -609,9 +569,6 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
         onSelectionChange={setSelection}
         catFilters={catFilters}
         onCatFiltersChange={setCatFilters}
-        from={from}
-        to={to}
-        onRangeChange={applyRange}
         onClearAll={clearFilters}
         onClose={() => setSheetOpen(false)}
       />
