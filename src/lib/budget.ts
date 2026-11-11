@@ -1,4 +1,5 @@
-import { monthName } from './dates'
+import type { Expense } from '../db'
+import { addMonths, monthName, monthOf } from './dates'
 import { formatMoney } from './money'
 import type { Badge } from './fixed'
 
@@ -100,14 +101,15 @@ export function withBudget(
 }
 
 // The budget spread evenly over the month, for the dashed line on the daily
-// chart. The value stays exact so the line sits true; only the label rounds.
+// chart. The value stays exact so the line sits true; only the label rounds, down.
 export function budgetReference(
   budget: number,
   totalDays: number,
   currency: string,
 ): { value: number; label: string } {
   const value = budget / totalDays
-  return { value, label: `${formatMoney(Math.round(value), currency)} a day keeps the budget` }
+  // Floor, not round: a rounded-up figure times the month's days overshoots the budget.
+  return { value, label: `${formatMoney(Math.floor(value), currency)} a day keeps the budget` }
 }
 
 export interface BudgetCardCopy {
@@ -202,4 +204,109 @@ export function budgetAlertCopy(alert: AlertFacts): BudgetAlertCopy {
     withinShare: budget / spent,
     overShare: (spent - budget) / spent,
   }
+}
+
+// Callers pass one currency's everyday entries, so the totals never mix.
+export function monthTotals(expenses: Expense[]): Map<string, number> {
+  const totals = new Map<string, number>()
+  for (const e of expenses) {
+    const month = monthOf(e.spentOn)
+    totals.set(month, (totals.get(month) ?? 0) + e.amount)
+  }
+  return totals
+}
+
+export interface YearLine {
+  month: string // 'YYYY-MM'
+  spent: number
+  diff: number // budget − spent; positive = under
+  running: number | null // Σ diff through this month; null on the partial month
+  partial: boolean // the month `today` is in
+}
+
+// The year's months from the later of January and the first month the ledger
+// was in use, to December for a past year or the current month otherwise. The
+// current month is still being spent, so it is listed but never accrues: its
+// diff would read as a saving that has not happened yet.
+export function yearLedger(
+  everydayByMonth: Map<string, number>,
+  budget: number,
+  year: string,
+  today: string,
+  firstMonth: string | null,
+): YearLine[] {
+  const thisMonth = monthOf(today)
+  const jan = `${year}-01`
+  const start = firstMonth !== null && firstMonth > jan ? firstMonth : jan
+  const end = year < thisMonth.slice(0, 4) ? `${year}-12` : thisMonth
+  const lines: YearLine[] = []
+  let running = 0
+  for (let month = start; month <= end && month.startsWith(year); month = addMonths(month, 1)) {
+    const spent = everydayByMonth.get(month) ?? 0
+    const diff = budget - spent
+    const partial = month === thisMonth
+    if (!partial) running += diff
+    lines.push({ month, spent, diff, running: partial ? null : running, partial })
+  }
+  return lines
+}
+
+// What earlier months left in hand (negative: still to make up).
+export function carriedInto(lines: YearLine[]): number | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!lines[i].partial) return lines[i].running
+  }
+  return null
+}
+
+// Complete months only; a month exactly on budget is neither over nor under.
+export function yearTally(lines: YearLine[]): {
+  overCount: number
+  overTotal: number
+  underCount: number
+  underTotal: number
+} {
+  const tally = { overCount: 0, overTotal: 0, underCount: 0, underTotal: 0 }
+  for (const { diff, partial } of lines) {
+    if (partial || diff === 0) continue
+    if (diff < 0) {
+      tally.overCount++
+      tally.overTotal -= diff
+    } else {
+      tally.underCount++
+      tally.underTotal += diff
+    }
+  }
+  return tally
+}
+
+export function yearSentence(lines: YearLine[], currency: string): string {
+  if (lines.every((l) => l.partial)) return ''
+  const { overCount, overTotal, underCount, underTotal } = yearTally(lines)
+  if (overCount === 0) return 'No month has run over.'
+  const over =
+    overCount === 1
+      ? `1 month ran over, by ${formatMoney(overTotal, currency)}.`
+      : `${overCount} months ran over, by ${formatMoney(overTotal, currency)} in all.`
+  if (underCount === 0) return over
+  const others = underCount === 1 ? 'The other month' : `The other ${underCount}`
+  const covered = underTotal >= overTotal ? ' and covered it' : ''
+  return `${over} ${others} came in ${formatMoney(underTotal, currency)} under${covered}.`
+}
+
+// The line under the budget alert that ties this month's overrun to the year.
+// `over` is how far the month is past its budget; null when no month is
+// complete, so there is nothing to tie it to.
+export function alertYearLine(
+  carried: number | null,
+  over: number,
+  currency: string,
+): string | null {
+  if (carried === null) return null
+  const net = carried - over
+  if (carried <= 0) return `The year is now ${formatMoney(over - carried, currency)} over.`
+  const hand = `Earlier months left ${formatMoney(carried, currency)} in hand`
+  return net >= 0
+    ? `${hand}, so the year is still ${formatMoney(net, currency)} under.`
+    : `${hand}; the year is now ${formatMoney(-net, currency)} over.`
 }

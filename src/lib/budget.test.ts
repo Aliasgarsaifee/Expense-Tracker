@@ -9,9 +9,16 @@ import {
   budgetLevel,
   budgetReference,
   budgetStatus,
+  alertYearLine,
+  carriedInto,
+  monthTotals,
   readBudgets,
   withBudget,
+  yearLedger,
+  yearSentence,
+  yearTally,
 } from './budget'
+import type { Expense } from '../db'
 
 describe('budget maths', () => {
   it('reads only positive finite numbers and survives junk', () => {
@@ -82,6 +89,12 @@ describe('budget maths', () => {
       .toEqual({ value: 25000 / 30, label: '₹833 a day keeps the budget' })
     expect(budgetReference(25000, 31, 'INR').label).toBe('₹806 a day keeps the budget')
     expect(budgetReference(600, 30, 'USD').label).toBe('$20 a day keeps the budget')
+  })
+
+  // Rounding up would claim a day's figure that overshoots the budget over the month.
+  it('rounds the daily label down so the figure really keeps the budget', () => {
+    expect(budgetReference(25000, 28, 'INR').label).toBe('₹892 a day keeps the budget')
+    expect(budgetReference(25000, 28, 'INR').value).toBe(25000 / 28)
   })
 
   it('words the card while under, with the bar said in words', () => {
@@ -192,5 +205,117 @@ describe('budget alert copy', () => {
       daysLeft: '6 days left in February',
       bar: '108% of the budget used',
     })
+  })
+})
+
+const BUDGET = 25000
+const TODAY = '2026-11-11'
+const spentJanToNov = [22400, 19850, 27900, 24100, 31200, 21300, 23650, 20400, 26300, 18300, 8730]
+const monthKey = (year: string, i: number) => `${year}-${String(i + 1).padStart(2, '0')}`
+const byMonth = (year: string, spent: number[]) =>
+  new Map(spent.map((s, i) => [monthKey(year, i), s]))
+const entry = (spentOn: string, amount: number): Expense => ({
+  id: spentOn + amount,
+  amount,
+  currency: 'INR',
+  category: 'Food',
+  spentOn,
+  createdAt: spentOn + 'T00:00:00.000Z',
+})
+
+describe('year ledger', () => {
+  const lines = yearLedger(byMonth('2026', spentJanToNov), BUDGET, '2026', TODAY, null)
+
+  it('sums everyday entries by month', () => {
+    const totals = monthTotals([
+      entry('2026-03-01', 100),
+      entry('2026-03-31', 250),
+      entry('2026-04-02', 40),
+    ])
+    expect([...totals]).toEqual([['2026-03', 350], ['2026-04', 40]])
+  })
+
+  it('accrues month by month', () => {
+    expect(lines.slice(0, 10).map((l) => l.running)).toEqual(
+      [2600, 7750, 4850, 5750, -450, 3250, 4600, 9200, 7900, 14600])
+    expect(lines[10]).toMatchObject(
+      { month: '2026-11', diff: 16270, running: null, partial: true })
+    expect(lines).toHaveLength(11) // December is not listed yet
+    expect(carriedInto(lines)).toBe(14600)
+    expect(yearTally(lines)).toEqual(
+      { overCount: 3, overTotal: 10400, underCount: 7, underTotal: 25000 })
+  })
+
+  it('starts at the first month the ledger was in use', () => {
+    const from = yearLedger(byMonth('2026', spentJanToNov), BUDGET, '2026', TODAY, '2026-04')
+    expect(from[0]).toMatchObject({ month: '2026-04', running: 900 })
+    expect(from).toHaveLength(8)
+    // A first month before the year does not pull the start earlier.
+    expect(yearLedger(byMonth('2026', spentJanToNov), BUDGET, '2026', TODAY, '2025-06')[0].month)
+      .toBe('2026-01')
+  })
+
+  it('lists all twelve months of a past year, none partial', () => {
+    const past = yearLedger(byMonth('2025', spentJanToNov), BUDGET, '2025', TODAY, null)
+    expect(past).toHaveLength(12)
+    expect(past.some((l) => l.partial)).toBe(false)
+    // A month with no spend is an under month, not a gap.
+    expect(past[11]).toMatchObject({ month: '2025-12', spent: 0, diff: BUDGET, running: 14600 + 16270 + BUDGET })
+  })
+
+  it('is empty for a future year or a ledger that starts later', () => {
+    expect(yearLedger(new Map(), BUDGET, '2027', TODAY, null)).toEqual([])
+    expect(yearLedger(new Map(), BUDGET, '2026', TODAY, '2027-01')).toEqual([])
+    expect(yearLedger(new Map(), BUDGET, '2025', TODAY, '2026-03')).toEqual([])
+  })
+
+  it('has nothing carried in January', () => {
+    const jan = yearLedger(byMonth('2026', [8000]), BUDGET, '2026', '2026-01-15', null)
+    expect(jan).toHaveLength(1)
+    expect(carriedInto(jan)).toBeNull()
+    expect(carriedInto([])).toBeNull()
+    expect(yearTally(jan)).toEqual({ overCount: 0, overTotal: 0, underCount: 0, underTotal: 0 })
+  })
+
+  it('leaves a month exactly on budget out of both counts', () => {
+    const even = yearLedger(byMonth('2025', [25000, 26000, 24000]), BUDGET, '2025', TODAY, null)
+    expect(yearTally(even.slice(0, 3)))
+      .toEqual({ overCount: 1, overTotal: 1000, underCount: 1, underTotal: 1000 })
+  })
+
+  it('says whether the others covered it', () => {
+    expect(yearSentence(lines, 'INR')).toBe(
+      '3 months ran over, by ₹10,400 in all. The other 7 came in ₹25,000 under and covered it.')
+    const one = yearLedger(byMonth('2025', [27900, 20000, 20000]), BUDGET, '2025', TODAY, null).slice(0, 3)
+    expect(yearSentence(one, 'INR')).toBe(
+      '1 month ran over, by ₹2,900. The other 2 came in ₹10,000 under and covered it.')
+    const oneUnder = yearLedger(byMonth('2025', [27900, 20000]), BUDGET, '2025', TODAY, null).slice(0, 2)
+    expect(yearSentence(oneUnder, 'INR')).toBe(
+      '1 month ran over, by ₹2,900. The other month came in ₹5,000 under and covered it.')
+    expect(yearSentence(yearLedger(byMonth('2025', [20000, 21000]), BUDGET, '2025', TODAY, null).slice(0, 2), 'INR'))
+      .toBe('No month has run over.')
+    const short = yearLedger(byMonth('2025', [29000, 21000]), BUDGET, '2025', TODAY, null).slice(0, 2)
+    expect(yearSentence(short, 'INR')).toBe(
+      '1 month ran over, by ₹4,000. The other month came in ₹4,000 under and covered it.')
+    const notCovered = yearLedger(byMonth('2025', [29000, 30000, 21000]), BUDGET, '2025', TODAY, null).slice(0, 3)
+    expect(yearSentence(notCovered, 'INR')).toBe(
+      '2 months ran over, by ₹9,000 in all. The other month came in ₹4,000 under.')
+    const noUnder = yearLedger(byMonth('2025', [29000, 25000]), BUDGET, '2025', TODAY, null).slice(0, 2)
+    expect(yearSentence(noUnder, 'INR')).toBe('1 month ran over, by ₹4,000.')
+  })
+
+  it('says nothing while no month is complete', () => {
+    const jan = yearLedger(byMonth('2026', [8000]), BUDGET, '2026', '2026-01-15', null)
+    expect(yearSentence(jan, 'INR')).toBe('')
+    expect(yearSentence([], 'INR')).toBe('')
+  })
+
+  it('ties an overrun to the year', () => {
+    expect(alertYearLine(14600, 1150, 'INR')).toBe(
+      'Earlier months left ₹14,600 in hand, so the year is still ₹13,450 under.')
+    expect(alertYearLine(500, 1150, 'INR')).toBe(
+      'Earlier months left ₹500 in hand; the year is now ₹650 over.')
+    expect(alertYearLine(-450, 1150, 'INR')).toBe('The year is now ₹1,600 over.')
+    expect(alertYearLine(null, 1150, 'INR')).toBeNull()
   })
 })
