@@ -7,15 +7,19 @@ import {
   listPaymentMethods,
   methodRecency,
   type Category,
+  type Expense,
   type PaymentMethod,
 } from '../db'
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
-import { parseAmount } from '../lib/money'
+import { tapFeedback } from '../lib/haptics'
+import { formatMoney, parseAmount } from '../lib/money'
+import { logAgainChoices } from '../lib/recent'
 import { AddCategorySheet } from './AddCategorySheet'
 import { AddMethodSheet } from './AddMethodSheet'
 import { CurrencySheet } from './CurrencySheet'
 import { DateField } from './DateField'
+import { EntryRow } from './EntryRow'
 import { PaymentPicker } from './PaymentPicker'
 
 export interface ExpenseFormValues {
@@ -33,9 +37,11 @@ interface Props {
   onSubmit: (values: ExpenseFormValues) => Promise<void> | void
   /** Add screen: clear amount + note after submit, keep category and date. */
   autoReset?: boolean
+  /** Add screen: newest entries, offered below the button as "Log again". */
+  recent?: Expense[]
 }
 
-export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props) {
+export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent }: Props) {
   const [amountText, setAmountText] = useState(
     initial?.amount !== undefined ? String(initial.amount) : '',
   )
@@ -122,6 +128,31 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
   }, [categories, category])
 
   const amount = parseAmount(amountText)
+
+  // Only active categories and methods (not pickableMethods, which in Edit
+  // mode also holds an archived one); no list until both queries have landed.
+  const logAgain = useMemo(
+    () =>
+      recent && categories && methods
+        ? logAgainChoices(
+            recent,
+            categories.map((c) => c.label),
+            methods.map((m) => m.id),
+          )
+        : [],
+    [recent, categories, methods],
+  )
+
+  // Fills the form's own state and saves nothing; the date is left as it is.
+  function fillFrom(x: Expense) {
+    setAmountText(String(x.amount))
+    setCurrency(x.currency)
+    setCategory(x.category)
+    setNote(x.note ?? '')
+    if (x.paymentMethodId) setPaymentMethodId(x.paymentMethodId)
+    void tapFeedback()
+    window.scrollTo(0, 0)
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -244,6 +275,30 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
         >
           {submitLabel}
         </button>
+
+        {logAgain.length > 0 && (
+          <section className="log-again" aria-label="Log again">
+            <p className="field-label">Log again</p>
+            <ul className="entries">
+              {logAgain.map((x) => {
+                const primary = x.note || x.category
+                const amountLabel = formatMoney(x.amount, x.currency)
+                const methodLabel = methods?.find((m) => m.id === x.paymentMethodId)?.label
+                return (
+                  <EntryRow
+                    key={x.id}
+                    emoji={categories?.find((c) => c.label === x.category)?.emoji ?? '🏷️'}
+                    primary={primary}
+                    sub={[x.note ? x.category : null, methodLabel].filter(Boolean).join(' · ')}
+                    amount={amountLabel}
+                    ariaLabel={`Fill the form with ${primary}, ${amountLabel}`}
+                    onClick={() => fillFrom(x)}
+                  />
+                )
+              })}
+            </ul>
+          </section>
+        )}
       </form>
       {/* Sheets carry their own <form>; keep them outside this one — nested
           forms are invalid HTML and the browser silently drops them. */}

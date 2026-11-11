@@ -505,7 +505,8 @@ h1.display {
   gap: 6px;
 }
 
-.field > span {
+.field > span,
+.field-label {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -773,6 +774,16 @@ button {
 .day-total {
   font-size: 15px;
   color: var(--ink-2);
+}
+
+.log-again {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.field-label {
+  margin: 0;
 }
 
 .entries {

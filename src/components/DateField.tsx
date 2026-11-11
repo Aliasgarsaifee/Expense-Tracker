@@ -6,7 +6,8 @@ interface Props {
   onChange: (iso: string) => void
 }
 
-// A row of the details group showing the friendly "12 July 2026" while a real
+// A row of the details group showing "Today, 11 Nov" / "Yesterday, 10 Nov" (the
+// long date further back, via dateRowLabel) while a real
 // (transparent) date input covers the whole row, so tapping anywhere still
 // opens the native iOS date wheel. The native control's own text is hidden.
 export function DateField({ value, onChange }: Props) {

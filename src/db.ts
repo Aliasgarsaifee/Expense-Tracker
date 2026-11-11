@@ -224,6 +224,19 @@ export async function listExpenses(): Promise<Expense[]> {
   return sortNewestFirst(await db.expenses.toArray())
 }
 
+// The newest `limit` entries, read from the spentOn index instead of the whole
+// table. The index cut can land mid-day, where its tie order is arbitrary, so
+// the boundary day is read in full and the createdAt tie-break decides.
+export async function listLatestExpenses(limit: number): Promise<Expense[]> {
+  const head = await db.expenses.orderBy('spentOn').reverse().limit(limit).toArray()
+  if (head.length < limit) return sortNewestFirst(head)
+  const rows = await db.expenses
+    .where('spentOn')
+    .aboveOrEqual(head[head.length - 1].spentOn)
+    .toArray()
+  return sortNewestFirst(rows).slice(0, limit)
+}
+
 // Inclusive on both bounds. Reads the existing spentOn index — no schema
 // change — so arbitrary Summary periods are just a range query. A one-month
 // range ('YYYY-MM-01' → last day) is the month view.

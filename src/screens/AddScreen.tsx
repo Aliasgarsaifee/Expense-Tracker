@@ -1,13 +1,23 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef } from 'react'
 import { Dialog } from '../components/Dialog'
 import { ExpenseForm, type ExpenseFormValues } from '../components/ExpenseForm'
 import { Toast } from '../components/Toast'
-import { addExpense, CASH_METHOD_ID, db, deleteExpense } from '../db'
+import {
+  addExpense,
+  CASH_METHOD_ID,
+  db,
+  deleteExpense,
+  listExpensesBetween,
+  listLatestExpenses,
+} from '../db'
 import { budgetHeadsUp, type Budgets } from '../lib/budget'
 import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
 import { todayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
 import { formatMoney } from '../lib/money'
+import { todaySoFar } from '../lib/recent'
+import { useToday } from '../lib/useToday'
 import { useDialog } from '../lib/useDialog'
 import { getPref, PREFS, setPref } from '../lib/prefs'
 import { useToast } from '../lib/useToast'
@@ -28,6 +38,13 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
     category: getPref(PREFS.lastCategory, 'Food'),
     paymentMethodId: getPref(PREFS.lastPaymentMethod, CASH_METHOD_ID),
   })
+
+  const today = useToday()
+  const todays = useLiveQuery(() => listExpensesBetween(today, today), [today])
+  // 30 is far more than three rows need: duplicates and archived categories
+  // or methods can thin the list, and a refill is only worth offering when
+  // it is still saveable.
+  const recent = useLiveQuery(() => listLatestExpenses(30), [])
 
   async function add(values: ExpenseFormValues) {
     let created
@@ -77,7 +94,7 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
     <div className="screen">
       <header className="screen-head">
         <div className="head-text">
-          <p className="eyebrow">Expense Tracker</p>
+          <p className="eyebrow">{todaySoFar(todays ?? [], initial.current.currency)}</p>
           <h1 className="display">New entry</h1>
         </div>
       </header>
@@ -85,6 +102,7 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
         submitLabel="Add to ledger"
         onSubmit={add}
         autoReset
+        recent={recent}
         initial={initial.current}
       />
       <Toast state={toast} />

@@ -17,6 +17,7 @@ import {
   listCategories,
   listExpenses,
   listExpensesBetween,
+  listLatestExpenses,
   listPaymentMethods,
   methodRecency,
   PAYMENT_GROUPS,
@@ -908,5 +909,20 @@ describe('unbackedSince', () => {
     const { count, oldestAt } = await unbackedSince(cursor)
     expect(count).toBe(2)
     expect(oldestAt).toBe(older.createdAt)
+  })
+})
+
+describe('listLatestExpenses', () => {
+  it('lists the latest entries by spent date, newest first, up to a limit', async () => {
+    // restoreExpense, not addExpense: createdAt must be explicit, or two
+    // entries added in the same millisecond tie and the order is luck.
+    const at = (id: string, amount: number, spentOn: string, createdAt: string) =>
+      restoreExpense({ id, amount, currency: 'INR', category: 'Food', spentOn, createdAt })
+    await at('a', 10, '2026-11-09', '2026-11-09T08:00:00.000Z')
+    await at('b', 20, '2026-11-11', '2026-11-11T08:00:00.000Z')
+    await at('c', 30, '2026-11-11', '2026-11-11T09:00:00.000Z')
+    await at('d', 40, '2026-11-10', '2026-11-10T08:00:00.000Z')
+    const latest = await listLatestExpenses(3)
+    expect(latest.map((e) => e.amount)).toEqual([30, 20, 40])
   })
 })
