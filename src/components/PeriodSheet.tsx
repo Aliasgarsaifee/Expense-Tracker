@@ -258,7 +258,7 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
           <footer className="cal-footer">
             <button
               type="button"
-              className="btn-text"
+              className="btn-text btn-text-icon"
               aria-label="Clear selection"
               onClick={() => setSel(null)}
             >

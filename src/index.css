@@ -752,6 +752,12 @@ button {
   opacity: 0.6;
 }
 
+/* Icon-only: the 2px side padding would leave a 22px-wide target. */
+.btn-text-icon {
+  min-width: var(--tap-min);
+  justify-content: center;
+}
+
 /* ——— history ——— */
 
 .day-group {
@@ -1358,7 +1364,6 @@ button {
   border-color: var(--ink-3);
   background: none;
   color: var(--ink-2);
-  font-weight: 700;
   min-width: 44px;
   display: inline-flex;
   align-items: center;
@@ -1688,11 +1693,6 @@ button {
   gap: 4px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
-}
-
-.cal-footer .btn-text {
-  min-width: 44px;
-  min-height: 44px;
 }
 
 .cal-footer-label {

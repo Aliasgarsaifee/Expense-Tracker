@@ -21,7 +21,7 @@ import { CurrencySheet } from './CurrencySheet'
 import { DateField } from './DateField'
 import { EntryRow } from './EntryRow'
 import { PaymentPicker } from './PaymentPicker'
-import { ChevronDownIcon, PlusIcon } from './icons'
+import { ChevronDownIcon, AddIcon } from './icons'
 
 export interface ExpenseFormValues {
   amount: number
@@ -244,7 +244,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
               aria-label="Add a category"
               onClick={() => setAddingCategory(true)}
             >
-              <PlusIcon size={18} />
+              <AddIcon size={18} />
             </button>
           </div>
         </div>

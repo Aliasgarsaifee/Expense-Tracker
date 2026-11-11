@@ -29,12 +29,12 @@ import { BackupSection } from './BackupSection'
 import { CurrencySheet } from './CurrencySheet'
 import { Dialog } from './Dialog'
 import {
+  AddIcon,
   ArchiveIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CloseIcon,
   PencilIcon,
-  PlusIcon,
   RestoreIcon,
 } from './icons'
 
@@ -344,7 +344,7 @@ function DrawerBody({
         <header className="drawer-head">
           <h2 className="display">Settings</h2>
           <button
-            className="btn-text"
+            className="btn-text btn-text-icon"
             type="button"
             aria-label="Close settings"
             onClick={onClose}
@@ -394,7 +394,7 @@ function DrawerBody({
           </ul>
           <button type="button" className="btn-ghost" onClick={() => setAddingMethod(true)}>
             <span>Add card or method</span>
-            <PlusIcon size={18} />
+            <AddIcon size={18} />
           </button>
         </section>
 
@@ -427,7 +427,7 @@ function DrawerBody({
           )}
           <button type="button" className="btn-ghost" onClick={() => setAddingCategory(true)}>
             <span>Add category</span>
-            <PlusIcon size={18} />
+            <AddIcon size={18} />
           </button>
         </section>
 

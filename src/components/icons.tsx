@@ -41,6 +41,14 @@ export function PlusIcon(props: IconProps) {
   )
 }
 
+export function AddIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  )
+}
+
 export function ReceiptIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -178,8 +186,8 @@ export function ArchiveIcon(props: IconProps) {
 export function RestoreIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M9 8.5L5 12.5l4 4" />
-      <path d="M5 12.5h9.5a4.5 4.5 0 010 9" transform="translate(0 -4.5)" />
+      <path d="M9.5 5l-4 4 4 4" />
+      <path d="M5.5 9h8.5a5 5 0 010 10" />
     </Icon>
   )
 }

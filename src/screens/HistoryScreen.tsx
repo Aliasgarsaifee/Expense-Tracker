@@ -411,7 +411,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
           />
           <button
             type="button"
-            className="btn-text"
+            className="btn-text btn-text-icon"
             aria-label="Clear search"
             onClick={() => {
               setQuery('')

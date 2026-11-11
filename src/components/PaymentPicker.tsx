@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PaymentMethod } from '../db'
 import { PICKER_SECTION_THRESHOLD, groupEmoji, pickerSections } from '../lib/paymentMeta'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
-import { CheckIcon, ChevronRightIcon, PlusIcon, SearchIcon } from './icons'
+import { CheckIcon, ChevronRightIcon, AddIcon, SearchIcon } from './icons'
 
 interface Props {
   methods: PaymentMethod[]
@@ -165,7 +165,7 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
               }}
             >
               <span>Add a payment method</span>
-              <PlusIcon size={18} />
+              <AddIcon size={18} />
             </button>
           </div>
         </div>
