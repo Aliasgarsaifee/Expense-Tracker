@@ -25,11 +25,11 @@ expense-tracker/
 │   ├── screens/                # AddScreen, HistoryScreen, SummaryScreen
 │   ├── components/             # shared UI: ExpenseForm, sheets, pickers, chart, drawer
 │   ├── lib/                    # helpers; pure ones have co-located *.test.ts
-│   │   ├── money / dates / period / summarize / history / currencies   # pure, fully tested
+│   │   ├── money / dates / period / summarize / history / currencies / fixed / budget   # pure, fully tested
 │   │   ├── backup.ts           # JSON backup (v3) + CSV export; imports v1–v3
 │   │   ├── prefs.ts            # localStorage wrapper (et-pref:*), deliberately outside Dexie
 │   │   ├── autoBackup.ts       # daily snapshot → Documents/Backups, keeps last 7
-│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / paymentMeta   # platform adapters
+│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / paymentMeta / budgetCheck   # platform adapters
 │   └── test/setup.ts           # fake-indexeddb → Dexie runs unmodified in Node
 ├── ios/App/                    # Capacitor Xcode project (SPM mode: CapApp-SPM package, no Pods)
 │   ├── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
@@ -119,6 +119,11 @@ Dependency direction is one-way: `screens/components → db.ts + lib/ → Dexie/
   Never change or reuse a seeded id — `pm-upi` stopped being seeded in v4
   (UPI is a group, not an instrument), but its id stays reserved: pre-v4
   backups may resurrect it as an ordinary, deletable-when-unreferenced method.
+- Fixedness (rent-like, recurring) is read only through `isFixedCategory`: the
+  default for `cat-rent` / `cat-utilities` is derived, never stored, which is
+  why there was no migration. The monthly budget is a device pref
+  (`PREFS.monthlyBudgets`) by design — it is not in backups, and changing it
+  re-judges earlier months.
 
 ### Migrations (the most dangerous code in the repo)
 
