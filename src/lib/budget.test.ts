@@ -83,6 +83,18 @@ describe('budget maths', () => {
     expect(budgetLevel(25000.01, 25000)).toBe('over')
   })
 
+  it('does not show float dust in the card words', () => {
+    const dusty = 25000.000000001
+    const copy = budgetCardCopy(budgetStatus(dusty, 25000, 10, 30), 25000, 20, 'INR')
+    expect(copy.amount).toBe('₹0')
+    expect(copy.of).toBe('left of ₹25,000')
+  })
+
+  it('still words a real paisa over as over', () => {
+    const copy = budgetCardCopy(budgetStatus(25000.01, 25000, 10, 30), 25000, 20, 'INR')
+    expect(copy.of).toBe('over ₹25,000')
+  })
+
   it('words the badge', () => {
     expect(budgetBadge(budgetStatus(8730, 25000, 11, 30), 'INR'))
       .toEqual({ tone: 'positive', text: 'On track' })

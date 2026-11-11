@@ -35,11 +35,14 @@ export function budgetFor(budgets: Budgets, currency: string): number | null {
   return isAmount(v) ? v : null
 }
 
+// Paise summed as floats can leave dust; the judgement and the card's words
+// both read amounts through this so they can never disagree.
+const toPaise = (x: number) => Math.round(x * 100) / 100
+
 export function budgetLevel(spent: number, budget: number): BudgetLevel {
-  // Paise summed as floats can leave dust past the budget; only a real paisa
-  // over counts, and the same rule keeps the save alert from firing on dust.
-  const paise = Math.round(spent * 100) / 100
-  if (paise > budget) return 'over'
+  // Only a real paisa over counts; the same rule keeps the save alert from
+  // firing on dust.
+  if (toPaise(spent) > budget) return 'over'
   return spent >= NEAR_SHARE * budget ? 'near' : 'under'
 }
 
@@ -131,7 +134,8 @@ export function budgetCardCopy(
   daysLeft: number,
   currency: string,
 ): BudgetCardCopy {
-  const over = status.left < 0
+  const left = toPaise(status.left)
+  const over = left < 0
   let perDay: string | null = null
   if (status.perDay !== null) {
     const each = formatMoney(status.perDay, currency)
@@ -142,7 +146,7 @@ export function budgetCardCopy(
   // so a month 5% over does not read as exactly spent.
   const used = `${percent((budget - status.left) / budget)} of the budget used`
   return {
-    amount: formatMoney(Math.abs(status.left), currency),
+    amount: formatMoney(Math.abs(left), currency),
     of: `${over ? 'over' : 'left of'} ${formatMoney(budget, currency)}`,
     perDay,
     // The card shows no even-pace tick once no days are left, so neither do
