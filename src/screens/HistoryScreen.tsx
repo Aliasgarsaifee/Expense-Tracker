@@ -329,16 +329,10 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
   }
 
   // An edit can raise an old entry, or move one into this month, past a mark.
-  // The edit is already saved and its sheet closed, so a failed check only
-  // costs the alert. Restoring a deleted entry is deliberately not checked: it
-  // puts back spending the month had already counted.
+  // Restoring a deleted entry is deliberately not checked: it puts back
+  // spending the month had already counted.
   async function handleSaved(before: Expense, after: Expense) {
-    let alert: BudgetAlert | null = null
-    try {
-      alert = await checkBudgetAfterSave(after, before, budgets, todayISO())
-    } catch (err) {
-      console.error('budget check failed', err)
-    }
+    const alert = await checkBudgetAfterSave(after, before, budgets, todayISO())
     if (alert?.kind === 'near') show({ message: budgetHeadsUp(alert) })
     if (alert?.kind === 'over') onBudgetAlert(alert)
   }

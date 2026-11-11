@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as dbModule from '../db'
 import {
   addCategory,
   addExpense,
@@ -36,7 +37,7 @@ async function save(
 // Persists the edit first (the check runs after the save), then judges it.
 async function edit(
   previous: Expense,
-  changes: { amount?: number; category?: string },
+  changes: { amount?: number; category?: string; spentOn?: string; currency?: string },
   budgets: Record<string, number> = BUDGETS,
 ) {
   await updateExpense(previous.id, changes)
@@ -63,7 +64,6 @@ describe('checkBudgetAfterSave', () => {
       spent: 26150,
       month: '2026-11',
       daysLeft: 6,
-      isNew: true,
     })
     expect(alert!.entry.amount).toBe(2150)
   })
@@ -128,8 +128,46 @@ describe('checkBudgetAfterSave', () => {
     expect(await edit(previous, { amount: 3150 })).toMatchObject({
       kind: 'over',
       spent: 26150,
-      isNew: false,
     })
+  })
+
+  it('alerts when an edit moves an entry from last month into this one', async () => {
+    await seedEveryday(24000)
+    const previous = await addExpense({ amount: 2150, category: 'Food', spentOn: '2026-10-20' })
+    expect(await edit(previous, { spentOn: '2026-11-20' })).toMatchObject({
+      kind: 'over',
+      spent: 26150,
+    })
+  })
+
+  it('alerts when an edit changes an entry into the budgeted currency', async () => {
+    await seedEveryday(24000)
+    const previous = await addExpense({
+      amount: 2150,
+      currency: 'USD',
+      category: 'Food',
+      spentOn: '2026-11-20',
+    })
+    expect(await edit(previous, { currency: 'INR' })).toMatchObject({
+      kind: 'over',
+      currency: 'INR',
+      spent: 26150,
+    })
+  })
+
+  it('alerts when an edit re-files a fixed cost as everyday', async () => {
+    await seedEveryday(24000)
+    const previous = await addExpense({ amount: 2150, category: 'Rent', spentOn: '2026-11-20' })
+    expect(await edit(previous, { category: 'Food' })).toMatchObject({
+      kind: 'over',
+      spent: 26150,
+    })
+  })
+
+  // In binary floating point 673.58 + 14.21 is 687.7900000000001.
+  it('does not call a month over when its paise sum exactly to the budget', async () => {
+    await addExpense({ amount: 673.58, category: 'Food', spentOn: '2026-11-03' })
+    expect(await save({ amount: 14.21 }, TODAY, { INR: 687.79 })).toBeNull()
   })
 
   it('says nothing when an edit lowers or re-files the entry', async () => {
@@ -164,7 +202,7 @@ describe('checkBudgetAfterSave, against the year', () => {
     expect(await save({ amount: 2150 })).toMatchObject({ kind: 'over', carried: 14600 })
   })
 
-  it('carries nothing when no earlier month of the year holds an entry', async () => {
+  it('carries nothing when the currency was first used this month', async () => {
     await seedEveryday(24000)
     expect(await save({ amount: 2150 })).toMatchObject({ kind: 'over', carried: null })
   })
@@ -198,5 +236,65 @@ describe('checkBudgetAfterSave, against the year', () => {
     await seedEarlierMonths(EARLIER.map(() => 40000))
     await seedEveryday(10000)
     expect(await save({ amount: 500 })).toBeNull()
+  })
+})
+
+// The save is already stored when the check runs, so a failed read may cost
+// the alert at most, and the year line must never cost the alert itself.
+describe('checkBudgetAfterSave, when a read fails', () => {
+  beforeEach(async () => {
+    await db.expenses.clear()
+    await db.categories.clear()
+    await db.categories.bulkAdd(DEFAULT_CATEGORIES)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('still alerts when the currency’s first month cannot be read', async () => {
+    await seedEarlierMonths()
+    await seedEveryday(24000)
+    vi.spyOn(dbModule, 'firstExpenseMonth').mockRejectedValue(new Error('read failed'))
+    expect(await save({ amount: 2150 })).toMatchObject({
+      kind: 'over',
+      spent: 26150,
+      carried: null,
+    })
+    expect(console.error).toHaveBeenCalled()
+  })
+
+  it('still alerts when the earlier months cannot be read', async () => {
+    await seedEarlierMonths()
+    await seedEveryday(24000)
+    const read = dbModule.listExpensesBetween
+    vi.spyOn(dbModule, 'listExpensesBetween').mockImplementation((from, to) =>
+      from === '2026-01-01' ? Promise.reject(new Error('read failed')) : read(from, to),
+    )
+    expect(await save({ amount: 2150 })).toMatchObject({
+      kind: 'over',
+      spent: 26150,
+      carried: null,
+    })
+    expect(console.error).toHaveBeenCalled()
+  })
+
+  it('resolves null, never rejects, when the month cannot be read', async () => {
+    await seedEveryday(24000)
+    vi.spyOn(dbModule, 'listExpensesBetween').mockRejectedValue(new Error('read failed'))
+    await expect(save({ amount: 2150 })).resolves.toBeNull()
+    expect(console.error).toHaveBeenCalled()
+  })
+
+  // The heads-up never shows the year line, so it must not pay for the read.
+  it('reads nothing of the year for a heads-up', async () => {
+    await seedEarlierMonths()
+    await seedEveryday(19500)
+    const first = vi.spyOn(dbModule, 'firstExpenseMonth')
+    const between = vi.spyOn(dbModule, 'listExpensesBetween')
+    expect(await save({ amount: 640 })).toMatchObject({ kind: 'near', carried: null })
+    expect(first).not.toHaveBeenCalled()
+    expect(between).toHaveBeenCalledTimes(1)
   })
 })

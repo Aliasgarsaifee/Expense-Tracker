@@ -45,15 +45,9 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
       setPref(PREFS.lastPaymentMethod, created.paymentMethodId)
     }
     void tapFeedback()
-    // The entry is saved by now; a check that fails only costs the alert, so
-    // it must never reach the form as a failed save. Today is read here, not
-    // at mount: the screen stays mounted across midnight.
-    let alert: BudgetAlert | null = null
-    try {
-      alert = await checkBudgetAfterSave(created, null, budgets, todayISO())
-    } catch (err) {
-      console.error('budget check failed', err)
-    }
+    // Never rejects, so a failed check cannot reach the form as a failed save.
+    // Today is read here, not at mount: the screen stays mounted across midnight.
+    const alert = await checkBudgetAfterSave(created, null, budgets, todayISO())
     // The category's own emoji, custom ones included — label isn't indexed,
     // and the table is tiny, so a scan beats widening the schema for a toast.
     const emoji =
