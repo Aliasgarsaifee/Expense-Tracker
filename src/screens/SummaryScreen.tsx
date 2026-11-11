@@ -16,6 +16,16 @@ import {
 } from '../db'
 import { currencySymbol } from '../lib/currencies'
 import { shortDayMonth, shortMonthYear, todayISO } from '../lib/dates'
+import {
+  expectedFixed,
+  fixedBadge,
+  fixedLabels,
+  fixedLines,
+  paceWithFixed,
+  splitFixed,
+  usualTotal,
+  usualWindow,
+} from '../lib/fixed'
 import type { HistoryJump } from '../lib/history'
 import { formatMoney } from '../lib/money'
 import { groupEmoji } from '../lib/paymentMeta'
@@ -85,8 +95,15 @@ export function SummaryScreen({
   // `today` must be a dep: the screen sits mounted across midnight, and the
   // clipped comparison window has to grow with the new day — deps of [period]
   // alone would keep Dexie re-running the closure captured yesterday.
+  // The fixed-cost history and the categories ride in this read too, not in
+  // live queries of their own: Dexie re-runs the whole querier when any table
+  // it read changes, so toggling a category's fixed flag re-splits Summary
+  // with no reload, and the split always lands in one snapshot with the
+  // entries it splits. Archived categories included: their label still sits
+  // on old entries, so they still decide fixedness and still need a face.
   const view = useLiveQuery(async () => {
     const windows = periodWindows(period, today)
+    const usual = usualWindow(period)
     return {
       period,
       today,
@@ -96,6 +113,10 @@ export function SummaryScreen({
       prevExpenses: windows.comparison
         ? await listExpensesBetween(windows.comparison.from, windows.comparison.to)
         : ([] as Expense[]),
+      history: usual
+        ? await listExpensesBetween(usual.from, usual.to)
+        : ([] as Expense[]),
+      categories: await listCategories({ includeArchived: true }),
     }
   }, [period, today])
 
@@ -105,6 +126,8 @@ export function SummaryScreen({
   const ready = view?.period === period && view.today === today
   const expenses = view?.expenses
   const prevExpenses = view?.prevExpenses
+  const history = view?.history
+  const categories = view?.categories
   // Everything below the pager is derived from the period the loaded data
   // actually belongs to, never the one just tapped. That keeps a total, its
   // chart and its comparison describing one period at all times, and it leaves
@@ -116,9 +139,6 @@ export function SummaryScreen({
   // like-for-like; cmp.toDate switches its sub-label to "by this point".
   const cmp = comparisonSlice(dataPeriod, today)
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
-  // Archived categories included: their label still sits on old entries, and
-  // the breakdown must be able to put a face on every one of them.
-  const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
 
   // ‹ › reach any period that holds data, even a fat-fingered future date —
   // otherwise it is visible in History but unreachable here. All-time averages
@@ -150,19 +170,53 @@ export function SummaryScreen({
 
   const bucket = buckets.find((b) => b.currency === currency)
   const summary = useMemo(() => summarize(bucket?.expenses ?? []), [bucket])
+
+  // Fixed costs (rent, bills) counted apart from everyday spending — month view
+  // only, since "usual" is a monthly idea. lib/fixed is single-currency, so the
+  // history is narrowed to the viewed currency first. No lines means no split:
+  // every figure below is then exactly what it was before the split existed.
+  const fixed = useMemo(() => fixedLabels(categories ?? []), [categories])
+  const lines = useMemo(
+    () =>
+      dataPeriod.kind === 'month'
+        ? fixedLines(
+            bucket?.expenses ?? [],
+            (history ?? []).filter((e) => e.currency === currency),
+            fixed,
+          )
+        : [],
+    [dataPeriod, bucket, history, currency, fixed],
+  )
+  const splitActive = lines.length > 0
+  const split = useMemo(
+    () => (splitActive ? splitFixed(bucket?.expenses ?? [], fixed) : null),
+    [splitActive, bucket, fixed],
+  )
+  // What the tiles, the trend and the category list describe. Without the
+  // split, everyday is simply everything — the very same array, so each memo
+  // keyed on it below behaves exactly as before.
+  const everyday = split ? split.everyday : bucket?.expenses
+  const everydaySummary = useMemo(
+    () => (split ? summarize(split.everyday) : summary),
+    [split, summary],
+  )
+  const fixedSummary = useMemo(() => summarize(split?.fixed ?? []), [split])
+
   // Only the previous period's total for the current currency is needed, so sum
-  // in one pass rather than building a full summary we would throw away.
+  // in one pass rather than building a full summary we would throw away. Under
+  // the split it is the previous everyday, so the vs-tile compares like for like.
   const prevTotal = useMemo(() => {
     let sum = 0
     let hasAny = false
-    for (const e of prevExpenses ?? []) {
+    const prev = splitActive ? splitFixed(prevExpenses ?? [], fixed).everyday : prevExpenses
+    for (const e of prev ?? []) {
       if (e.currency === currency) {
         sum += e.amount
         hasAny = true
       }
     }
     return hasAny ? sum : null
-  }, [prevExpenses, currency])
+  }, [prevExpenses, currency, splitActive, fixed])
 
   const methodsById = useMemo(
     () => new Map((methods ?? []).map((m: PaymentMethod) => [m.id, m])),
@@ -175,7 +229,7 @@ export function SummaryScreen({
     [categories],
   )
 
-  const biggest = useMemo(() => biggestExpense(bucket?.expenses ?? []), [bucket])
+  const biggest = useMemo(() => biggestExpense(everyday ?? []), [everyday])
 
   const spanDays = bounds ? daysBetween(bounds.from, bounds.to) : 0
   const trendUnitOf = bounds ? trendUnit(bounds) : 'day'
@@ -196,28 +250,36 @@ export function SummaryScreen({
   const singleDay = bounds !== null && bounds.from === bounds.to
 
   const busiest = useMemo(
-    () => (dayScale ? busiestDay(bucket?.expenses ?? []) : null),
-    [bucket, dayScale],
+    () => (dayScale ? busiestDay(everyday ?? []) : null),
+    [everyday, dayScale],
   )
   const busiestM = useMemo(
     () => (dayScale ? null : busiestMonth(bucket?.expenses ?? [])),
     [bucket, dayScale],
   )
 
-  const avg = bounds ? averagePerDay(summary.total, bounds, today) : 0
+  const avg = bounds ? averagePerDay(everydaySummary.total, bounds, today) : 0
   const noSpend = bounds ? noSpendDays(bucket?.expenses ?? [], bounds, today) : 0
   const elapsed = bounds ? elapsedDays(bounds, today) : 0
-  const projected = bounds ? projectTotal(summary.total, elapsed, spanDays) : 0
+  // Under the split, fixed costs count once at what they are expected to come
+  // to and only everyday spending is extrapolated — extrapolating the rent day
+  // by day is what had the pace reading double.
+  const projected = !bounds
+    ? 0
+    : splitActive
+      ? paceWithFixed(expectedFixed(lines), everydaySummary.total, elapsed, spanDays)
+      : projectTotal(summary.total, elapsed, spanDays)
 
   const trend = useMemo(
-    () => (bounds ? trendBuckets(bucket?.expenses ?? [], bounds, trendUnitOf) : []),
-    [bucket, bounds, trendUnitOf],
+    () => (bounds ? trendBuckets(everyday ?? [], bounds, trendUnitOf) : []),
+    [everyday, bounds, trendUnitOf],
   )
 
   const delta =
     prevTotal !== null && prevTotal > 0
-      ? Math.round(((summary.total - prevTotal) / prevTotal) * 100)
+      ? Math.round(((everydaySummary.total - prevTotal) / prevTotal) * 100)
       : null
+  const usualSum = usualTotal(lines)
   const cmpLabel = comparisonLabel(period)
 
   // shiftPeriod preserves the kind, so periodBounds is non-null for any non-all
@@ -241,6 +303,18 @@ export function SummaryScreen({
   // just equals the total — suppress both degenerate ends.
   const showPace =
     containsToday && dataPeriod.kind !== 'all' && elapsed >= 2 && elapsed < spanDays
+  // Second tile without the split. With it the grid is always four, and pace
+  // takes the fourth slot, where Busiest day stands when there is no pace.
+  const paceTile = showPace && bounds && (
+    <div className="stat-tile">
+      <p className="stat-label">On pace for</p>
+      <p className="stat-value money">{formatMoney(projected, currency)}</p>
+      <p className={splitActive ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
+        by {shortDayMonth(bounds.to)}
+        {splitActive && ' · fixed counted once'}
+      </p>
+    </div>
+  )
 
   // A tapped trend bucket drills to its span clipped to the viewed period; a
   // whole in-period month jumps as a month (History's monthly-pager mode, like
@@ -326,9 +400,12 @@ export function SummaryScreen({
         <p className="hero-meta">
           {entryCount === 0
             ? `nothing logged ${emptyPhrase}`
-            : entryCount === 1
-              ? 'across 1 entry'
-              : `across ${entryCount} entries`}
+            : splitActive
+              ? `${formatMoney(fixedSummary.total, currency)} fixed · ` +
+                `${formatMoney(everydaySummary.total, currency)} everyday`
+              : entryCount === 1
+                ? 'across 1 entry'
+                : `across ${entryCount} entries`}
         </p>
         {/* Only offer "add" when the empty period is the one you can add into:
            the Add form defaults to today, so a CTA on a past month would lie. */}
@@ -343,20 +420,16 @@ export function SummaryScreen({
         <section className="stat-grid" aria-label="Period statistics">
           {!singleDay && (
             <div className="stat-tile">
-              <p className="stat-label">Daily average</p>
+              <p className="stat-label">
+                {splitActive ? 'Everyday average' : 'Daily average'}
+              </p>
               {/* Rounded at display only: paise read as noise beside whole-₹
                  tiles, but the "≈ a month" derivation keeps the precise value. */}
               <p className="stat-value money">{formatMoney(Math.round(avg), currency)}</p>
               <p className="stat-sub">{avgSub}</p>
             </div>
           )}
-          {showPace && (
-            <div className="stat-tile">
-              <p className="stat-label">On pace for</p>
-              <p className="stat-value money">{formatMoney(projected, currency)}</p>
-              <p className="stat-sub">by {shortDayMonth(bounds.to)}</p>
-            </div>
-          )}
+          {!splitActive && paceTile}
           {cmpLabel && (
             <div className="stat-tile">
               <p className="stat-label">{cmpLabel}</p>
@@ -365,12 +438,17 @@ export function SummaryScreen({
                   ? '—'
                   : `${delta > 0 ? '▲' : delta < 0 ? '▼' : '='} ${Math.abs(delta)}%`}
               </p>
-              <p className="stat-sub">
-                {delta === null
-                  ? 'nothing to compare'
-                  : cmp?.toDate
-                    ? `${formatMoney(prevTotal ?? 0, currency)} by this point`
-                    : `was ${formatMoney(prevTotal ?? 0, currency)}`}
+              <p className={splitActive ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
+                {delta === null ? (
+                  'nothing to compare'
+                ) : (
+                  <>
+                    {splitActive && 'everyday · '}
+                    {cmp?.toDate
+                      ? `${formatMoney(prevTotal ?? 0, currency)} by this point`
+                      : `was ${formatMoney(prevTotal ?? 0, currency)}`}
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -381,7 +459,9 @@ export function SummaryScreen({
               aria-label={`See the ${biggest.note || biggest.category} entry in History`}
               onClick={() => onDrill({ from: biggest.spentOn, to: biggest.spentOn })}
             >
-              <p className="stat-label">Biggest spend</p>
+              <p className="stat-label">
+                {splitActive ? 'Biggest everyday' : 'Biggest spend'}
+              </p>
               <p className="stat-value money">{formatMoney(biggest.amount, currency)}</p>
               <p className="stat-sub">
                 {biggest.note || biggest.category}
@@ -391,7 +471,8 @@ export function SummaryScreen({
               </p>
             </button>
           )}
-          {!singleDay && busiest && (
+          {splitActive && paceTile}
+          {!singleDay && busiest && !(splitActive && showPace) && (
             <button
               type="button"
               className="stat-tile stat-tile-btn"
@@ -428,9 +509,18 @@ export function SummaryScreen({
         </section>
       )}
 
-      {trend.length >= 2 && entryCount > 0 && (
+      {trend.length >= 2 && everydaySummary.count > 0 && (
         <section className="chart-card">
-          <h2 className="section-title">Over time</h2>
+          {/* Everyday only under the split: one rent bar flattened every other
+             day of the month to a sliver. */}
+          {splitActive ? (
+            <div className="card-head">
+              <h2 className="section-title">Everyday, day by day</h2>
+              <span className="card-note">fixed costs left out</span>
+            </div>
+          ) : (
+            <h2 className="section-title">Over time</h2>
+          )}
           <TrendChart
             buckets={trend}
             unit={trendUnitOf}
@@ -441,13 +531,45 @@ export function SummaryScreen({
         </section>
       )}
 
-      {summary.byCategory.length > 0 && (
+      {splitActive && (
         <section className="chart-card">
-          <h2 className="section-title">By category</h2>
+          <div className="card-head">
+            <h2 className="section-title">Fixed costs</h2>
+            {usualSum !== null && (
+              <span className="card-note">
+                usually {formatMoney(usualSum, currency)} a month
+              </span>
+            )}
+          </div>
+          {/* A line with no usual yet has no pill (nothing to judge it by) and
+             keeps the share/count sub-line, as a share of the fixed costs. */}
           <BreakdownList
             currency={currency}
-            whole={summary.total}
-            rows={summary.byCategory.map((c) => ({
+            whole={fixedSummary.total}
+            rows={lines.map((l) => ({
+              key: l.category,
+              emoji: categoryEmoji.get(l.category) ?? '🧾',
+              label: l.category,
+              total: l.spent,
+              count:
+                fixedSummary.byCategory.find((c) => c.category === l.category)?.count ?? 0,
+              badge: fixedBadge(l, currency) ?? undefined,
+              selectLabel: `See ${l.category} entries in History`,
+              onSelect: () => onDrill({ category: l.category, ...drillBounds(dataPeriod) }),
+            }))}
+          />
+        </section>
+      )}
+
+      {everydaySummary.byCategory.length > 0 && (
+        <section className="chart-card">
+          <h2 className="section-title">
+            {splitActive ? 'Everyday by category' : 'By category'}
+          </h2>
+          <BreakdownList
+            currency={currency}
+            whole={everydaySummary.total}
+            rows={everydaySummary.byCategory.map((c) => ({
               key: c.category,
               emoji: categoryEmoji.get(c.category) ?? '🧾',
               label: c.category,

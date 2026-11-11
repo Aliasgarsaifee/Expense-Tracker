@@ -1,3 +1,4 @@
+import type { Badge } from '../lib/fixed'
 import { formatMoney, formatShare } from '../lib/money'
 
 export interface BreakdownRow {
@@ -6,6 +7,8 @@ export interface BreakdownRow {
   label: string
   total: number
   count: number
+  /** Present → a status pill in place of the share/count sub-line. */
+  badge?: Badge
   /** Absent → a static row: the "Unrecorded" bucket has nothing to drill into. */
   onSelect?: () => void
   selectLabel?: string // accessible name when the row is a button
@@ -36,10 +39,16 @@ export function BreakdownList({
             </span>
             <span className="pay-text">
               <span className="pay-label">{r.label}</span>
-              <span className="pay-sub">
-                {formatShare(r.total, whole)} ·{' '}
-                {r.count === 1 ? '1 entry' : `${r.count} entries`}
-              </span>
+              {r.badge ? (
+                <span className="status-pill" data-tone={r.badge.tone}>
+                  {r.badge.text}
+                </span>
+              ) : (
+                <span className="pay-sub">
+                  {formatShare(r.total, whole)} ·{' '}
+                  {r.count === 1 ? '1 entry' : `${r.count} entries`}
+                </span>
+              )}
             </span>
             <span className="leader" aria-hidden="true" />
             <span className="pay-amount money">{formatMoney(r.total, currency)}</span>

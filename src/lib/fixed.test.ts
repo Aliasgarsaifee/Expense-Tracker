@@ -8,6 +8,8 @@ import {
   paceWithFixed,
   splitFixed,
   usualAmount,
+  usualTotal,
+  usualWindow,
   type FixedLine,
 } from './fixed'
 
@@ -121,6 +123,50 @@ describe('fixedLines', () => {
       new Set(['Rent', 'Utilities']),
     )
     expect(lines.map((l) => l.category)).toEqual(['Rent', 'Utilities'])
+  })
+})
+
+describe('usualWindow', () => {
+  it('spans the three calendar months before a viewed month', () => {
+    expect(usualWindow({ kind: 'month', month: '2026-11' })).toEqual({
+      from: '2026-08-01',
+      to: '2026-10-31',
+    })
+  })
+
+  it('crosses a year boundary and ends on a short February', () => {
+    expect(usualWindow({ kind: 'month', month: '2026-01' })).toEqual({
+      from: '2025-10-01',
+      to: '2025-12-31',
+    })
+    expect(usualWindow({ kind: 'month', month: '2026-03' })).toEqual({
+      from: '2025-12-01',
+      to: '2026-02-28',
+    })
+  })
+
+  it('has no window outside the month view', () => {
+    expect(usualWindow({ kind: 'day', date: '2026-11-11' })).toBeNull()
+    expect(usualWindow({ kind: 'year', year: '2026' })).toBeNull()
+    expect(usualWindow({ kind: 'all' })).toBeNull()
+    expect(usualWindow({ kind: 'custom', from: '2026-11-01', to: '2026-11-11' })).toBeNull()
+  })
+})
+
+describe('usualTotal', () => {
+  it('sums the usuals that exist, skipping lines with none', () => {
+    expect(
+      usualTotal([
+        line({ category: 'Rent', usual: 32000, status: 'as-usual' }),
+        line({ category: 'Utilities', usual: 1999, status: 'to-come' }),
+        line({ category: 'Internet', spent: 500, usual: null, status: 'none' }),
+      ]),
+    ).toBe(33999)
+  })
+
+  it('is null when no line has a usual, so nothing reads "usually ₹0"', () => {
+    expect(usualTotal([])).toBeNull()
+    expect(usualTotal([line({ spent: 500, usual: null, status: 'none' })])).toBeNull()
   })
 })
 

@@ -1,6 +1,7 @@
 import { isFixedCategory, type Category, type Expense } from '../db'
-import { monthOf } from './dates'
+import { addMonths, monthOf } from './dates'
 import { formatMoney } from './money'
+import { periodBounds, type Bounds, type Period } from './period'
 import { projectTotal } from './summarize'
 
 // Everything here is single-currency: amounts are summed as-is, so callers
@@ -64,6 +65,17 @@ function classify(spent: number, usual: number | null): FixedStatus {
   return 'as-usual'
 }
 
+// The `history` fixedLines takes: the three calendar months before a viewed
+// month. Only the month view judges fixed costs against their usual, so every
+// other period has none.
+export function usualWindow(p: Period): Bounds | null {
+  if (p.kind !== 'month') return null
+  return {
+    from: periodBounds({ kind: 'month', month: addMonths(p.month, -3) })!.from,
+    to: periodBounds({ kind: 'month', month: addMonths(p.month, -1) })!.to,
+  }
+}
+
 // `history` is the three calendar months before the viewed one. A month in
 // which a label has no entry is skipped, not counted as zero.
 export function fixedLines(
@@ -97,6 +109,14 @@ export function fixedLines(
       Math.max(b.spent, b.usual ?? 0) - Math.max(a.spent, a.usual ?? 0) ||
       a.category.localeCompare(b.category),
   )
+}
+
+// What the fixed lines usually come to in a month. null, not 0, when no line
+// has a usual yet: there is nothing to say, and "usually ₹0" would be false.
+export function usualTotal(lines: FixedLine[]): number | null {
+  let sum: number | null = null
+  for (const l of lines) if (l.usual !== null) sum = (sum ?? 0) + l.usual
+  return sum
 }
 
 // What fixed costs will total by month end: what's paid, or the usual if not

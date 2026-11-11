@@ -12,6 +12,7 @@
    light accent #4c6b4a on #ebebe0 (5.0) · dark accent #a4c39a on #191a14 (9.0)
    light ink-2 #5e5e50 on #ebebe0 (5.5) · dark ink-2 #a6a890 on #191a14 (7.2)
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
+   ink-3 on the #f5f4ec / #21231a card surface (.pay-sub, .card-note): 5.5 / 4.6
    light danger #b3372b on #ebebe0 (5.0) · dark danger #e06a5e on #191a14 (5.3)
    light danger on #f5f4ec surface (5.4) · dark danger on #21231a (4.8)
    danger on the .backup-warning tint (danger 4% + surface): 5.1 / 4.6 dark —
@@ -27,6 +28,10 @@
    hit, found again independently: at 8% it measures 4.37 and fails. Do not
    deepen a tint. The tints are the ONLY use of these hues as a ground; as
    text they sit on --bg and --surface, measured above.
+   Where each tone-on-tint pair is used: .status-pill, and only there
+   (data-tone picks --<tone> on --<tone>-tint). Summary's Fixed costs card
+   wears positive ("As usual"), caution ("₹X above usual") and pending ("₹X
+   to come", "Not logged yet"); negative is validated but no pill wears it yet.
    Calendar spend-heat once lived here as four background tints and no longer
    does: the day number sits inside the cell, so ink legibility capped the
    ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
@@ -833,6 +838,31 @@ button {
   margin-bottom: 18px;
 }
 
+/* A card title with a quiet note on its right ("fixed costs left out"). At
+   375px "Everyday, day by day" and its note need ~330px of a 301px row, and
+   squeezed side by side both broke mid-phrase — so the note wraps whole onto
+   its own line under the title instead. The head takes over the title's 10px
+   bottom margin, so the card body sits where it would under a bare title. */
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  column-gap: var(--space-10);
+  row-gap: var(--space-2);
+  margin-bottom: 10px;
+}
+
+.card-head .section-title {
+  margin: 0;
+}
+
+.card-note {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
 /* Recharts wears the theme via CSS: single validated hue, muted ticks,
    ink value labels (text tokens, never the series color). */
 .trend-chart .recharts-tooltip-cursor {
@@ -1594,7 +1624,8 @@ button {
    labels ("Daily average", "vs May"). Those are derived from the period
    itself, not from the ledger, so they are already correct the instant the
    arrow is tapped — and keeping them visible makes the pause read as filling
-   in rather than as a flash of empty page. */
+   in rather than as a flash of empty page. The card notes blank with the
+   figures, since one of them is a figure ("usually ₹X a month"). */
 .screen[data-loading] .currency-row,
 .screen[data-loading] .hero-total,
 .screen[data-loading] .hero-meta,
@@ -1602,7 +1633,8 @@ button {
 .screen[data-loading] .stat-value,
 .screen[data-loading] .stat-sub,
 .screen[data-loading] .trend-chart,
-.screen[data-loading] .pay-list {
+.screen[data-loading] .pay-list,
+.screen[data-loading] .card-note {
   visibility: hidden;
 }
 
@@ -1646,6 +1678,14 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A sub-line that qualifies its figure ("everyday · ₹7,500 by this point",
+   "· fixed counted once") is wrong cut short, and is ~30px wider than a 375px
+   tile — it wraps, balanced so neither line is a lone word. */
+.stat-sub-wrap {
+  white-space: normal;
+  text-wrap: balance;
 }
 
 /* A stat tile that drills into History; keeps the .stat-tile look, resets the
@@ -1744,6 +1784,49 @@ button {
 .pay-amount {
   font-size: 15.5px;
   white-space: nowrap;
+}
+
+/* ——— status pill ——— */
+
+/* A status said in words, toned by its own validated pair (see the header) —
+   the colour reinforces the word and never carries it alone. */
+.status-pill {
+  padding: var(--space-2) var(--space-8);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-pill[data-tone='positive'] {
+  color: var(--positive);
+  background: var(--positive-tint);
+}
+
+.status-pill[data-tone='caution'] {
+  color: var(--caution);
+  background: var(--caution-tint);
+}
+
+.status-pill[data-tone='pending'] {
+  color: var(--pending);
+  background: var(--pending-tint);
+}
+
+.status-pill[data-tone='negative'] {
+  color: var(--negative);
+  background: var(--negative-tint);
+}
+
+/* In a breakdown row the pill takes the sub-line's place; .pay-text is a
+   grid, which would otherwise stretch it to the column's width. */
+.pay-text .status-pill {
+  justify-self: start;
+  margin-top: var(--space-2);
 }
 
 /* ——— picker sheets (currency) ——— */
