@@ -42,8 +42,9 @@
    is --ink. The budget alert sheet wears negative ("Over budget"), the one
    pill outside Summary; its bar splits that track at the budget into an
    --accent and a --negative fill. Those two measure 1.0:1 against each
-   other in light (1.7 dark), so a 2px gap of --line marks the split (≥ 4.0:1
-   against either fill, both themes) — non-text fills again, no new text pair.
+   other in light (1.7 dark), so a 2px gap of --line marks the split (≈ 4:1
+   against either fill, both themes; 3.99 at the lowest, dark --line on
+   --negative) — non-text fills again, no new text pair.
    Calendar spend-heat once lived here as four background tints and no longer
    does: the day number sits inside the cell, so ink legibility capped the
    ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
@@ -1689,11 +1690,14 @@ button {
    does not collapse and snap back around the reader.
 
    Deliberately not blanked: the pager label, the section titles and the tile
-   labels ("Daily average", "vs May"). Those are derived from the period
-   itself, not from the ledger, so they are already correct the instant the
-   arrow is tapped — and keeping them visible makes the pause read as filling
-   in rather than as a flash of empty page. The card notes blank with the
-   figures, since one of them is a figure ("usually ₹X a month"). */
+   labels ("Daily average", "vs May"). They are words, not figures, and
+   keeping them visible makes the pause read as filling in rather than as a
+   flash of empty page. The pager label comes from the period alone; the
+   others can follow the fixed/everyday split ("Everyday average", "Fixed
+   costs"), which depends on the ledger and the categories, so they settle
+   when the read lands. The figures are what stay blanked while it is in
+   flight. The card notes blank with them, since one of them is a figure
+   ("usually ₹X a month"). */
 .screen[data-loading] .currency-row,
 .screen[data-loading] .hero-total,
 .screen[data-loading] .hero-meta,

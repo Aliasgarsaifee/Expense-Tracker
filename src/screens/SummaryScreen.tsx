@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useMemo, useState } from 'react'
-import { BreakdownList } from '../components/BreakdownList'
+import { BreakdownList, type BreakdownRow } from '../components/BreakdownList'
 import { BudgetCard, YearBudgetCard } from '../components/BudgetCard'
 import { Pager } from '../components/Pager'
 import { PeriodSheet } from '../components/PeriodSheet'
@@ -71,6 +71,7 @@ import {
   splitByCurrency,
   summarize,
   trendBuckets,
+  type CategoryTotal,
 } from '../lib/summarize'
 
 // A month averages ≈ 30.44 days; the year/all "a month" figure is approximate
@@ -266,6 +267,18 @@ export function SummaryScreen({
     () => new Map((categories ?? []).map((c: Category) => [c.label, c.emoji])),
     [categories],
   )
+  // A plain by-category list whose rows drill to History for that category
+  // over the viewed period: everyday spending, and the year's fixed costs.
+  const categoryRows = (totals: CategoryTotal[]): BreakdownRow[] =>
+    totals.map((c) => ({
+      key: c.category,
+      emoji: categoryEmoji.get(c.category) ?? '🧾',
+      label: c.category,
+      total: c.total,
+      count: c.count,
+      selectLabel: `See ${c.category} entries in History`,
+      onSelect: () => onDrill({ category: c.category, ...drillBounds(dataPeriod) }),
+    }))
 
   const biggest = useMemo(() => biggestExpense(everyday ?? []), [everyday])
 
@@ -385,14 +398,17 @@ export function SummaryScreen({
     containsToday && dataPeriod.kind !== 'all' && elapsed >= 2 && elapsed < spanDays
   // Without the split, pace is the second tile and Busiest day comes after
   // Biggest. With it the grid is always four, led by pace — or by Busiest day
-  // in the same slot when there is no pace to show.
+  // in the same slot when there is no pace to show. The year's pace takes no
+  // usual (month-only), so it projects all spending, and says so beside its
+  // everyday neighbours.
   const paceTile = showPace && bounds && (
     <div className="stat-tile">
       <p className="stat-label">On pace for</p>
       <p className="stat-value money">{formatMoney(projected, currency)}</p>
-      <p className={monthSplit ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
+      <p className={splitActive ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
         by {shortDayMonth(bounds.to)}
         {monthSplit && ' · fixed counted once'}
+        {yearSplit && ' · all spending'}
       </p>
     </div>
   )
@@ -603,8 +619,11 @@ export function SummaryScreen({
             >
               <p className="stat-label">Busiest month</p>
               <p className="stat-value money">{formatMoney(busiestM.total, currency)}</p>
-              <p className="stat-sub">
+              {/* Months are ranked on all spending; under the split its
+                 neighbours say "everyday", so this one says what it covers. */}
+              <p className={yearSplit ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
                 {shortMonthYear(busiestM.month)}
+                {yearSplit && ' · all spending'}
                 <span className="stat-go" aria-hidden="true">
                   ›
                 </span>
@@ -646,7 +665,9 @@ export function SummaryScreen({
           currency={currency}
           today={today}
           onSelectMonth={(month) => {
-            setPeriod({ kind: 'month', month })
+            // Through applyPeriod, as the period sheet does, so the next launch
+            // restores the month the owner opened rather than the year.
+            applyPeriod({ kind: 'month', month })
             // The ledger sits at the foot of a long page; the month it opens
             // reads from the top, where its heading and budget card are.
             window.scrollTo(0, 0)
@@ -684,6 +705,19 @@ export function SummaryScreen({
         </section>
       )}
 
+      {yearSplit && (
+        <section className="chart-card">
+          {/* What the year's fixed costs came to, plain: pills and the usual
+             judge a month against its usual, which is month-only maths. */}
+          <h2 className="section-title">Fixed costs</h2>
+          <BreakdownList
+            currency={currency}
+            whole={fixedSummary.total}
+            rows={categoryRows(fixedSummary.byCategory)}
+          />
+        </section>
+      )}
+
       {everydaySummary.byCategory.length > 0 && (
         <section className="chart-card">
           <h2 className="section-title">
@@ -692,15 +726,7 @@ export function SummaryScreen({
           <BreakdownList
             currency={currency}
             whole={everydaySummary.total}
-            rows={everydaySummary.byCategory.map((c) => ({
-              key: c.category,
-              emoji: categoryEmoji.get(c.category) ?? '🧾',
-              label: c.category,
-              total: c.total,
-              count: c.count,
-              selectLabel: `See ${c.category} entries in History`,
-              onSelect: () => onDrill({ category: c.category, ...drillBounds(dataPeriod) }),
-            }))}
+            rows={categoryRows(everydaySummary.byCategory)}
           />
         </section>
       )}

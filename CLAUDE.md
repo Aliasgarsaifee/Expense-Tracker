@@ -29,7 +29,8 @@ expense-tracker/
 │   │   ├── backup.ts           # JSON backup (v3) + CSV export; imports v1–v3
 │   │   ├── prefs.ts            # localStorage wrapper (et-pref:*), deliberately outside Dexie
 │   │   ├── autoBackup.ts       # daily snapshot → Documents/Backups, keeps last 7
-│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / paymentMeta / budgetCheck   # platform adapters
+│   │   ├── budgetCheck.ts      # judges a just-saved entry against the month's budget (reads db.ts; tested)
+│   │   └── exportFile / haptics / useKeyboardInset / useMeasuredWidth / paymentMeta   # platform adapters
 │   └── test/setup.ts           # fake-indexeddb → Dexie runs unmodified in Node
 ├── ios/App/                    # Capacitor Xcode project (SPM mode: CapApp-SPM package, no Pods)
 │   ├── App/Info.plist          # hand-set: UIFileSharingEnabled + LSSupportsOpeningDocumentsInPlace
@@ -143,6 +144,9 @@ archive-if-referenced) — migrations may simplify, never just accrete.
   round-trip losslessly; imports merge by id, and same-labeled
   methods/categories from a different install merge by label — re-importing
   must never duplicate.
+- v3 category rows may carry an optional boolean `fixed`. Absent must stay
+  absent on parse and export (the default is derived — see `isFixedCategory`),
+  and an import never clears a local `fixed` the file does not mention.
 - CSV export: fixed column order, formula-injection escaping, BOM for Excel.
 - `autoBackup.ts` prunes only files matching the exact `auto-backup-` prefix
   (keeps 7); `pre-import-*.json` safety copies are never pruned. Users' own
