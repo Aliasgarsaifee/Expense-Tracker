@@ -53,6 +53,10 @@ describe('budget maths', () => {
     expect(budgetLevel(25000.01, 25000)).toBe('over')
   })
 
+  it('judges the 80% mark on rounded paise, as the save path does', () => {
+    expect(budgetLevel(19999.999999999996, 25000)).toBe('near')
+  })
+
   it('reports a crossing only when the level rises', () => {
     expect(budgetCrossing(8730, 9000, 25000)).toBeNull()
     expect(budgetCrossing(19500, 20140, 25000)).toBe('near')
@@ -283,6 +287,25 @@ describe('year ledger', () => {
     expect(carriedInto(lines)).toBe(14600)
     expect(yearTally(lines)).toEqual(
       { overCount: 3, overTotal: 10400, underCount: 7, underTotal: 25000 })
+  })
+
+  it('does not call float dust an overrun', () => {
+    // 10.21 + 21.94 + 27.85 sums to 60.00000000000001 in floats.
+    const dusty = monthTotals([
+      entry('2026-03-02', 10.21),
+      entry('2026-03-09', 21.94),
+      entry('2026-03-16', 27.85),
+    ])
+    const [mar] = yearLedger(dusty, 60, '2026', TODAY, '2026-03')
+    expect(mar.spent).toBe(60)
+    expect(mar.diff).toBe(0)
+    expect(mar.running).toBe(0)
+    expect(yearTally([mar])).toMatchObject({ overCount: 0, underCount: 0 })
+    const copy = yearLineCopy(mar, 'INR', TODAY)
+    expect(copy.over).toBe(false)
+    expect(copy.diff).toBe('On budget')
+    expect(yearCardCopy([mar], 'INR').sentence).not.toContain('0.00')
+    expect(yearSentence([mar], 'INR')).toBe('No month has run over.')
   })
 
   it('starts at the first month the ledger was in use', () => {

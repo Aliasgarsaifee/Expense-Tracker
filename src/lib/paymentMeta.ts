@@ -83,6 +83,10 @@ export const PICKER_SECTION_THRESHOLD = 5
 
 export interface PickerSection {
   title: string // '' = no heading
+  // Whether a row's sub-line names its group: not under a type heading, where
+  // it would repeat it. Carried as data because a custom group can be titled
+  // "Recent", so the title alone cannot say which kind of section this is.
+  showGroup: boolean
   methods: PaymentMethod[]
 }
 
@@ -101,14 +105,16 @@ export function pickerSections(
 ): PickerSection[] {
   if (query.trim() !== '') {
     const hits = filterByLabel(methods, query)
-    return hits.length === 0 ? [] : [{ title: '', methods: [...hits].sort(byLabel) }]
+    return hits.length === 0 ? [] : [{ title: '', showGroup: true, methods: [...hits].sort(byLabel) }]
   }
   const ordered = orderByRecency(methods, recency)
-  if (methods.length <= PICKER_SECTION_THRESHOLD) return [{ title: '', methods: ordered }]
+  if (methods.length <= PICKER_SECTION_THRESHOLD) return [{ title: '', showGroup: true, methods: ordered }]
   const recent = ordered.filter((m) => recency.has(m.id)).slice(0, recentLimit)
-  const sections: PickerSection[] = recent.length > 0 ? [{ title: 'Recent', methods: recent }] : []
+  const sections: PickerSection[] = recent.length > 0
+      ? [{ title: 'Recent', showGroup: true, methods: recent }]
+      : []
   for (const b of bucketize(methods)) {
-    sections.push({ title: b.group, methods: [...b.members].sort(byLabel) })
+    sections.push({ title: b.group, showGroup: false, methods: [...b.members].sort(byLabel) })
   }
   return sections
 }

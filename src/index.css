@@ -507,6 +507,7 @@ h1.display {
 
 .field > span,
 .field-label {
+  margin: 0;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -737,7 +738,9 @@ button {
 .btn-text {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: var(--tap-min);
+  min-width: var(--tap-min);
   border: 0;
   background: none;
   color: var(--ink-2);
@@ -750,12 +753,6 @@ button {
 
 .btn-text:active {
   opacity: 0.6;
-}
-
-/* Icon-only: the 2px side padding would leave a 22px-wide target. */
-.btn-text-icon {
-  min-width: var(--tap-min);
-  justify-content: center;
 }
 
 /* ——— history ——— */
@@ -791,10 +788,6 @@ button {
   display: grid;
   gap: 6px;
   margin-top: 8px;
-}
-
-.field-label {
-  margin: 0;
 }
 
 .entries {
@@ -923,8 +916,8 @@ button {
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
-  line-height: 1;
-  padding-bottom: 4px;
+  display: grid;
+  place-items: center;
   transition: transform 0.06s ease;
 }
 
@@ -1300,6 +1293,7 @@ button {
 /* ——— currency button (amount row) ——— */
 
 .currency-btn {
+  min-width: var(--tap-min);
   display: grid;
   justify-items: center;
   gap: 0;
@@ -1329,7 +1323,7 @@ button {
   color: var(--accent);
 }
 
-/* ——— chip rows (payment, filters, currencies) ——— */
+/* ——— chip rows (filters, currencies, shortcuts) ——— */
 
 .chip-row {
   display: flex;
@@ -2460,14 +2454,9 @@ button {
   padding: 0;
 }
 
-/* Same look as .field > span. Scrolls with its rows (not sticky). */
+/* Typography comes from .field-label. Scrolls with its rows (not sticky). */
 .pick-section {
   margin: 14px 0 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
 }
 
 .pick-list > :first-child > .pick-section {
@@ -2670,6 +2659,8 @@ button {
   display: grid;
   gap: 1px;
   min-width: 0;
+  min-height: var(--tap-min);
+  align-content: center;
   padding: 10px 0;
   margin: -10px 0;
   background: none;
@@ -2730,11 +2721,12 @@ button {
 }
 
 /* Painted 34px, tappable 44px: an invisible halo keeps the settings rows
-   dense while honouring the 44pt touch-target guideline. */
+   dense while honouring the 44pt touch-target guideline. inset counts from
+   inside the 1.5px border, hence 6.5px for a 44px box. */
 .icon-btn::before {
   content: '';
   position: absolute;
-  inset: -5px;
+  inset: -6.5px;
 }
 
 .icon-btn:active {

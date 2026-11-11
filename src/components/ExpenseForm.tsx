@@ -253,6 +253,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
           <PaymentPicker
             methods={pickableMethods}
             selectedId={paymentMethodId}
+            loaded={methods !== undefined && selectedArchived !== undefined}
             recency={recency}
             onSelect={setPaymentMethodId}
             onAddNew={() => setAddingMethod(true)}

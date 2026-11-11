@@ -2,6 +2,7 @@ import { firstExpenseMonth, listCategories, listExpensesBetween, type Expense } 
 import { budgetCrossing, budgetFor, carriedIntoMonth, earlierThisYear, type Budgets } from './budget'
 import { daysSince, monthOf } from './dates'
 import { everydayIn, fixedLabels } from './fixed'
+import { toMinorUnits } from './money'
 import { periodBounds } from './period'
 
 export interface BudgetAlert {
@@ -17,11 +18,6 @@ export interface BudgetAlert {
   // read failed.
   carried: number | null
 }
-
-// Stored amounts are clamped to minor units (parseAmount), but their float sum
-// is not: 673.58 + 14.21 is 687.7900000000001, which would call a month spent
-// exactly to its budget over. Every currency here is entered to 2 decimals.
-const toMinorUnits = (n: number) => Math.round(n * 100) / 100
 
 // Judges one just-persisted save, and never rejects: the entry is already
 // stored, so a failed read may cost the alert but must never fail or block the

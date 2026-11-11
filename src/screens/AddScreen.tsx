@@ -94,7 +94,11 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
     <div className="screen">
       <header className="screen-head">
         <div className="head-text">
-          <p className="eyebrow">{todaySoFar(todays ?? [], initial.current.currency)}</p>
+          {/* A non-breaking space until the first read lands: "Nothing logged
+              today" would be false for a moment on every cold start. */}
+          <p className="eyebrow">
+            {todays === undefined ? '\u00a0' : todaySoFar(todays, initial.current.currency)}
+          </p>
           <h1 className="display">New entry</h1>
         </div>
       </header>

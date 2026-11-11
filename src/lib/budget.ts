@@ -1,6 +1,6 @@
 import type { Expense } from '../db'
 import { addMonths, monthName, monthOf } from './dates'
-import { formatMoney } from './money'
+import { formatMoney, toMinorUnits } from './money'
 import type { Badge } from './fixed'
 import type { Period } from './period'
 
@@ -35,15 +35,13 @@ export function budgetFor(budgets: Budgets, currency: string): number | null {
   return isAmount(v) ? v : null
 }
 
-// Paise summed as floats can leave dust; the judgement and the card's words
-// both read amounts through this so they can never disagree.
-const toPaise = (x: number) => Math.round(x * 100) / 100
-
 export function budgetLevel(spent: number, budget: number): BudgetLevel {
-  // Only a real paisa over counts; the same rule keeps the save alert from
-  // firing on dust.
-  if (toPaise(spent) > budget) return 'over'
-  return spent >= NEAR_SHARE * budget ? 'near' : 'under'
+  // Paise summed as floats leave dust; judging both marks on the rounded sum
+  // keeps the card and the save alert from ever disagreeing. Only a real
+  // paisa over counts.
+  const paise = toMinorUnits(spent)
+  if (paise > budget) return 'over'
+  return paise >= NEAR_SHARE * budget ? 'near' : 'under'
 }
 
 // Only a rising level is worth announcing; under → over reports 'over'.
@@ -134,7 +132,7 @@ export function budgetCardCopy(
   daysLeft: number,
   currency: string,
 ): BudgetCardCopy {
-  const left = toPaise(status.left)
+  const left = toMinorUnits(status.left)
   const over = left < 0
   let perDay: string | null = null
   if (status.perDay !== null) {
@@ -253,10 +251,10 @@ export function yearLedger(
   const lines: YearLine[] = []
   let running = 0
   for (let month = start; month <= end && month.startsWith(year); month = addMonths(month, 1)) {
-    const spent = everydayByMonth.get(month) ?? 0
-    const diff = budget - spent
+    const spent = toMinorUnits(everydayByMonth.get(month) ?? 0)
+    const diff = toMinorUnits(budget - spent)
     const partial = month === thisMonth
-    if (!partial) running += diff
+    if (!partial) running = toMinorUnits(running + diff)
     lines.push({ month, spent, diff, running: partial ? null : running, partial })
   }
   return lines

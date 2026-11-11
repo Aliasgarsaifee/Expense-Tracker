@@ -7,6 +7,9 @@ import { CheckIcon, ChevronRightIcon, AddIcon, SearchIcon } from './icons'
 interface Props {
   methods: PaymentMethod[]
   selectedId?: string
+  // The method list (and an edited entry's archived method) has resolved, so
+  // a selectedId that matches nothing is genuinely dangling, not still loading.
+  loaded: boolean
   recency: Map<string, string>
   onSelect: (id: string) => void
   onAddNew: () => void
@@ -14,8 +17,8 @@ interface Props {
 
 // Under Recent and in an untitled run the group is the sub-line; under a type
 // heading only the archived tag remains.
-function subLine(title: string, m: PaymentMethod): string {
-  const parts = title === '' || title === 'Recent' ? [m.group] : []
+function subLine(showGroup: boolean, m: PaymentMethod): string {
+  const parts = showGroup ? [m.group] : []
   if (m.archived) parts.push('archived')
   return parts.join(' · ')
 }
@@ -24,7 +27,7 @@ function subLine(title: string, m: PaymentMethod): string {
 // opens one sheet listing every method. A long list gains a search field (the
 // app's standard search-in-sheet pattern, see CurrencySheet) and is sectioned:
 // the last-used few, then every method under its type in a fixed A–Z order.
-export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew }: Props) {
+export function PaymentPicker({ methods, selectedId, loaded, recency, onSelect, onAddNew }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const sections = useMemo(
@@ -64,10 +67,11 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
             {selected.archived && <span className="chip-tag">archived</span>}
           </span>
         ) : (
-          // Empty while a chosen method's liveQuery is still resolving: only
-          // an entry with no method at all reads "Not recorded".
+          // Empty only while the lists are still resolving; an entry with no
+          // method, or one pointing at a method that no longer exists (an
+          // imported backup can), reads "Not recorded".
           <span className="detail-value detail-empty">
-            {selectedId ? '' : 'Not recorded'}
+            {loaded ? 'Not recorded' : ''}
           </span>
         )}
         <ChevronRightIcon size={18} />
@@ -117,9 +121,11 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
               </label>
             )}
             <div className="pick-list" ref={listRef}>
-              {sections.map((section) => (
-                <div key={section.title}>
-                  {section.title !== '' && <h3 className="pick-section">{section.title}</h3>}
+              {sections.map((section, i) => (
+                <div key={i}>
+                  {section.title !== '' && (
+                    <h3 className="pick-section field-label">{section.title}</h3>
+                  )}
                   <ul aria-label={section.title || 'Payment methods'}>
                     {section.methods.map((m) => (
                       <li key={m.id}>
@@ -137,8 +143,8 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
                               <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
                             </span>
                             {/* Under a type heading the group would only repeat it. */}
-                            {subLine(section.title, m) !== '' && (
-                              <span className="pick-sub">{subLine(section.title, m)}</span>
+                            {subLine(section.showGroup, m) !== '' && (
+                              <span className="pick-sub">{subLine(section.showGroup, m)}</span>
                             )}
                           </span>
                           {m.id === selectedId && (

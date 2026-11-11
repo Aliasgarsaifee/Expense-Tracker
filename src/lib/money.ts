@@ -27,6 +27,11 @@ function formatterFor(currency: string, digits: number): Intl.NumberFormat | nul
   return made
 }
 
+// Float sums leave dust (673.58 + 14.21 is 687.7900000000001); every currency
+// here is entered to 2 decimals, so judgements and copy compare amounts rounded
+// to minor units, never raw sums.
+export const toMinorUnits = (n: number) => Math.round(n * 100) / 100
+
 // Whole amounts show clean (₹450); fractions only when present (₹450.50).
 export function formatMoney(amount: number, currency = 'INR'): string {
   const digits = Number.isInteger(amount) ? 0 : 2

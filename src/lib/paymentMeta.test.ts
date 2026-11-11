@@ -248,6 +248,30 @@ describe('pickerSections', () => {
     expect(out[0].methods.map((x) => x.label)).toEqual(['HDFC Regalia', 'HDFC Savings'])
     expect(pickerSections(many, used, 'zzz')).toEqual([])
   })
+  it('marks which sections name the group, so a group titled Recent is not mistaken', () => {
+    const clash = [
+      m('cash', 'Cash', 'Cash'),
+      m('gpay', 'GPay', 'UPI'),
+      m('a', 'Alpha', 'Recent'),
+      m('b', 'Beta', 'Recent'),
+      m('regalia', 'HDFC Regalia', 'Credit card'),
+      m('amex', 'amex Platinum', 'Credit card'),
+      m('savings', 'HDFC Savings', 'Debit card'),
+    ]
+    const out = pickerSections(clash, new Map([
+      ['a', '2026-11-11T09:00:00.000Z'],
+      ['gpay', '2026-11-10T09:00:00.000Z'],
+    ]), '')
+    expect(out[0]).toMatchObject({ title: 'Recent', showGroup: true })
+    const custom = out.slice(1).find((s) => s.title === 'Recent')!
+    expect(custom.showGroup).toBe(false)
+    expect(custom).not.toBe(out[0])
+    expect(custom.methods.map((x) => x.id)).toEqual(['a', 'b'])
+  })
+  it('shows the group in untitled sections', () => {
+    expect(pickerSections(few, new Map(), '')[0].showGroup).toBe(true)
+    expect(pickerSections(many, used, 'hdfc')[0].showGroup).toBe(true)
+  })
   it('honours a custom recent limit', () => {
     expect(pickerSections(many, used, '', 2)[0].methods.map((x) => x.id)).toEqual(['regalia', 'gpay'])
   })

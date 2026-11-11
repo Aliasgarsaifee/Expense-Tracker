@@ -11,7 +11,7 @@ import {
   monthOf,
   todayISO,
 } from '../lib/dates'
-import { initialPeriod, periodBounds, periodLabel, type Period } from '../lib/period'
+import { initialPeriod, periodBounds, periodLabel, rangePeriod, type Period } from '../lib/period'
 import { getPref, PREFS, setPref } from '../lib/prefs'
 import { ArrowRightIcon, CloseIcon } from './icons'
 
@@ -99,11 +99,7 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
         : { from: sel.a, to: sel.b }
     : null
   const hl = pend ?? viewed
-  const pendingPeriod: Period | null = pend
-    ? pend.from === pend.to
-      ? { kind: 'day', date: pend.from }
-      : { kind: 'custom', from: pend.from, to: pend.to }
-    : null
+  const pendingPeriod: Period | null = pend ? rangePeriod(pend.from, pend.to) : null
 
   function tapDay(d: string) {
     setSel((s) => (s && s.b === null && d !== s.a ? { a: s.a, b: d } : { a: d, b: null }))
@@ -258,7 +254,7 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
           <footer className="cal-footer">
             <button
               type="button"
-              className="btn-text btn-text-icon"
+              className="btn-text"
               aria-label="Clear selection"
               onClick={() => setSel(null)}
             >

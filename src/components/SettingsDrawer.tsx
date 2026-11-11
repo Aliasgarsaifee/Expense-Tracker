@@ -344,7 +344,7 @@ function DrawerBody({
         <header className="drawer-head">
           <h2 className="display">Settings</h2>
           <button
-            className="btn-text btn-text-icon"
+            className="btn-text"
             type="button"
             aria-label="Close settings"
             onClick={onClose}

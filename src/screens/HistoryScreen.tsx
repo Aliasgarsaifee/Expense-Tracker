@@ -174,8 +174,8 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
     setSortOpen(false)
   }, [jump])
 
-  // Focus only when the user tapped the search icon: a jump that sets a query
-  // must not raise the keyboard.
+  // Focus only when the user tapped the search icon: opening the search by
+  // other means must not raise the keyboard.
   const focusSearch = useRef(false)
   useEffect(() => {
     if (searchOpen && focusSearch.current) searchRef.current?.focus()
@@ -411,7 +411,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
           />
           <button
             type="button"
-            className="btn-text btn-text-icon"
+            className="btn-text"
             aria-label="Clear search"
             onClick={() => {
               setQuery('')
