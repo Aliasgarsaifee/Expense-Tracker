@@ -452,8 +452,10 @@ export function SummaryScreen({
     // wrong heading.
     <div className="screen" data-loading={ready ? undefined : ''} aria-busy={!ready}>
       <header className="screen-head">
-        <p className="eyebrow">Summary</p>
-        <h1 className="sr-only">Summary</h1>
+        <div className="head-text">
+          <p className="eyebrow">Summary</p>
+          <h1 className="sr-only">Summary</h1>
+        </div>
       </header>
 
       <PeriodPager

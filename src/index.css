@@ -242,8 +242,53 @@ body::after {
   margin-bottom: 22px;
   padding-left: 56px;
   min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.head-text {
+  min-width: 0;
+}
+
+/* History's three controls, right-aligned on the menu button's centre line.
+   Negative margin lets the last icon's glyph, not its 44px box, meet the
+   20px gutter. */
+.head-actions {
+  display: flex;
+  flex-shrink: 0;
+  margin-right: -10px;
+}
+
+.head-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
   display: grid;
-  align-content: center;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  transition: transform 0.06s ease;
+}
+
+.head-btn[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.head-btn:active {
+  transform: scale(0.94);
+}
+
+.head-btn-count {
+  position: absolute;
+  top: 5px;
+  right: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
 }
 
 .sr-only {
@@ -697,7 +742,7 @@ button {
 /* ——— history ——— */
 
 .day-group {
-  margin-bottom: 26px;
+  margin-bottom: 20px;
 }
 
 .day-head {
@@ -706,7 +751,7 @@ button {
   align-items: baseline;
   gap: 12px;
   padding-bottom: 7px;
-  border-bottom: 1.5px solid var(--ink-3);
+  border-bottom: 1px solid var(--line);
   margin-bottom: 2px;
 }
 
@@ -734,9 +779,9 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 2px;
+  min-height: var(--tap-min);
+  padding: 4px 2px;
   border: 0;
-  border-bottom: 1px solid var(--line);
   background: none;
   color: var(--ink);
   font-family: var(--font-body);
@@ -784,26 +829,25 @@ button {
 }
 
 /* What the visible slice comes to, directly under the period it belongs to.
-   It used to sit at the very foot of the page — a ~4250px scroll once rent is
-   in the ledger — in the faintest type, while every day header carried its own
-   total. Tracks the filters, so it answers "how much, of what I'm looking at". */
-.history-total {
+   Tracks the filters, so it answers "how much, of what I'm looking at". */
+.history-line {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: space-between;
   align-items: baseline;
-  gap: 4px 9px;
-  margin: -8px 0 16px;
+  gap: 2px 12px;
+  /* Pulls up under the pager (its 18px bottom margin is shared with Summary). */
+  margin: -8px 0 10px;
 }
 
-.history-total .money {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.history-total-count {
+.history-count {
   font-size: 12.5px;
-  color: var(--ink-3);
+  color: var(--ink-2);
+}
+
+.history-line .money {
+  font-size: 17px;
+  font-weight: 600;
 }
 
 /* ——— summary ——— */
@@ -1262,7 +1306,7 @@ button {
   /* Room for the chips' 5px hit area, which overflow-x would otherwise clip. */
   padding-top: 5px;
   margin-top: -5px;
-  padding-bottom: 4px;
+  padding-bottom: 5px;
   scrollbar-width: none;
 }
 
@@ -1649,9 +1693,9 @@ button {
   border-color: var(--accent);
 }
 
-.search-field > span {
-  font-size: 14px;
-  opacity: 0.7;
+.search-field > svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
 }
 
 .search-field input {
@@ -1678,7 +1722,6 @@ button {
 /* Clear must be a real thumb target: fill the 44px row, no dead strip. */
 .search-field .btn-text {
   align-self: stretch;
-  min-height: 44px;
   padding: 6px 12px;
 }
 

@@ -1,7 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { EditSheet } from '../components/EditSheet'
+import { EntryRow } from '../components/EntryRow'
 import { FilterSheet } from '../components/FilterSheet'
+import { CloseIcon, FilterIcon, SearchIcon, SortIcon } from '../components/icons'
 import { PeriodPager } from '../components/PeriodPager'
 import { SortSheet } from '../components/SortSheet'
 import { Toast } from '../components/Toast'
@@ -23,6 +25,7 @@ import {
   formatTotals,
   groupByDay,
   groupByMonth,
+  historyCountLine,
   isGroupedSort,
   sortExpenses,
   spansMonths,
@@ -63,18 +66,12 @@ function shortDate(iso: string): string {
 }
 
 const SORTS: HistorySort[] = ['newest', 'oldest', 'largest', 'smallest']
-const SORT_WORD: Record<HistorySort, string> = {
-  newest: 'Newest',
-  oldest: 'Oldest',
-  largest: 'Largest',
-  smallest: 'Smallest',
-}
 function readSort(): HistorySort {
   const v = getPref(PREFS.historySort, 'newest')
   return SORTS.includes(v as HistorySort) ? (v as HistorySort) : 'newest'
 }
 
-function EntryRow({
+function LedgerRow({
   expense,
   emoji,
   methodLabel,
@@ -91,21 +88,13 @@ function EntryRow({
     .filter(Boolean)
     .join(' · ')
   return (
-    <li>
-      <button type="button" className="entry" onClick={() => onEdit(expense)}>
-        <span className="entry-emoji" aria-hidden="true">
-          {emoji}
-        </span>
-        <span className="entry-text">
-          <span className="entry-primary">{expense.note || expense.category}</span>
-          {sub && <span className="entry-sub">{sub}</span>}
-        </span>
-        <span className="leader" aria-hidden="true" />
-        <span className="entry-amount money">
-          {formatMoney(expense.amount, expense.currency)}
-        </span>
-      </button>
-    </li>
+    <EntryRow
+      emoji={emoji}
+      primary={expense.note || expense.category}
+      sub={sub}
+      amount={formatMoney(expense.amount, expense.currency)}
+      onClick={() => onEdit(expense)}
+    />
   )
 }
 
@@ -128,7 +117,7 @@ function DaySection({
       </div>
       <ul className="entries">
         {group.items.map((e) => (
-          <EntryRow
+          <LedgerRow
             key={e.id}
             expense={e}
             emoji={emojiFor(e.category)}
@@ -163,6 +152,8 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
   const [sort, setSortState] = useState<HistorySort>(readSort)
   const [sortOpen, setSortOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<Expense | null>(null)
   const { toast, show } = useToast()
 
@@ -173,6 +164,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
     if (!jump) return
     setPeriod(jump.period ?? { kind: 'all' })
     setQuery('')
+    setSearchOpen(false)
     setSelection({
       methodIds: jump.paymentMethodId ? [jump.paymentMethodId] : [],
       groups: [],
@@ -181,6 +173,14 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
     setSheetOpen(false)
     setSortOpen(false)
   }, [jump])
+
+  // Focus only when the user tapped the search icon: a jump that sets a query
+  // must not raise the keyboard.
+  const focusSearch = useRef(false)
+  useEffect(() => {
+    if (searchOpen && focusSearch.current) searchRef.current?.focus()
+    focusSearch.current = false
+  }, [searchOpen])
 
   const labels = useMemo(
     () => new Map((methods ?? []).map((m: PaymentMethod) => [m.id, m.label])),
@@ -327,13 +327,60 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
   const hasMatches = filtered.length > 0
   const activeChipCount =
     selection.groups.length + selection.methodIds.length + catFilters.length
+  const searchShown = searchOpen || query !== ''
   const filtersActive = activeChipCount > 0 || query.trim() !== ''
 
   return (
     <div className="screen">
       <header className="screen-head">
-        <p className="eyebrow">History</p>
-        <h1 className="sr-only">History</h1>
+        <div className="head-text">
+          <p className="eyebrow">History</p>
+          <h1 className="sr-only">History</h1>
+        </div>
+        {hasAnything && (
+          <div className="head-actions">
+            <button
+              type="button"
+              className="head-btn"
+              aria-label="Search"
+              aria-expanded={searchShown}
+              onClick={() => {
+                if (searchShown && query === '') {
+                  setSearchOpen(false)
+                } else {
+                  focusSearch.current = true
+                  setSearchOpen(true)
+                }
+              }}
+            >
+              <SearchIcon />
+            </button>
+            <button
+              type="button"
+              className="head-btn"
+              aria-label={activeChipCount > 0 ? `Filters, ${activeChipCount} active` : 'Filters'}
+              aria-pressed={activeChipCount > 0}
+              aria-haspopup="dialog"
+              onClick={() => setSheetOpen(true)}
+            >
+              <FilterIcon />
+              {activeChipCount > 0 && (
+                <span className="head-btn-count money" aria-hidden="true">
+                  {activeChipCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              className="head-btn"
+              aria-haspopup="dialog"
+              aria-label={`Sort: ${sort} first`}
+              onClick={() => setSortOpen(true)}
+            >
+              <SortIcon />
+            </button>
+          </div>
+        )}
       </header>
 
       <PeriodPager
@@ -345,133 +392,104 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
       />
 
       {hasMatches && (
-        <p className="history-total">
+        <p className="history-line">
+          <span className="history-count">{historyCountLine(filtered.length, sort)}</span>
           <span className="money">{formatTotals(totals)}</span>
-          <span className="history-total-count">
-            {filtered.length === 1 ? '1 entry' : `${filtered.length} entries`}
-          </span>
         </p>
       )}
 
-      {hasAnything && (
-        <>
-          <div className="chip-row filter-row">
+      {searchShown && (
+        <div className="search-field">
+          <SearchIcon size={18} />
+          <input
+            ref={searchRef}
+            type="search"
+            placeholder="Search notes, categories, amounts…"
+            aria-label="Search entries"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-text"
+            aria-label="Clear search"
+            onClick={() => {
+              setQuery('')
+              setSearchOpen(false)
+            }}
+          >
+            <CloseIcon size={18} />
+          </button>
+        </div>
+      )}
+
+      {activeChipCount > 0 && (
+        <div className="chip-row filter-row" role="group" aria-label="Active filters">
+          {selection.groups.map((g) => (
             <button
+              key={`group-${g}`}
               type="button"
               className="chip"
-              aria-pressed={activeChipCount > 0}
-              aria-haspopup="dialog"
-              onClick={() => setSheetOpen(true)}
+              aria-pressed="true"
+              aria-label={`Clear ${g} filter`}
+              onClick={() =>
+                setSelection({
+                  methodIds: selection.methodIds,
+                  groups: selection.groups.filter((x) => x !== g),
+                })
+              }
             >
-              Filters{activeChipCount > 0 ? ` · ${activeChipCount}` : ''}
+              <span aria-hidden="true">{groupEmoji(g)}</span> {g}
               <span className="chip-caret" aria-hidden="true">
-                ▾
+                <CloseIcon size={14} />
               </span>
             </button>
-            <button
-              type="button"
-              className="chip"
-              aria-haspopup="dialog"
-              aria-label={`Sort: ${SORT_WORD[sort]} first — change`}
-              onClick={() => setSortOpen(true)}
-            >
-              Sort · {SORT_WORD[sort]}
-              <span className="chip-caret" aria-hidden="true">
-                ▾
-              </span>
-            </button>
-          </div>
-
-          {activeChipCount > 0 && (
-            <div className="chip-row filter-row" role="group" aria-label="Active filters">
-              {selection.groups.map((g) => (
-                <button
-                  key={`group-${g}`}
-                  type="button"
-                  className="chip"
-                  aria-pressed="true"
-                  aria-label={`Clear ${g} filter`}
-                  onClick={() =>
-                    setSelection({
-                      methodIds: selection.methodIds,
-                      groups: selection.groups.filter((x) => x !== g),
-                    })
-                  }
-                >
-                  <span aria-hidden="true">{groupEmoji(g)}</span> {g}
-                  <span className="chip-caret" aria-hidden="true">
-                    ✕
-                  </span>
-                </button>
-              ))}
-              {selection.methodIds.map((id) => {
-                const m = (methods ?? []).find((x: PaymentMethod) => x.id === id)
-                if (!m) return null
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className="chip"
-                    aria-pressed="true"
-                    aria-label={`Clear ${m.label} filter`}
-                    onClick={() =>
-                      setSelection({
-                        groups: selection.groups,
-                        methodIds: selection.methodIds.filter((x) => x !== id),
-                      })
-                    }
-                  >
-                    <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
-                    <span className="chip-caret" aria-hidden="true">
-                      ✕
-                    </span>
-                  </button>
-                )
-              })}
-              {catFilters.map((label) => (
-                <button
-                  key={`cat-${label}`}
-                  type="button"
-                  className="chip"
-                  aria-pressed="true"
-                  aria-label={`Clear ${label} filter`}
-                  onClick={() => setCatFilters(catFilters.filter((l) => l !== label))}
-                >
-                  <span aria-hidden="true">{emojiFor(label)}</span> {label}
-                  <span className="chip-caret" aria-hidden="true">
-                    ✕
-                  </span>
-                </button>
-              ))}
-              {activeChipCount >= 2 && (
-                <button type="button" className="btn-text" onClick={clearFilters}>
-                  Clear all
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="search-field">
-            <span aria-hidden="true">🔎</span>
-            <input
-              type="search"
-              placeholder="Search notes, categories, amounts…"
-              aria-label="Search entries"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {query !== '' && (
+          ))}
+          {selection.methodIds.map((id) => {
+            const m = (methods ?? []).find((x: PaymentMethod) => x.id === id)
+            if (!m) return null
+            return (
               <button
+                key={id}
                 type="button"
-                className="btn-text"
-                aria-label="Clear search"
-                onClick={() => setQuery('')}
+                className="chip"
+                aria-pressed="true"
+                aria-label={`Clear ${m.label} filter`}
+                onClick={() =>
+                  setSelection({
+                    groups: selection.groups,
+                    methodIds: selection.methodIds.filter((x) => x !== id),
+                  })
+                }
               >
-                ✕
+                <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
+                <span className="chip-caret" aria-hidden="true">
+                  <CloseIcon size={14} />
+                </span>
               </button>
-            )}
-          </div>
-        </>
+            )
+          })}
+          {catFilters.map((label) => (
+            <button
+              key={`cat-${label}`}
+              type="button"
+              className="chip"
+              aria-pressed="true"
+              aria-label={`Clear ${label} filter`}
+              onClick={() => setCatFilters(catFilters.filter((l) => l !== label))}
+            >
+              <span aria-hidden="true">{emojiFor(label)}</span> {label}
+              <span className="chip-caret" aria-hidden="true">
+                <CloseIcon size={14} />
+              </span>
+            </button>
+          ))}
+          {activeChipCount >= 2 && (
+            <button type="button" className="btn-text" onClick={clearFilters}>
+              Clear all
+            </button>
+          )}
+        </div>
       )}
 
       {!hasAnything ? (
@@ -509,7 +527,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
       ) : !grouped ? (
         <ul className="entries">
           {sorted.map((e) => (
-            <EntryRow
+            <LedgerRow
               key={e.id}
               expense={e}
               emoji={emojiFor(e.category)}
@@ -540,7 +558,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
       ) : period.kind === 'day' ? (
         <ul className="entries">
           {sorted.map((e) => (
-            <EntryRow
+            <LedgerRow
               key={e.id}
               expense={e}
               emoji={emojiFor(e.category)}

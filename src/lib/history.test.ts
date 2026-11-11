@@ -5,6 +5,7 @@ import {
   formatTotals,
   groupByDay,
   groupByMonth,
+  historyCountLine,
   sortExpenses,
   isGroupedSort,
   spansMonths,
@@ -348,5 +349,14 @@ describe('spansMonths', () => {
   it('is true across a month boundary and for all time', () => {
     expect(spansMonths({ from: '2026-10-28', to: '2026-11-03' })).toBe(true)
     expect(spansMonths(null)).toBe(true)
+  })
+})
+
+describe('historyCountLine', () => {
+  it('counts entries and names the order', () => {
+    expect(historyCountLine(1, 'newest')).toBe('1 entry · newest first')
+    expect(historyCountLine(13, 'oldest')).toBe('13 entries · oldest first')
+    expect(historyCountLine(13, 'largest')).toBe('13 entries · largest first')
+    expect(historyCountLine(2, 'smallest')).toBe('2 entries · smallest first')
   })
 })

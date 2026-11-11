@@ -49,6 +49,11 @@ export function isGroupedSort(sort: HistorySort): boolean {
   return sort === 'newest' || sort === 'oldest'
 }
 
+// The summary line's count and order: "13 entries · newest first".
+export function historyCountLine(count: number, sort: HistorySort): string {
+  return `${count === 1 ? '1 entry' : `${count} entries`} · ${sort} first`
+}
+
 // A stable total order per mode. Amount modes rank by the raw number across
 // currencies — there is no FX in this app, so a mixed-currency ranking is not
 // value-accurate; acceptable because the ledger is effectively single-currency.

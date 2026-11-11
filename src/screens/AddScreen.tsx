@@ -76,8 +76,10 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
   return (
     <div className="screen">
       <header className="screen-head">
-        <p className="eyebrow">Expense Tracker</p>
-        <h1 className="display">New entry</h1>
+        <div className="head-text">
+          <p className="eyebrow">Expense Tracker</p>
+          <h1 className="display">New entry</h1>
+        </div>
       </header>
       <ExpenseForm
         submitLabel="Add to ledger"
