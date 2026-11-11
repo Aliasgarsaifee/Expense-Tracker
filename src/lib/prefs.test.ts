@@ -38,6 +38,7 @@ describe('prefs without localStorage (in-module Map fallback)', () => {
       summaryPeriod: 'summaryPeriodKind',
       historySort: 'historySort',
       calendarHeatBasis: 'calendarHeatBasis',
+      monthlyBudgets: 'monthlyBudgets',
       lastExport: 'lastExportAt',
     })
   })
