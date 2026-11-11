@@ -8,6 +8,8 @@ import { ExpenseForm, type ExpenseFormValues } from './ExpenseForm'
 
 interface Props {
   expense: Expense | null
+  /** The currency entries count in; the form converts a foreign amount into it. */
+  home: string
   onClose: () => void
   /** Delete succeeded — the screen owns the undo toast (the sheet is gone by then). */
   onDeleted: (expense: Expense) => void
@@ -15,15 +17,22 @@ interface Props {
   onSaved?: (before: Expense, after: Expense) => void
 }
 
-export function EditSheet({ expense, onClose, onDeleted, onSaved }: Props) {
+export function EditSheet({ expense, home, onClose, onDeleted, onSaved }: Props) {
   if (!expense) return null
   return (
-    <SheetBody expense={expense} onClose={onClose} onDeleted={onDeleted} onSaved={onSaved} />
+    <SheetBody
+      expense={expense}
+      home={home}
+      onClose={onClose}
+      onDeleted={onDeleted}
+      onSaved={onSaved}
+    />
   )
 }
 
 function SheetBody({
   expense,
+  home,
   onClose,
   onDeleted,
   onSaved,
@@ -40,6 +49,9 @@ function SheetBody({
       spentOn: values.spentOn,
       note: values.note,
       paymentMethodId: values.paymentMethodId,
+      // Present even when undefined: that is what deletes a stale memo, and
+      // the "after" entry below must not keep one either.
+      paid: values.paid,
     }
     try {
       await updateExpense(expense.id, changes)
@@ -98,6 +110,7 @@ function SheetBody({
         <ExpenseForm
           key={expense.id}
           initial={expense}
+          home={home}
           submitLabel="Save changes"
           onSubmit={save}
         />

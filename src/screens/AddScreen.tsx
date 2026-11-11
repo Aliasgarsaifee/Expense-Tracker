@@ -13,9 +13,9 @@ import {
 } from '../db'
 import { budgetHeadsUp, type Budgets } from '../lib/budget'
 import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
+import { savedMessage } from '../lib/conversion'
 import { todayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
-import { formatMoney } from '../lib/money'
 import { addButtonLabel, todaySoFar } from '../lib/recent'
 import { useToday } from '../lib/useToday'
 import { useDialog } from '../lib/useDialog'
@@ -71,7 +71,7 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
       (await db.categories.toArray()).find((c) => c.label === created.category)
         ?.emoji ?? '🧾'
     show({
-      message: `${emoji} ${formatMoney(created.amount, created.currency)} added to ${created.category}`,
+      message: savedMessage(emoji, created),
       detail: alert?.kind === 'near' ? budgetHeadsUp(alert) : undefined,
       onUndo: () => undo(created.id),
     })
@@ -103,6 +103,7 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
         </div>
       </header>
       <ExpenseForm
+        home={initial.current.currency}
         submitLabel={(d) => addButtonLabel(d.amount, d.currency, d.category, d.spentOn, today)}
         onSubmit={add}
         autoReset

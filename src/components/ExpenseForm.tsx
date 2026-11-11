@@ -8,20 +8,25 @@ import {
   methodRecency,
   type Category,
   type Expense,
+  type Paid,
   type PaymentMethod,
 } from '../db'
+import { entryValues, paidLabel, paidOf, rateLine, seedRate } from '../lib/conversion'
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
-import { formatMoney, parseAmount } from '../lib/money'
+import { formatMoney, parseAmount, roundHome } from '../lib/money'
 import { logAgainChoices } from '../lib/recent'
+import { useDialog } from '../lib/useDialog'
+import { useRate } from '../lib/useRate'
 import { AddCategorySheet } from './AddCategorySheet'
 import { AddMethodSheet } from './AddMethodSheet'
 import { CurrencySheet } from './CurrencySheet'
 import { DateField } from './DateField'
+import { Dialog } from './Dialog'
 import { EntryRow } from './EntryRow'
 import { PaymentPicker } from './PaymentPicker'
-import { ChevronDownIcon, AddIcon } from './icons'
+import { ChevronDownIcon, ChevronRightIcon, AddIcon } from './icons'
 
 export interface ExpenseFormValues {
   amount: number
@@ -30,10 +35,13 @@ export interface ExpenseFormValues {
   spentOn: string
   note?: string
   paymentMethodId?: string
+  paid?: Paid
 }
 
 interface Props {
   initial?: Partial<ExpenseFormValues>
+  /** The currency entries count in; a foreign amount is converted into it. */
+  home: string
   /** A function lets the button name what it will save (Add screen). */
   submitLabel:
     | string
@@ -50,11 +58,16 @@ interface Props {
   recent?: Expense[]
 }
 
-export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent }: Props) {
+export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, recent }: Props) {
+  // The amount field and currency button always mean what was paid: for a
+  // converted entry that is the memo, not the stored home value.
+  const shownAmount = initial?.paid ? initial.paid.amount : initial?.amount
   const [amountText, setAmountText] = useState(
-    initial?.amount !== undefined ? String(initial.amount) : '',
+    shownAmount !== undefined ? String(shownAmount) : '',
   )
-  const [currency, setCurrency] = useState(initial?.currency ?? 'INR')
+  const [currency, setCurrency] = useState(
+    initial?.paid ? initial.paid.currency : (initial?.currency ?? 'INR'),
+  )
   const [paymentMethodId, setPaymentMethodId] = useState(initial?.paymentMethodId)
   const [category, setCategory] = useState(initial?.category ?? 'Food')
   const [spentOn, setSpentOn] = useState(initial?.spentOn ?? todayISO())
@@ -72,6 +85,17 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
   // Edit mode arrives with a date; the Add screen fills today and may sit
   // mounted across midnight, so we refresh it on resume until hand-picked.
   const userPickedDate = useRef(initial?.spentOn !== undefined)
+  // Edit of a converted entry: the rate it was booked at, read once. It stands
+  // only for the currency and day it was booked at, so it carries both, and
+  // reusing it is what lets Edit open without a network request.
+  const [seed] = useState(() => {
+    const s = seedRate(initial, home)
+    return s && { ...s, currency: initial?.paid?.currency, spentOn: initial?.spentOn }
+  })
+  // A home value the owner typed, kept as a rate so that correcting the amount
+  // scales it. Survives a change of date or amount; a change of currency drops it.
+  const [handRate, setHandRate] = useState(() => (seed?.byHand ? seed.rate : null))
+  const { dialog, close, showAlert, askPrompt } = useDialog()
 
   useEffect(() => {
     if (userPickedDate.current) return
@@ -138,6 +162,47 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
 
   const amount = parseAmount(amountText)
 
+  const seedApplies =
+    seed !== null && !seed.byHand && currency === seed.currency && spentOn === seed.spentOn
+  const fetched = useRate(currency, home, spentOn, handRate !== null || seedApplies)
+  const rate = handRate ?? (seedApplies ? seed.rate : fetched.rate)
+  const byHand = handRate !== null
+  const line = rateLine({ typed: amount, currency, home, rate, loading: fetched.loading, byHand })
+
+  function chooseCurrency(code: string) {
+    if (code === currency) return // re-picking the same one is not a change
+    setCurrency(code)
+    setHandRate(null)
+  }
+
+  async function editValue(typed: number) {
+    // Prefilled with the value the line shows, which is what Save would write.
+    const shown =
+      rate === null ? '' : String(entryValues({ amount: typed, currency }, home, rate, byHand).amount)
+    const text = await askPrompt({
+      title: `Value in ${home}`,
+      label: byHand
+        ? "Type what your card charged, or leave empty to use the day's rate."
+        : rate !== null
+          ? `The day's rate gives ${formatMoney(roundHome(typed * rate), home)}. Type what your card charged.`
+          : `Type what your card charged in ${home}.`,
+      initialValue: shown,
+      inputMode: 'decimal',
+      allowEmpty: byHand,
+    })
+    if (text === null) return
+    if (text.trim() === '') {
+      setHandRate(null)
+      return
+    }
+    const value = parseAmount(text)
+    if (value === null) {
+      await showAlert('Enter an amount above zero')
+      return
+    }
+    setHandRate(value / typed)
+  }
+
   // Only active categories and methods (not pickableMethods, which in Edit
   // mode also holds an archived one); no list until both queries have landed.
   const logAgain = useMemo(
@@ -153,9 +218,13 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
   )
 
   // Fills the form's own state and saves nothing; the date is left as it is.
+  // It fills what was paid, so the rate is the one for the form's date, never
+  // the old entry's.
   function fillFrom(x: Expense) {
-    setAmountText(String(x.amount))
-    setCurrency(x.currency)
+    const paid = paidOf(x)
+    setAmountText(String(paid.amount))
+    setCurrency(paid.currency)
+    setHandRate(null)
     setCategory(x.category)
     setNote(x.note ?? '')
     if (x.paymentMethodId) setPaymentMethodId(x.paymentMethodId)
@@ -175,9 +244,10 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
     setSubmitting(true)
     const trimmed = note.trim()
     try {
+      // A foreign amount with a rate saves as its home value with the memo; with
+      // no rate yet it saves as typed and the background fill-in converts it.
       await onSubmit({
-        amount,
-        currency,
+        ...entryValues({ amount, currency }, home, rate, byHand),
         category,
         spentOn,
         note: trimmed === '' ? undefined : trimmed,
@@ -186,6 +256,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
       if (autoReset) {
         setAmountText('')
         setNote('')
+        setHandRate(null)
         // Back to the amount for the next entry. The note is the last field,
         // so typing it leaves the page panned up, and iOS keeps it there
         // after the keyboard closes.
@@ -227,6 +298,25 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
             onChange={(e) => setAmountText(e.target.value)}
           />
         </div>
+
+        {/* Home currency: nothing here at all. Foreign: what it counts as, a
+            button once there is an amount to put a value on. One height in
+            every state, so typing the first digit moves nothing below. */}
+        {line !== null &&
+          (amount !== null ? (
+            <button
+              type="button"
+              className="rate-line"
+              aria-haspopup="dialog"
+              aria-label={`${line.replace(/\.$/, '')}. Change the value`}
+              onClick={() => void editValue(amount)}
+            >
+              <span>{line}</span>
+              <ChevronRightIcon size={18} />
+            </button>
+          ) : (
+            <p className="rate-line">{line}</p>
+          ))}
 
         <div className="field">
           <span>Category</span>
@@ -303,14 +393,18 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
                 const primary = x.note || x.category
                 const amountLabel = formatMoney(x.amount, x.currency)
                 const methodLabel = methods?.find((m) => m.id === x.paymentMethodId)?.label
+                const paid = paidLabel(x)
                 return (
                   <EntryRow
                     key={x.id}
                     emoji={categories?.find((c) => c.label === x.category)?.emoji ?? '🏷️'}
                     primary={primary}
-                    sub={[x.note ? x.category : null, methodLabel].filter(Boolean).join(' · ')}
+                    sub={[x.note ? x.category : null, methodLabel, paid]
+                      .filter(Boolean)
+                      .join(' · ')}
                     amount={amountLabel}
-                    ariaLabel={`Fill the form with ${primary}, ${amountLabel}`}
+                    // A tap fills what was paid, so that is what it announces.
+                    ariaLabel={`Fill the form with ${primary}, ${paid ?? amountLabel}`}
                     onClick={() => fillFrom(x)}
                   />
                 )
@@ -324,7 +418,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
       <CurrencySheet
         open={pickingCurrency}
         selected={currency}
-        onSelect={setCurrency}
+        onSelect={chooseCurrency}
         onClose={() => setPickingCurrency(false)}
       />
       <AddMethodSheet
@@ -340,6 +434,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
         onCreated={(c) => setCategory(c.label)}
         onClose={() => setAddingCategory(false)}
       />
+      <Dialog state={dialog} onClose={close} />
     </>
   )
 }

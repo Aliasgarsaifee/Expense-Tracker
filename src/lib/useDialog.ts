@@ -17,6 +17,10 @@ export interface PromptOptions {
   maxLength?: number
   /** 'decimal' raises the number pad for an amount; text otherwise. */
   inputMode?: 'text' | 'decimal'
+  /** Lets an empty answer through, for a caller where empty means "go back to
+   *  the default" (a hand-typed home value returning to the day's rate).
+   *  Everywhere else an empty prompt has nothing to submit. */
+  allowEmpty?: boolean
 }
 
 export interface DialogState {
@@ -31,6 +35,7 @@ export interface DialogState {
     placeholder?: string
     maxLength?: number
     inputMode?: 'text' | 'decimal'
+    allowEmpty?: boolean
   }
   settle: (result: boolean | string | null) => void
 }
@@ -98,6 +103,7 @@ export function useDialog() {
         placeholder: o.placeholder,
         maxLength: o.maxLength,
         inputMode: o.inputMode,
+        allowEmpty: o.allowEmpty,
       },
     }) as Promise<string | null>
   }

@@ -606,6 +606,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
       />
       <EditSheet
         expense={editing}
+        home={defaultCurrency}
         onClose={() => setEditing(null)}
         onDeleted={handleDeleted}
         onSaved={(before, after) => void handleSaved(before, after)}

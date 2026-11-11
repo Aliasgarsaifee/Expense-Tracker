@@ -37,8 +37,9 @@ function DialogBody({ state, onClose }: { state: DialogState; onClose: Props['on
   const dismiss = () => onClose(state.kind === 'confirm' ? false : null)
   const accept = () => onClose(state.kind === 'prompt' ? value : true)
   // A prompt with nothing in it has nothing to submit; db.ts would reject the
-  // empty label anyway, and a dialog is the wrong place to learn that.
-  const blocked = state.kind === 'prompt' && value.trim() === ''
+  // empty label anyway, and a dialog is the wrong place to learn that. Unless
+  // the caller asked for empty, where it means "back to the default".
+  const blocked = state.kind === 'prompt' && !state.field?.allowEmpty && value.trim() === ''
 
   // No dep array on purpose: `dismiss` closes over this render's state, and
   // re-binding one listener is cheaper than reasoning about a stale one. Esc is
