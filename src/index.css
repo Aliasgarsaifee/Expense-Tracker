@@ -1952,10 +1952,14 @@ button {
   color: var(--ink-2);
 }
 
-/* 10px of bar, then one 11px line for the even-pace label under it. --used
-   and --even are shares of the month's budget and of its days (BudgetCard). */
+/* --used and --even are shares of the month's budget and of its days
+   (BudgetCard). The bar is 10px; while the month has days left it also makes
+   room for one 11px line, the even-pace label under it. */
 .budget-bar {
   position: relative;
+}
+
+.budget-bar[data-paced] {
   height: 34px;
 }
 

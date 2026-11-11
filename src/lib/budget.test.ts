@@ -107,4 +107,11 @@ describe('budget maths', () => {
     expect(at(25000, 11, 19)).toMatchObject({ amount: '₹0', of: 'left of ₹25,000', perDay: null })
     expect(at(8730, 29, 1).perDay).toBe('₹16,270 for the last day')
   })
+
+  // With no days left the card hides its even-pace tick, so the words for the
+  // bar must not describe one.
+  it('drops even pace from the bar once no days are left', () => {
+    const done = budgetCardCopy(budgetStatus(8730, 25000, 30, 30), 25000, 0, 'INR')
+    expect(done.bar).toBe('35% of the budget used')
+  })
 })

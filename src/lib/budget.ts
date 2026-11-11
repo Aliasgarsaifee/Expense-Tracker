@@ -131,14 +131,15 @@ export function budgetCardCopy(
     perDay =
       daysLeft === 1 ? `${each} for the last day` : `${each} a day for the next ${daysLeft} days`
   }
+  // usedShare is clamped for the bar's width; the words give the real share,
+  // so a month 5% over does not read as exactly spent.
+  const used = `${percent((budget - status.left) / budget)} of the budget used`
   return {
     amount: formatMoney(Math.abs(status.left), currency),
     of: `${over ? 'over' : 'left of'} ${formatMoney(budget, currency)}`,
     perDay,
-    // usedShare is clamped for the bar's width; the words give the real share,
-    // so a month 5% over does not read as exactly spent.
-    bar:
-      `${percent((budget - status.left) / budget)} of the budget used; ` +
-      `even pace today is ${percent(status.evenShare)}`,
+    // The card shows no even-pace tick once no days are left, so neither do
+    // the words.
+    bar: daysLeft > 0 ? `${used}; even pace today is ${percent(status.evenShare)}` : used,
   }
 }
