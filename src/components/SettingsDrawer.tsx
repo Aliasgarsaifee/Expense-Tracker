@@ -5,6 +5,7 @@ import {
   deleteCategory,
   deletePaymentMethod,
   isBuiltinCategoryId,
+  isFixedCategory,
   listCategories,
   listExpenses,
   listPaymentMethods,
@@ -33,6 +34,7 @@ interface Props {
   onClose: () => void
   onDefaultCurrencyChange?: (code: string) => void
   onJumpToHistory: (jump: HistoryJump) => void
+  onOpenBudget: () => void
   onExported?: () => void
 }
 
@@ -173,6 +175,7 @@ function DrawerBody({
   onClose,
   onDefaultCurrencyChange,
   onJumpToHistory,
+  onOpenBudget,
   onExported,
 }: Omit<Props, 'open'>) {
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
@@ -315,6 +318,7 @@ function DrawerBody({
     }
   }
 
+  const fixedCount = (categories ?? []).filter((c) => !c.archived && isFixedCategory(c)).length
   const entryCount = expenses?.length ?? 0
 
   return (
@@ -418,6 +422,16 @@ function DrawerBody({
 
         <section className="drawer-section">
           <h3 className="drawer-title">Preferences</h3>
+          <button type="button" className="btn-ghost" onClick={onOpenBudget}>
+            <span>Fixed costs</span>
+            <span>
+              {fixedCount === 0
+                ? 'None'
+                : fixedCount === 1
+                  ? '1 category'
+                  : `${fixedCount} categories`}
+            </span>
+          </button>
           <button
             type="button"
             className="btn-ghost"

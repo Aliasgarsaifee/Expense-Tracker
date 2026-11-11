@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
+import { BudgetSheet } from './components/BudgetSheet'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
@@ -57,6 +58,7 @@ type Tab = (typeof TABS)[number]['id']
 export default function App() {
   const [tab, setTab] = useState<Tab>('add')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [budgetOpen, setBudgetOpen] = useState(false)
   const [historyJump, setHistoryJump] = useState<HistoryJump | null>(null)
 
   // A settings row was tapped: close the drawer, land on History, filter to
@@ -152,8 +154,14 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onDefaultCurrencyChange={setDefaultCurrency}
         onJumpToHistory={jumpToHistory}
+        // Close the drawer first: a sheet sits under the drawer's z-index.
+        onOpenBudget={() => {
+          setSettingsOpen(false)
+          setBudgetOpen(true)
+        }}
         onExported={() => setLastExport(getPref(PREFS.lastExport, ''))}
       />
+      <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} />
     </div>
   )
 }

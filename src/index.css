@@ -412,6 +412,11 @@ h1.display {
   transform: scale(0.96);
 }
 
+/* Touch-target floor for chips that are the whole job of a sheet (ios-feel). */
+.chip-tall {
+  min-height: 44px;
+}
+
 /* Selection reads through colour alone: a weight change here would make the
    chip (and the whole wrapped row) shift width on every tap. */
 .chip[aria-pressed='true'] {
@@ -1696,6 +1701,11 @@ button {
   color: inherit;
   text-align: left;
   cursor: pointer;
+  /* A button centres its content vertically when the grid stretches it, which
+     drops the label below its neighbour's when that tile's sub-line wraps. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   transition: transform 0.06s ease, background-color 0.12s ease;
 }
 
