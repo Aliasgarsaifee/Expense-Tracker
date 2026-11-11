@@ -12,6 +12,7 @@ import {
   deleteCategory,
   deleteExpense,
   deletePaymentMethod,
+  isFixedCategory,
   listCategories,
   listExpenses,
   listExpensesBetween,
@@ -23,6 +24,7 @@ import {
   renamePaymentMethod,
   restoreExpense,
   setCategoryArchived,
+  setCategoryFixed,
   setPaymentMethodArchived,
   unbackedSince,
   UPI_METHOD_ID,
@@ -665,6 +667,70 @@ describe('categories', () => {
 
     const food = (await listCategories()).find((c) => c.label === 'Food')!
     await expect(deleteCategory(food.id)).rejects.toThrow(/built-in/i)
+  })
+})
+
+describe('category fixed flag', () => {
+  it('treats Rent and Utilities as fixed until told otherwise', () => {
+    expect(isFixedCategory({ id: 'cat-rent' })).toBe(true)
+    expect(isFixedCategory({ id: 'cat-utilities' })).toBe(true)
+    expect(isFixedCategory({ id: 'cat-food' })).toBe(false)
+    expect(isFixedCategory({ id: 'cat-rent', fixed: false })).toBe(false)
+    expect(isFixedCategory({ id: 'custom-1', fixed: true })).toBe(true)
+  })
+
+  it('seeds no fixed field: the default is derived, not stored', async () => {
+    const name = `SeedFixed-${crypto.randomUUID()}`
+    const fresh = createDb(name)
+    try {
+      const categories = await fresh.categories.toArray()
+      expect(categories).toHaveLength(8)
+      for (const c of categories) expect('fixed' in c).toBe(false)
+    } finally {
+      fresh.close()
+      await Dexie.delete(name)
+    }
+  })
+
+  it('leaves categories from a v4 database untouched', async () => {
+    const name = `FixedV4-${crypto.randomUUID()}`
+    const legacy = new Dexie(name)
+    const stores = {
+      expenses: 'id, spentOn, category, createdAt, paymentMethodId',
+      paymentMethods: 'id, createdAt',
+      categories: 'id, createdAt',
+    }
+    legacy.version(1).stores({ expenses: 'id, spentOn, category, createdAt' })
+    legacy.version(2).stores({
+      expenses: stores.expenses,
+      paymentMethods: stores.paymentMethods,
+    })
+    legacy.version(3).stores(stores)
+    legacy.version(4).stores(stores)
+    const stored = [
+      { id: 'cat-rent', label: 'Rent', emoji: '🏠', createdAt: '1970-01-01T00:00:03.000Z' },
+      { id: 'custom-1', label: 'Pets', emoji: '🐕', archived: true, createdAt: '2026-07-03T08:00:00.000Z' },
+    ]
+    await legacy.table('categories').bulkAdd(stored)
+    legacy.close()
+
+    const upgraded = createDb(name)
+    try {
+      const rows = await upgraded.categories.orderBy('createdAt').toArray()
+      expect(rows).toEqual(stored)
+      for (const row of rows) expect('fixed' in row).toBe(false)
+    } finally {
+      upgraded.close()
+      await Dexie.delete(name)
+    }
+  })
+
+  it('setCategoryFixed persists and survives a rename', async () => {
+    await setCategoryFixed('cat-food', true)
+    await renameCategory('cat-food', 'Meals')
+    const food = await db.categories.get('cat-food')
+    expect(food?.fixed).toBe(true)
+    expect(food?.label).toBe('Meals')
   })
 })
 

@@ -259,6 +259,32 @@ describe('parseBackupJson categories', () => {
   })
 })
 
+describe('parseBackupJson category fixed flag', () => {
+  it('round-trips a category fixed flag, true and false', () => {
+    const cats: Category[] = [
+      { ...catPets, fixed: true },
+      { ...DEFAULT_CATEGORIES[3], fixed: false },
+    ]
+    const parsed = parseBackupJson(
+      backupToJson({ expenses: [], paymentMethods: [], categories: cats }),
+    )
+    expect(parsed.categories).toEqual(cats)
+  })
+
+  it('keeps fixed absent when the file has none', () => {
+    const {
+      categories: [parsed],
+    } = parseBackupJson(v3Json([], [], [catPets]))
+    expect('fixed' in parsed).toBe(false)
+  })
+
+  it('names a category whose fixed flag is not a boolean', () => {
+    expect(() =>
+      parseBackupJson(v3Json([], [], [{ ...catPets, fixed: 'yes' }])),
+    ).toThrow(/category 1 has an invalid fixed flag/)
+  })
+})
+
 describe('importBackup', () => {
   beforeEach(async () => {
     await db.expenses.clear()
@@ -354,6 +380,19 @@ describe('importBackup', () => {
     // ...and the imported expense now points at the surviving local method.
     const [imported] = await listExpenses()
     expect(imported.paymentMethodId).toBe(local)
+  })
+
+  it('keeps the local fixed flag when an import merges by label', async () => {
+    await db.categories.update('cat-food', { fixed: true })
+
+    await importBackup({
+      expenses: [],
+      paymentMethods: [],
+      categories: [{ ...DEFAULT_CATEGORIES[0], id: 'other-install-food' }],
+    })
+
+    expect(await db.categories.get('cat-food')).toMatchObject({ label: 'Food', fixed: true })
+    expect(await db.categories.get('other-install-food')).toBeUndefined()
   })
 
   it('merges an incoming category with a new id onto an existing same-label category', async () => {

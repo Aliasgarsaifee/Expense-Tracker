@@ -157,7 +157,10 @@ function parseCategory(raw: unknown, position: number): Category {
   if (typeof raw !== 'object' || raw === null) {
     throw invalid(`category ${position} is not an object`)
   }
-  const { id, label, emoji, archived, createdAt } = raw as Record<string, unknown>
+  const { id, label, emoji, archived, fixed, createdAt } = raw as Record<
+    string,
+    unknown
+  >
   if (typeof id !== 'string' || id === '') {
     throw invalid(`category ${position} is missing an id`)
   }
@@ -170,11 +173,15 @@ function parseCategory(raw: unknown, position: number): Category {
   if (archived !== undefined && typeof archived !== 'boolean') {
     throw invalid(`category ${position} has an invalid archived flag`)
   }
+  if (fixed !== undefined && typeof fixed !== 'boolean') {
+    throw invalid(`category ${position} has an invalid fixed flag`)
+  }
   if (typeof createdAt !== 'string' || createdAt === '') {
     throw invalid(`category ${position} has an invalid createdAt`)
   }
   const category: Category = { id, label, emoji, createdAt }
   if (archived !== undefined) category.archived = archived
+  if (fixed !== undefined) category.fixed = fixed
   return category
 }
 

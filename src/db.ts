@@ -24,6 +24,7 @@ export interface Category {
   label: string
   emoji: string
   archived?: boolean
+  fixed?: boolean // recurring obligation; absent means the derived default
   createdAt: string
 }
 
@@ -89,6 +90,15 @@ const BUILTIN_CATEGORY_IDS = new Set(DEFAULT_CATEGORIES.map((c) => c.id))
 
 export function isBuiltinCategoryId(id: string): boolean {
   return BUILTIN_CATEGORY_IDS.has(id)
+}
+
+// Absent `fixed` falls back to this default instead of being seeded, so no
+// device needs a migration and a later change to the defaults reaches
+// every install that never made its own choice.
+const DEFAULT_FIXED_IDS = new Set(['cat-rent', 'cat-utilities'])
+
+export function isFixedCategory(category: Pick<Category, 'id' | 'fixed'>): boolean {
+  return category.fixed ?? DEFAULT_FIXED_IDS.has(category.id)
 }
 
 export type NewExpense = Omit<Expense, 'id' | 'createdAt' | 'currency'> & {
@@ -407,6 +417,10 @@ export async function setCategoryArchived(
   archived: boolean,
 ): Promise<void> {
   await db.categories.update(id, { archived })
+}
+
+export async function setCategoryFixed(id: string, fixed: boolean): Promise<void> {
+  await db.categories.update(id, { fixed })
 }
 
 export async function deleteCategory(id: string): Promise<void> {
