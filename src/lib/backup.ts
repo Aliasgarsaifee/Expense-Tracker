@@ -1,4 +1,4 @@
-import { db, type Category, type Expense, type PaymentMethod } from '../db'
+import { db, type Category, type Expense, type Paid, type PaymentMethod } from '../db'
 
 export interface BackupData {
   expenses: Expense[]
@@ -7,7 +7,9 @@ export interface BackupData {
 }
 
 // Spreadsheet-friendly column order: what/when first, bookkeeping ids last.
-const CSV_HEADER = 'spentOn,amount,currency,category,paymentMethod,note,id,createdAt'
+// New columns only ever append: users' spreadsheets key on this order.
+const CSV_HEADER =
+  'spentOn,amount,currency,category,paymentMethod,note,id,createdAt,paidAmount,paidCurrency'
 
 function csvField(value: string | number | undefined): string {
   if (value === undefined) return ''
@@ -36,6 +38,8 @@ export function expensesToCsv(
         e.note,
         e.id,
         e.createdAt,
+        e.paid?.amount,
+        e.paid?.currency,
       ]
         .map(csvField)
         .join(','),
@@ -67,11 +71,26 @@ function invalid(detail: string): Error {
   return new Error(`Invalid backup: ${detail}`)
 }
 
+// What was paid in another currency. Rebuilt key by key so unknown keys in a
+// hand-edited file never reach the database; it must differ from the entry's
+// own currency, since the entry's amount already holds the home value.
+function parsePaid(raw: unknown, entryCurrency: string, position: number): Paid {
+  const bad = invalid(`record ${position} has an invalid paid amount`)
+  if (typeof raw !== 'object' || raw === null) throw bad
+  const { amount, currency, byHand } = raw as Record<string, unknown>
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) throw bad
+  if (typeof currency !== 'string' || currency === '' || currency === entryCurrency) throw bad
+  if (byHand !== undefined && byHand !== true) throw bad
+  const paid: Paid = { amount, currency }
+  if (byHand) paid.byHand = true
+  return paid
+}
+
 function parseRecord(raw: unknown, position: number): Expense {
   if (typeof raw !== 'object' || raw === null) {
     throw invalid(`record ${position} is not an object`)
   }
-  const { id, amount, currency, category, spentOn, note, paymentMethodId, createdAt } =
+  const { id, amount, currency, category, spentOn, note, paymentMethodId, createdAt, paid } =
     raw as Record<string, unknown>
   if (typeof id !== 'string' || id === '') {
     throw invalid(`record ${position} is missing an id`)
@@ -111,6 +130,7 @@ function parseRecord(raw: unknown, position: number): Expense {
   }
   if (note !== undefined) expense.note = note
   if (paymentMethodId !== undefined) expense.paymentMethodId = paymentMethodId
+  if (paid !== undefined) expense.paid = parsePaid(paid, expense.currency, position)
   return expense
 }
 

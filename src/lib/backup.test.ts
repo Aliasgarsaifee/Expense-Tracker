@@ -83,23 +83,23 @@ describe('expensesToCsv', () => {
   it('renders a BOM, a header, and CRLF rows with method labels resolved', () => {
     expect(expensesToCsv([e1, e2], labels)).toBe(
       '﻿' +
-        'spentOn,amount,currency,category,paymentMethod,note,id,createdAt\r\n' +
-        '2026-07-12,249.5,INR,Food,Cash,"lunch, ""extra"" naan",a1,2026-07-12T10:00:00.000Z\r\n' +
-        '2026-07-01,1200,INR,Rent,,,b2,2026-07-01T09:00:00.000Z\r\n',
+        'spentOn,amount,currency,category,paymentMethod,note,id,createdAt,paidAmount,paidCurrency\r\n' +
+        '2026-07-12,249.5,INR,Food,Cash,"lunch, ""extra"" naan",a1,2026-07-12T10:00:00.000Z,,\r\n' +
+        '2026-07-01,1200,INR,Rent,,,b2,2026-07-01T09:00:00.000Z,,\r\n',
     )
   })
 
   it('leaves paymentMethod empty when the id has no label', () => {
     const csv = expensesToCsv([{ ...e2, paymentMethodId: 'pm-gone' }], labels)
     expect(csv.split('\r\n')[1]).toBe(
-      '2026-07-01,1200,INR,Rent,,,b2,2026-07-01T09:00:00.000Z',
+      '2026-07-01,1200,INR,Rent,,,b2,2026-07-01T09:00:00.000Z,,',
     )
   })
 
   it('renders a foreign currency as-is', () => {
     const csv = expensesToCsv([{ ...e2, currency: 'USD' }], labels)
     expect(csv.split('\r\n')[1]).toBe(
-      '2026-07-01,1200,USD,Rent,,,b2,2026-07-01T09:00:00.000Z',
+      '2026-07-01,1200,USD,Rent,,,b2,2026-07-01T09:00:00.000Z,,',
     )
   })
 
@@ -209,6 +209,53 @@ describe('backupToJson / parseBackupJson', () => {
   it('names the offending record when one entry is invalid', () => {
     const input = JSON.stringify([e2, { ...e1, amount: 0 }])
     expect(() => parseBackupJson(input)).toThrow(/invalid backup: record 2/i)
+  })
+})
+
+describe('what was paid', () => {
+  const conv: Expense = { ...e2, id: 'c1', amount: 3076, currency: 'INR', paid: { amount: 120, currency: 'AED' } }
+
+  it('round-trips what was paid, with and without the by-hand mark', () => {
+    const byHand: Expense = { ...conv, id: 'c2', paid: { amount: 120, currency: 'AED', byHand: true } }
+    const out = parseBackupJson(backupToJson({ expenses: [conv, byHand], paymentMethods: [], categories: [] }))
+    expect(out.expenses).toEqual([conv, byHand])
+  })
+
+  it('leaves paid absent on entries that never had it', () => {
+    const out = parseBackupJson(backupToJson({ expenses: [e2], paymentMethods: [], categories: [] }))
+    expect('paid' in out.expenses[0]).toBe(false)
+  })
+
+  it('copies only the known keys of paid', () => {
+    const raw = { ...conv, paid: { amount: 120, currency: 'AED', byHand: true, foo: 'bar' } }
+    const { expenses: [parsed] } = parseBackupJson(JSON.stringify([raw]))
+    expect(parsed.paid).toEqual({ amount: 120, currency: 'AED', byHand: true })
+  })
+
+  it('compares paid against the default currency when the record has none', () => {
+    const { currency: _c, ...legacy } = conv
+    expect(() => parseBackupJson(JSON.stringify([{ ...legacy, paid: { amount: 120, currency: 'INR' } }])))
+      .toThrow(/invalid backup: record 1 has an invalid paid amount/i)
+  })
+
+  it.each([
+    ['not an object', 'AED 120'],
+    ['a zero amount', { amount: 0, currency: 'AED' }],
+    ['a text amount', { amount: '120', currency: 'AED' }],
+    ['an empty currency', { amount: 120, currency: '' }],
+    ['the entry\'s own currency', { amount: 120, currency: 'INR' }],
+    ['a by-hand mark that is not true', { amount: 120, currency: 'AED', byHand: 'yes' }],
+  ])('rejects paid that is %s', (_name, paid) => {
+    expect(() => parseBackupJson(JSON.stringify([{ ...conv, paid }])))
+      .toThrow(/invalid backup: record 1 has an invalid paid amount/i)
+  })
+
+  it('appends the paid columns to the CSV', () => {
+    const csv = expensesToCsv([conv, e2], new Map())
+    const [header, first, second] = csv.replace('﻿', '').split('\r\n')
+    expect(header).toBe('spentOn,amount,currency,category,paymentMethod,note,id,createdAt,paidAmount,paidCurrency')
+    expect(first.endsWith(',120,AED')).toBe(true)
+    expect(second.endsWith(',,')).toBe(true)
   })
 })
 
