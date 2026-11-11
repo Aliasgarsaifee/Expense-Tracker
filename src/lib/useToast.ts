@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 export interface ToastState {
   message: string
+  /** A second, quieter line under the message (the budget heads-up). */
+  detail?: string
   /** Present while the toast can still reverse what it announced. */
   onUndo?: () => void | Promise<void>
 }

@@ -1,3 +1,4 @@
+import { monthName } from './dates'
 import { formatMoney } from './money'
 import type { Badge } from './fixed'
 
@@ -141,5 +142,64 @@ export function budgetCardCopy(
     // The card shows no even-pace tick once no days are left, so neither do
     // the words.
     bar: daysLeft > 0 ? `${used}; even pace today is ${percent(status.evenShare)}` : used,
+  }
+}
+
+// What the words need to know about a save that moved the month's level.
+// budgetCheck's BudgetAlert carries all of it; spelling it out here keeps
+// budget.ts free of the database.
+export interface AlertFacts {
+  currency: string
+  budget: number
+  spent: number
+  month: string // 'YYYY-MM'
+  daysLeft: number // after today
+  entry: { amount: number; category: string; note?: string }
+}
+
+// The second line of the save toast at 80%. The share is the real one, so a
+// save that lands on 83% does not read as exactly the mark.
+export function budgetHeadsUp({
+  spent,
+  budget,
+  currency,
+}: Pick<AlertFacts, 'spent' | 'budget' | 'currency'>): string {
+  return `${percent(spent / budget)} of ${formatMoney(budget, currency)} used this month`
+}
+
+export interface BudgetAlertCopy {
+  pill: string
+  title: string
+  sentence: string // names the entry that did it
+  spent: string // the figure, set large
+  of: string
+  over: string
+  daysLeft: string
+  bar: string // the bar, for VoiceOver
+  withinShare: number // the budget's part of the bar, 0..1
+  overShare: number // the overshoot's part; the two sum to 1
+}
+
+// The sheet for the save that took the month past its budget. A fact and the
+// room left in the month, nothing more: the owner set the line, and the sheet
+// is there to say it was crossed, not to scold.
+export function budgetAlertCopy(alert: AlertFacts): BudgetAlertCopy {
+  const { currency, budget, spent, month, daysLeft, entry } = alert
+  const name = monthName(month)
+  return {
+    pill: 'Over budget',
+    title: 'Monthly budget crossed',
+    sentence: `${entry.note || entry.category}, ${formatMoney(entry.amount, currency)}, took ${name}’s everyday spending past the line you set.`,
+    spent: formatMoney(spent, currency),
+    of: `of ${formatMoney(budget, currency)}`,
+    over: `${formatMoney(spent - budget, currency)} over`,
+    // daysLeft counts the days after today, so 0 means today is the last.
+    daysLeft:
+      daysLeft === 0
+        ? `Last day of ${name}`
+        : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left in ${name}`,
+    bar: `${percent(spent / budget)} of the budget used`,
+    withinShare: budget / spent,
+    overShare: (spent - budget) / spent,
   }
 }

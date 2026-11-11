@@ -35,7 +35,11 @@
    track"), caution ("Close") and negative ("Over by ₹X"). That card's bar
    fill takes its pill's tone as a non-text fill on a --line track, under the
    word and never instead of it, so it adds no text pair; its even-pace tick
-   is --ink.
+   is --ink. The budget alert sheet wears negative ("Over budget"), the one
+   pill outside Summary; its bar splits that track at the budget into an
+   --accent and a --negative fill. Those two measure 1.0:1 against each
+   other in light (1.7 dark), so a 2px gap of --line marks the split (≥ 4.0:1
+   against either fill, both themes) — non-text fills again, no new text pair.
    Calendar spend-heat once lived here as four background tints and no longer
    does: the day number sits inside the cell, so ink legibility capped the
    ramp, and within that cap no 3- or 4-step ramp separated (best ΔL* 4.9 per
@@ -1069,10 +1073,33 @@ button {
   animation: toast-in 0.25s cubic-bezier(0.32, 0.72, 0.3, 1);
 }
 
-.toast-text {
+/* At two lines a full pill's half-round ends crowd the text's corners, so the
+   heads-up toast takes the sheet-corner radius instead. */
+.toast[data-detail] {
+  border-radius: var(--radius-xl);
+}
+
+/* min-width: 0 lets the lines shrink inside the flex row, or neither could
+   ellipsize. */
+.toast-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toast-text,
+.toast-detail {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Quieter by weight and size, never by colour: it keeps the toast's own ink
+   pair, so it adds nothing to validate. */
+.toast-detail {
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 /* The one interactive part of the toast, and now the app's undo-a-delete
@@ -2100,6 +2127,105 @@ button {
 
 .budget-section .btn-text-tap {
   margin-top: var(--space-4);
+}
+
+/* ——— budget alert sheet ——— */
+
+/* Raised when a save takes the month past its budget. It takes focus so the
+   form behind lets go; the sheet itself needs no ring for that. */
+.alert-sheet:focus {
+  outline: none;
+}
+
+.alert-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+}
+
+.alert-head h2 {
+  font-size: 23px;
+  line-height: 1.15;
+}
+
+.alert-sentence {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.alert-figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin: var(--space-16) 0;
+}
+
+.alert-spent {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-8);
+}
+
+.alert-amount {
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+/* The Summary card's track, split at the budget: --within (budget / spent) in
+   --accent, then the overshoot in --negative. Those two fills sit at one
+   lightness in light (1.0:1), so a gap — the track showing through — marks
+   the line as well, and colour alone never carries it. The overshoot keeps a
+   sliver even when it is a rupee, or a crossing would draw as a bar with no
+   line on it. */
+.budget-track[data-split] {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.budget-track[data-split] .budget-fill {
+  width: calc(var(--within) * 100%);
+  border-radius: 0;
+  background: var(--accent);
+}
+
+.budget-over {
+  display: block;
+  width: calc(var(--over) * 100%);
+  min-width: var(--space-4);
+  background: var(--negative);
+}
+
+.alert-foot {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-3);
+}
+
+.alert-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.alert-actions .btn-ghost {
+  min-height: var(--control-min);
+}
+
+.alert-actions .btn-ghost svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--ink-3);
 }
 
 /* ——— picker sheets (currency) ——— */

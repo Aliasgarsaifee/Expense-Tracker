@@ -1,11 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
+import { BudgetAlertSheet } from './components/BudgetAlertSheet'
 import { BudgetSheet } from './components/BudgetSheet'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
 import { assessBackupHealth } from './lib/backupHealth'
 import { budgetFor, readBudgets, withBudget } from './lib/budget'
+import type { BudgetAlert } from './lib/budgetCheck'
+import { warnFeedback } from './lib/haptics'
 import type { HistoryJump } from './lib/history'
 import { getPref, PREFS, setPref } from './lib/prefs'
 import { AddScreen } from './screens/AddScreen'
@@ -94,6 +97,19 @@ export default function App() {
   }
   const sheetCurrency = budgetSheetFor ?? defaultCurrency
 
+  // A new entry on Add or an edit on History can take the month past its
+  // budget, so the sheet lives here, above both. `undo` comes only with a new
+  // entry. The warning tick belongs to the sheet appearing, whichever save
+  // raised it.
+  const [budgetAlert, setBudgetAlert] = useState<{
+    alert: BudgetAlert
+    undo?: () => void
+  } | null>(null)
+  function raiseBudgetAlert(alert: BudgetAlert, undo?: () => void) {
+    setBudgetAlert({ alert, undo })
+    void warnFeedback()
+  }
+
   // Prefs are not reactive, so the last-export timestamp lives here and the
   // drawer reports back when an export succeeds.
   const [lastExport, setLastExport] = useState(() => getPref(PREFS.lastExport, ''))
@@ -143,10 +159,18 @@ export default function App() {
       </button>
       <main>
         <section hidden={tab !== 'add'}>
-          <AddScreen key={defaultCurrency} />
+          <AddScreen
+            key={defaultCurrency}
+            budgets={budgets}
+            onBudgetAlert={raiseBudgetAlert}
+          />
         </section>
         <section hidden={tab !== 'history'}>
-          <HistoryScreen jump={historyJump} />
+          <HistoryScreen
+            jump={historyJump}
+            budgets={budgets}
+            onBudgetAlert={raiseBudgetAlert}
+          />
         </section>
         <section hidden={tab !== 'summary'}>
           <SummaryScreen
@@ -189,6 +213,12 @@ export default function App() {
         currency={sheetCurrency}
         budget={budgetFor(budgets, sheetCurrency)}
         onBudgetChange={(amount) => saveBudget(sheetCurrency, amount)}
+      />
+      <BudgetAlertSheet
+        alert={budgetAlert?.alert ?? null}
+        onClose={() => setBudgetAlert(null)}
+        onSeeEntries={() => budgetAlert && jumpToHistory({ month: budgetAlert.alert.month })}
+        onUndo={budgetAlert?.undo}
       />
     </div>
   )

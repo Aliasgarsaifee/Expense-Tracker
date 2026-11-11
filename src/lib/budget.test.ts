@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  budgetAlertCopy,
   budgetBadge,
   budgetCardCopy,
   budgetCrossing,
   budgetFor,
+  budgetHeadsUp,
   budgetLevel,
   budgetReference,
   budgetStatus,
@@ -113,5 +115,82 @@ describe('budget maths', () => {
   it('drops even pace from the bar once no days are left', () => {
     const done = budgetCardCopy(budgetStatus(8730, 25000, 30, 30), 25000, 0, 'INR')
     expect(done.bar).toBe('35% of the budget used')
+  })
+})
+
+describe('budget alert copy', () => {
+  const crossed = {
+    currency: 'INR',
+    budget: 25000,
+    spent: 26150,
+    month: '2026-11',
+    daysLeft: 6,
+    entry: { amount: 4200, category: 'Food', note: 'Dinner for six' },
+  }
+
+  it('words the heads-up with the real rounded share', () => {
+    expect(budgetHeadsUp({ spent: 20140, budget: 25000, currency: 'INR' }))
+      .toBe('81% of ₹25,000 used this month')
+    expect(budgetHeadsUp({ spent: 20000, budget: 25000, currency: 'INR' }))
+      .toBe('80% of ₹25,000 used this month')
+    expect(budgetHeadsUp({ spent: 25000, budget: 25000, currency: 'INR' }))
+      .toBe('100% of ₹25,000 used this month') // at the line is still near
+    expect(budgetHeadsUp({ spent: 450, budget: 500, currency: 'USD' }))
+      .toBe('90% of $500 used this month')
+  })
+
+  it('words the crossing sheet, naming the entry by its note', () => {
+    const copy = budgetAlertCopy(crossed)
+    expect(copy).toMatchObject({
+      pill: 'Over budget',
+      title: 'Monthly budget crossed',
+      sentence: 'Dinner for six, ₹4,200, took November’s everyday spending past the line you set.',
+      spent: '₹26,150',
+      of: 'of ₹25,000',
+      over: '₹1,150 over',
+      daysLeft: '6 days left in November',
+      bar: '105% of the budget used',
+    })
+  })
+
+  it('names the entry by its category when it has no note', () => {
+    const { sentence } = budgetAlertCopy({
+      ...crossed,
+      entry: { amount: 4200, category: 'Food' },
+    })
+    expect(sentence).toBe('Food, ₹4,200, took November’s everyday spending past the line you set.')
+  })
+
+  // The bar is spent's whole length: the budget's part, then the overshoot.
+  it('splits the bar at the budget', () => {
+    const { withinShare, overShare } = budgetAlertCopy(crossed)
+    expect(withinShare).toBeCloseTo(25000 / 26150)
+    expect(overShare).toBeCloseTo(1150 / 26150)
+    expect(withinShare + overShare).toBeCloseTo(1)
+  })
+
+  it('counts the days left down to the last one', () => {
+    const left = (daysLeft: number) => budgetAlertCopy({ ...crossed, daysLeft }).daysLeft
+    expect(left(1)).toBe('1 day left in November')
+    expect(left(0)).toBe('Last day of November')
+  })
+
+  it('stays in the crossing’s own currency', () => {
+    const copy = budgetAlertCopy({
+      ...crossed,
+      currency: 'USD',
+      budget: 500,
+      spent: 540,
+      month: '2026-02',
+      entry: { amount: 60, category: 'Food', note: 'Groceries run' },
+    })
+    expect(copy).toMatchObject({
+      sentence: 'Groceries run, $60, took February’s everyday spending past the line you set.',
+      spent: '$540',
+      of: 'of $500',
+      over: '$40 over',
+      daysLeft: '6 days left in February',
+      bar: '108% of the budget used',
+    })
   })
 })

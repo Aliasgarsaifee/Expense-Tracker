@@ -14,6 +14,8 @@ import {
   type Expense,
   type PaymentMethod,
 } from '../db'
+import { budgetHeadsUp, type Budgets } from '../lib/budget'
+import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
 import { addMonths, monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
 import {
@@ -137,7 +139,14 @@ function DaySection({
   )
 }
 
-export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
+interface Props {
+  jump?: HistoryJump | null
+  budgets: Budgets
+  /** An edit took the month past its budget. Edits pass no undo. */
+  onBudgetAlert: (alert: BudgetAlert, undo?: () => void) => void
+}
+
+export function HistoryScreen({ jump, budgets, onBudgetAlert }: Props) {
   const expenses = useLiveQuery(listExpenses)
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   const categories = useLiveQuery(() => listCategories({ includeArchived: true }))
@@ -317,6 +326,21 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
         show({ message: 'Entry restored' }, 2000)
       },
     })
+  }
+
+  // An edit can raise an old entry, or move one into this month, past a mark.
+  // The edit is already saved and its sheet closed, so a failed check only
+  // costs the alert. Restoring a deleted entry is deliberately not checked: it
+  // puts back spending the month had already counted.
+  async function handleSaved(before: Expense, after: Expense) {
+    let alert: BudgetAlert | null = null
+    try {
+      alert = await checkBudgetAfterSave(after, before, budgets, todayISO())
+    } catch (err) {
+      console.error('budget check failed', err)
+    }
+    if (alert?.kind === 'near') show({ message: budgetHeadsUp(alert) })
+    if (alert?.kind === 'over') onBudgetAlert(alert)
   }
 
   if (expenses === undefined) return null // first IndexedDB read, avoid a flash
@@ -608,6 +632,7 @@ export function HistoryScreen({ jump }: { jump?: HistoryJump | null }) {
         expense={editing}
         onClose={() => setEditing(null)}
         onDeleted={handleDeleted}
+        onSaved={(before, after) => void handleSaved(before, after)}
       />
       <Toast state={toast} />
     </div>

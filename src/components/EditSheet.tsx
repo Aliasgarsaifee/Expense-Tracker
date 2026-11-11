@@ -11,36 +11,38 @@ interface Props {
   onClose: () => void
   /** Delete succeeded — the screen owns the undo toast (the sheet is gone by then). */
   onDeleted: (expense: Expense) => void
+  /** Update succeeded: the entry as it was, and as it now is in the database. */
+  onSaved?: (before: Expense, after: Expense) => void
 }
 
-export function EditSheet({ expense, onClose, onDeleted }: Props) {
+export function EditSheet({ expense, onClose, onDeleted, onSaved }: Props) {
   if (!expense) return null
-  return <SheetBody expense={expense} onClose={onClose} onDeleted={onDeleted} />
+  return (
+    <SheetBody expense={expense} onClose={onClose} onDeleted={onDeleted} onSaved={onSaved} />
+  )
 }
 
 function SheetBody({
   expense,
   onClose,
   onDeleted,
-}: {
-  expense: Expense
-  onClose: () => void
-  onDeleted: (expense: Expense) => void
-}) {
+  onSaved,
+}: Omit<Props, 'expense'> & { expense: Expense }) {
   const sheetRef = useRef<HTMLDivElement>(null)
   useKeyboardInset(sheetRef)
   const { dialog, close, showAlert, askConfirm } = useDialog()
 
   async function save(values: ExpenseFormValues) {
+    const changes = {
+      amount: values.amount,
+      currency: values.currency,
+      category: values.category,
+      spentOn: values.spentOn,
+      note: values.note,
+      paymentMethodId: values.paymentMethodId,
+    }
     try {
-      await updateExpense(expense.id, {
-        amount: values.amount,
-        currency: values.currency,
-        category: values.category,
-        spentOn: values.spentOn,
-        note: values.note,
-        paymentMethodId: values.paymentMethodId,
-      })
+      await updateExpense(expense.id, changes)
     } catch (err) {
       await showAlert(
         'Could not save',
@@ -50,6 +52,9 @@ function SheetBody({
     }
     void tapFeedback()
     onClose()
+    // updateExpense returns nothing, so the stored record is rebuilt from the
+    // very changes it was given.
+    onSaved?.(expense, { ...expense, ...changes })
   }
 
   async function remove() {
