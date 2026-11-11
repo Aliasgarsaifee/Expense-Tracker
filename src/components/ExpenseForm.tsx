@@ -129,6 +129,11 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (amount === null || inFlight.current) return // no double-tap duplicates
+    // Let go of the keyboard before saving. Submitting from a field (Done on
+    // the note) keeps that field focused, and the iOS keyboard overlays the
+    // bottom of the screen — exactly where the save toast sits. Its Undo and
+    // the budget heads-up would live and die behind the keys.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     inFlight.current = true
     setSubmitting(true)
     const trimmed = note.trim()

@@ -42,6 +42,8 @@ like "my change didn't work".
 These are the paths a browser cannot verify — walk them after every install:
 
 - [ ] Add an expense → haptic tick fires, toast with **Undo** appears, Undo works.
+- [ ] Add an expense by typing a note and pressing **Done** on the keyboard →
+      the keyboard drops and the toast is in view (it sits where the keys were).
 - [ ] Settings → Export JSON → the iOS share sheet opens (not a download).
 - [ ] Files app → On My iPhone → Expense Tracker → `Backups/` is visible and
       today's `auto-backup-*.json` appears after a fresh launch.

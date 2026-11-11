@@ -12,7 +12,8 @@
    light accent #4c6b4a on #ebebe0 (5.0) · dark accent #a4c39a on #191a14 (9.0)
    light ink-2 #5e5e50 on #ebebe0 (5.5) · dark ink-2 #a6a890 on #191a14 (7.2)
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
-   ink-3 on the #f5f4ec / #21231a card surface (.pay-sub, .card-note): 5.5 / 4.6
+   ink-3 on the #f5f4ec / #21231a card surface (.pay-sub, .card-note, the
+   trend chart's axis ticks and its .trend-ref key): 5.5 / 4.6
    light danger #b3372b on #ebebe0 (5.0) · dark danger #e06a5e on #191a14 (5.3)
    light danger on #f5f4ec surface (5.4) · dark danger on #21231a (4.8)
    danger on the .backup-warning tint (danger 4% + surface): 5.1 / 4.6 dark —
@@ -900,7 +901,13 @@ button {
   fill: var(--now);
 }
 
-.trend-chart .recharts-cartesian-axis-tick text {
+/* Aimed at the label's own class, not at a path through Recharts' groups:
+   3.x moved tick labels out of .recharts-cartesian-axis-tick into a layer of
+   their own, and the old descendant selector quietly stopped matching — the
+   labels fell back to Recharts' #666 at the page's 16px, which overflowed the
+   18px axis band (cut off at the SVG's edge) and measured 2.8:1 on the dark
+   card. If the ticks ever look big and grey again, this hook has moved. */
+.trend-chart .recharts-cartesian-axis-tick-value {
   fill: var(--ink-3);
   font-family: var(--font-body);
   font-size: 11px;
@@ -2461,6 +2468,13 @@ button {
 
 .drawer-section {
   margin-bottom: 28px;
+}
+
+/* Two rows stacked in one section (Budget over Default currency) keep the
+   9px that .backup-actions gives its own stack; without it their borders
+   touch and read as one split control. */
+.drawer-section > .btn-ghost + .btn-ghost {
+  margin-top: 9px;
 }
 
 .drawer-title {
