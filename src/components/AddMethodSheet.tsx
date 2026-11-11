@@ -10,8 +10,6 @@ const CUSTOM = '__custom__'
 
 interface Props {
   open: boolean
-  /** Pre-select this group's chip when opened from a group's "+ add". */
-  presetGroup?: string
   onCreated: (method: PaymentMethod) => void
   onClose: () => void
 }
@@ -25,32 +23,22 @@ export function AddMethodSheet({ open, ...rest }: Props) {
 }
 
 // Group chips come from live data (custom groups stay offered once created);
-// wait out the millisecond first read so presetGroup resolves against the
-// real choices exactly once, at SheetBody's mount.
+// wait out the millisecond first read so the chips render complete.
 function SheetLoader(props: Omit<Props, 'open'>) {
   const methods = useLiveQuery(() => listPaymentMethods({ includeArchived: true }))
   if (!methods) return null
   return <SheetBody choices={groupChoices(methods)} {...props} />
 }
 
-// Mounted fresh on every open: presetGroup lands in state each time it is
-// shown, and a name typed on a cancelled visit never leaks into the next one.
+// Mounted fresh on every open: a name typed on a cancelled visit never leaks
+// into the next one.
 function SheetBody({
   choices,
-  presetGroup,
   onCreated,
   onClose,
 }: Omit<Props, 'open'> & { choices: string[] }) {
-  const initialChip =
-    presetGroup && choices.includes(presetGroup)
-      ? presetGroup
-      : presetGroup
-        ? CUSTOM
-        : 'Credit card'
-  const [groupChip, setGroupChip] = useState(initialChip)
-  const [customGroup, setCustomGroup] = useState(
-    initialChip === CUSTOM ? (presetGroup ?? '') : '',
-  )
+  const [groupChip, setGroupChip] = useState('Credit card')
+  const [customGroup, setCustomGroup] = useState('')
   const [label, setLabel] = useState('')
   const inFlight = useRef(false)
   const [saving, setSaving] = useState(false)

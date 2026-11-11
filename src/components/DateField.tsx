@@ -1,24 +1,24 @@
 import { formatDateLong, todayISO } from '../lib/dates'
+import { ChevronRightIcon } from './icons'
 
 interface Props {
   value: string
   onChange: (iso: string) => void
 }
 
-// Shows the friendly "12 July 2026" while a real (transparent) date input
-// sits on top, so tapping still opens the native iOS date wheel. The native
-// control's own text is hidden; only our formatted label shows through.
+// A row of the details group showing the friendly "12 July 2026" while a real
+// (transparent) date input covers the whole row, so tapping anywhere still
+// opens the native iOS date wheel. The native control's own text is hidden.
 export function DateField({ value, onChange }: Props) {
   const isToday = value === todayISO()
   return (
-    <div className="date-field">
-      <span className="date-display">
+    <label className="detail-row detail-date">
+      <span className="detail-label">Date</span>
+      <span className="detail-value">
         {formatDateLong(value)}
         {isToday && <span className="date-today"> · Today</span>}
       </span>
-      <span className="date-caret" aria-hidden="true">
-        📅
-      </span>
+      <ChevronRightIcon size={18} />
       <input
         type="date"
         required
@@ -29,6 +29,6 @@ export function DateField({ value, onChange }: Props) {
           if (e.target.value) onChange(e.target.value)
         }}
       />
-    </div>
+    </label>
   )
 }

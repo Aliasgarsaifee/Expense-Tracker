@@ -1,34 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PaymentMethod } from '../db'
-import { bucketize, filterByLabel, groupEmoji, orderByRecency } from '../lib/paymentMeta'
+import { filterByLabel, groupEmoji, orderByRecency } from '../lib/paymentMeta'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
+import { CheckIcon, ChevronRightIcon, SearchIcon } from './icons'
 
 interface Props {
   methods: PaymentMethod[]
   selectedId?: string
   recency: Map<string, string>
   onSelect: (id: string) => void
-  onAddNew: (presetGroup?: string) => void
+  onAddNew: () => void
 }
 
-// Above this many methods in one group, that group's sheet shows a search field.
+// Above this many methods the sheet shows a search field.
 const SEARCH_THRESHOLD = 5
 
-// The "Paid with" control: one chip per payment group. A group with a single
-// method toggles it directly; a group with several opens a dropdown sheet so
-// the row never sprawls as cards pile up. Within a group, methods are ordered
-// most-recently-used first; a long group's sheet also gains a search field
-// (the app's standard search-in-sheet pattern, see CurrencySheet).
+// The "Paid with" row of the details group: it shows the current method and
+// opens one sheet listing every method, most-recently-used first, with the
+// group as each row's sub-line. A long list gains a search field (the app's
+// standard search-in-sheet pattern, see CurrencySheet).
 export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew }: Props) {
-  const buckets = useMemo(
-    () =>
-      bucketize(methods).map((b) => ({
-        ...b,
-        members: orderByRecency(b.members, recency),
-      })),
-    [methods, recency],
-  )
-  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const ordered = useMemo(() => orderByRecency(methods, recency), [methods, recency])
+  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const listRef = useRef<HTMLUListElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -36,99 +29,74 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
   // A stale query would greet the next open with a filtered list.
   useEffect(() => {
     setQuery('')
-  }, [openGroup])
+  }, [open])
 
   // A new query re-ranks the list; reset scroll so the top matches show.
   useEffect(() => {
     listRef.current?.scrollTo(0, 0)
   }, [query])
 
-  useKeyboardInset(sheetRef, openGroup !== null)
+  useKeyboardInset(sheetRef, open)
 
-  const active = openGroup ? buckets.find((b) => b.group === openGroup) : null
-  const searchable = !!active && active.members.length > SEARCH_THRESHOLD
-  const visible = active ? filterByLabel(active.members, query) : []
+  const selected = methods.find((m) => m.id === selectedId)
+  const searchable = methods.length > SEARCH_THRESHOLD
+  const visible = filterByLabel(ordered, query)
 
   return (
     <>
-      <div className="chip-row" role="group" aria-label="Payment method">
-        {buckets.map(({ group, members }) => {
-          const selected = members.find((m) => m.id === selectedId)
-          const multi = members.length > 1
-          if (!multi) {
-            const m = members[0]
-            return (
-              <button
-                key={group}
-                type="button"
-                className="chip"
-                aria-pressed={m.id === selectedId}
-                onClick={() => onSelect(m.id)}
-              >
-                <span aria-hidden="true">{groupEmoji(group)}</span> {m.label}
-                {m.archived && <span className="chip-tag">archived</span>}
-              </button>
-            )
-          }
-          return (
-            <button
-              key={group}
-              type="button"
-              className="chip chip-group"
-              aria-pressed={!!selected}
-              aria-haspopup="dialog"
-              onClick={() => setOpenGroup(group)}
-            >
-              <span aria-hidden="true">{groupEmoji(group)}</span>{' '}
-              {selected ? selected.label : group}
-              <span className="chip-caret" aria-hidden="true">
-                ▾
-              </span>
-            </button>
-          )
-        })}
-        <button
-          type="button"
-          className="chip chip-add"
-          aria-label="Add a payment method"
-          onClick={() => onAddNew()}
-        >
-          +
-        </button>
-      </div>
+      <button
+        type="button"
+        className="detail-row"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+      >
+        <span className="detail-label">Paid with</span>
+        {selected ? (
+          <span className="detail-value">
+            <span aria-hidden="true">{groupEmoji(selected.group)}</span> {selected.label}
+            {selected.archived && <span className="chip-tag">archived</span>}
+          </span>
+        ) : (
+          <span className="detail-value detail-empty">Not recorded</span>
+        )}
+        <ChevronRightIcon size={18} />
+      </button>
 
-      {active && (
-        <div className="sheet-scrim" onClick={() => setOpenGroup(null)}>
+      {open && (
+        <div className="sheet-scrim" onClick={() => setOpen(false)}>
           <div
             ref={sheetRef}
             className={searchable ? 'sheet sheet-search' : 'sheet'}
             role="dialog"
             aria-modal="true"
-            aria-label={`Choose ${active.group}`}
+            aria-label="Paid with"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sheet-handle" aria-hidden="true" />
             <header className="sheet-head">
-              <h2 className="display">
-                <span aria-hidden="true">{groupEmoji(active.group)}</span> {active.group}
-              </h2>
-              <button className="btn-text" type="button" onClick={() => setOpenGroup(null)}>
+              <h2 className="display">Paid with</h2>
+              <button className="btn-text" type="button" onClick={() => setOpen(false)}>
                 Cancel
               </button>
             </header>
             {searchable && (
               // label, not div: a tap anywhere on the field focuses the input
               <label className="search-field">
-                <span aria-hidden="true">🔎</span>
+                <SearchIcon size={18} />
                 <input
                   type="search"
-                  placeholder={`Search ${active.group}…`}
-                  aria-label={`Search ${active.group}`}
+                  placeholder="Search payment methods…"
+                  aria-label="Search payment methods"
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  // This sheet renders inside the entry form, where Enter in
+                  // a field would otherwise submit the expense.
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.preventDefault()
+                  }}
                 />
                 {query !== '' && (
                   <button type="button" className="btn-text" onClick={() => setQuery('')}>
@@ -146,16 +114,21 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
                     aria-pressed={m.id === selectedId}
                     onClick={() => {
                       onSelect(m.id)
-                      setOpenGroup(null)
+                      setOpen(false)
                     }}
                   >
                     <span className="pick-text">
-                      <span className="pick-primary">{m.label}</span>
-                      {m.archived && <span className="pick-sub">archived</span>}
+                      <span className="pick-primary">
+                        <span aria-hidden="true">{groupEmoji(m.group)}</span> {m.label}
+                      </span>
+                      <span className="pick-sub">
+                        {m.group}
+                        {m.archived ? ' · archived' : ''}
+                      </span>
                     </span>
                     {m.id === selectedId && (
                       <span className="pick-check" aria-hidden="true">
-                        ✓
+                        <CheckIcon size={18} />
                       </span>
                     )}
                   </button>
@@ -169,12 +142,11 @@ export function PaymentPicker({ methods, selectedId, recency, onSelect, onAddNew
               type="button"
               className="btn-ghost"
               onClick={() => {
-                const g = active.group
-                setOpenGroup(null)
-                onAddNew(g)
+                setOpen(false)
+                onAddNew()
               }}
             >
-              <span>Add another {active.group.toLowerCase()}</span>
+              <span>Add a payment method</span>
               <span aria-hidden="true">+</span>
             </button>
           </div>

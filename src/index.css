@@ -500,12 +500,6 @@ h1.display {
   color: var(--on-accent);
 }
 
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 12px;
-}
-
 .field {
   display: grid;
   gap: 6px;
@@ -540,31 +534,49 @@ h1.display {
   text-align: left;
 }
 
-/* ——— friendly date field ——— */
+/* ——— details group (Add/Edit form: Paid with, Date) ——— */
 
-.date-field {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
+/* The same border/surface/radius as .field input, so the group reads as one
+   field with rows rather than a card. */
+.detail-group {
   border: 1.5px solid var(--line);
   background: var(--surface);
   border-radius: 12px;
-  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.detail-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--row-touch);
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font-family: var(--font-body);
+  text-align: left;
   transition: background-color 0.12s ease;
 }
 
-.date-field:active {
+.detail-row + .detail-row {
+  border-top: 1px solid var(--line);
+}
+
+.detail-row:active {
   background: color-mix(in srgb, var(--chip) 60%, transparent);
 }
 
-.date-field:focus-within {
-  border-color: var(--accent);
+.detail-label {
+  font-size: 16px;
+  color: var(--ink-2);
 }
 
-.date-display {
-  flex: 1;
+.detail-value {
+  margin-left: auto;
+  min-width: 0;
   font-size: 16px;
   color: var(--ink);
   white-space: nowrap;
@@ -572,18 +584,18 @@ h1.display {
   text-overflow: ellipsis;
 }
 
+.detail-empty {
+  color: var(--ink-3);
+}
+
 .date-today {
   color: var(--ink-3);
   font-size: 13px;
 }
 
-.date-caret {
-  font-size: 15px;
-  opacity: 0.65;
-}
-
-/* The real control sits invisibly on top so the native wheel still opens. */
-.date-field input[type='date'] {
+/* The real control sits invisibly over the whole row so the native wheel
+   still opens. */
+.detail-date input[type='date'] {
   position: absolute;
   inset: 0;
   width: 100%;

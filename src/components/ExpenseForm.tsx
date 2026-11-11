@@ -45,10 +45,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
   const [spentOn, setSpentOn] = useState(initial?.spentOn ?? todayISO())
   const [note, setNote] = useState(initial?.note ?? '')
   const [pickingCurrency, setPickingCurrency] = useState(false)
-  const [addMethodGroup, setAddMethodGroup] = useState<string | null | undefined>(
-    undefined,
-  )
-  const addingMethod = addMethodGroup !== undefined
+  const [addingMethod, setAddingMethod] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   // Ref, not just state: state guards re-render too late to stop two
@@ -87,7 +84,7 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
         : null,
     [autoReset, paymentMethodId],
   )
-  const methodChips = useMemo(() => {
+  const pickableMethods = useMemo(() => {
     const active = methods ?? []
     if (
       selectedArchived?.archived &&
@@ -103,13 +100,13 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
   // selection. Never touch a locally just-created id awaiting the liveQuery.
   useEffect(() => {
     if (!autoReset || !methods || !paymentMethodId) return
-    if (methodChips.some((m) => m.id === paymentMethodId)) {
+    if (pickableMethods.some((m) => m.id === paymentMethodId)) {
       if (justCreatedMethod.current === paymentMethodId) justCreatedMethod.current = null
       return
     }
     if (justCreatedMethod.current === paymentMethodId) return
     setPaymentMethodId(CASH_METHOD_ID)
-  }, [autoReset, methods, methodChips, paymentMethodId])
+  }, [autoReset, methods, pickableMethods, paymentMethodId])
 
   // A backup import (or an archived/deleted category on an edited entry) may
   // carry a category outside the active list; keep it selectable.
@@ -186,16 +183,17 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
           />
         </div>
 
-        <div className="field">
-          <span>Paid with</span>
-          <PaymentPicker
-            methods={methodChips}
-            selectedId={paymentMethodId}
-            recency={recency}
-            onSelect={setPaymentMethodId}
-            onAddNew={(g) => setAddMethodGroup(g ?? null)}
+        <label className="field">
+          <span>What was it?</span>
+          <input
+            type="text"
+            placeholder="e.g. auto to office"
+            maxLength={120}
+            enterKeyHint="done"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
           />
-        </div>
+        </label>
 
         <div className="field">
           <span>Category</span>
@@ -222,31 +220,21 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
           </div>
         </div>
 
-        <div className="field-row">
-          <label className="field">
-            <span>Date</span>
-            <DateField
-              value={spentOn}
-              onChange={(iso) => {
-                userPickedDate.current = true
-                setSpentOn(iso)
-              }}
-            />
-          </label>
-          <label className="field">
-            <span>What was it?</span>
-            {/* The placeholder is kept short enough to fit: this field shares
-                its row with the date, leaving 110px, and the old "e.g. auto to
-                office" needed 122 — it rendered as "e.g. auto to offic". */}
-            <input
-              type="text"
-              placeholder="e.g. auto fare"
-              maxLength={120}
-              enterKeyHint="done"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </label>
+        <div className="detail-group">
+          <PaymentPicker
+            methods={pickableMethods}
+            selectedId={paymentMethodId}
+            recency={recency}
+            onSelect={setPaymentMethodId}
+            onAddNew={() => setAddingMethod(true)}
+          />
+          <DateField
+            value={spentOn}
+            onChange={(iso) => {
+              userPickedDate.current = true
+              setSpentOn(iso)
+            }}
+          />
         </div>
 
         <button
@@ -267,12 +255,11 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset }: Props
       />
       <AddMethodSheet
         open={addingMethod}
-        presetGroup={addMethodGroup ?? undefined}
         onCreated={(m) => {
           justCreatedMethod.current = m.id
           setPaymentMethodId(m.id)
         }}
-        onClose={() => setAddMethodGroup(undefined)}
+        onClose={() => setAddingMethod(false)}
       />
       <AddCategorySheet
         open={addingCategory}
