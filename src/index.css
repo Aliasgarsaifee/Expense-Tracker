@@ -224,19 +224,23 @@ body::after {
 /* ——— shell ——— */
 
 .app {
+  /* One value for main's top padding and the menu button's top, so the two
+     cannot drift apart. */
+  --head-top: calc(env(safe-area-inset-top) + 22px);
+  position: relative;
   max-width: 560px;
   margin: 0 auto;
 }
 
 .app > main {
-  padding: calc(env(safe-area-inset-top) + 22px) 20px
-    calc(env(safe-area-inset-bottom) + 96px);
+  padding: var(--head-top) 20px calc(env(safe-area-inset-bottom) + 96px);
 }
 
-/* Indented past the fixed menu button, like a ledger's gutter margin. */
+/* Indented past the menu button, like a ledger's gutter margin. The button
+   sits in the page, not over it: it scrolls away with the header. */
 .screen-head {
   margin-bottom: 22px;
-  padding-left: 54px;
+  padding-left: 56px;
   min-height: 44px;
   display: grid;
   align-content: center;
@@ -255,20 +259,18 @@ body::after {
 }
 
 .menu-btn {
-  position: fixed;
-  top: calc(env(safe-area-inset-top) + 18px);
+  position: absolute;
+  top: var(--head-top);
   left: max(20px, env(safe-area-inset-left));
-  z-index: 30;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 1.5px solid var(--line);
   border-radius: 13px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  backdrop-filter: blur(14px) saturate(1.3);
+  background: var(--surface);
   color: var(--ink-2);
+  transition: background-color 0.12s ease;
 }
 
 .menu-btn svg {
@@ -348,6 +350,11 @@ h1.display {
   font-weight: 700;
   letter-spacing: 0.04em;
   border-radius: 12px;
+  transition: transform 0.06s ease;
+}
+
+.tabbar button:active {
+  transform: scale(0.94);
 }
 
 .tabbar button svg {
@@ -418,12 +425,21 @@ h1.display {
   font-weight: 400;
   padding: 8px 13px;
   border-radius: 999px;
+  position: relative;
   transition: transform 0.06s ease, background-color 0.12s ease,
     border-color 0.12s ease, color 0.12s ease;
 }
 
 .chip:active {
   transform: scale(0.96);
+}
+
+/* Hit area only: the pill stays ~38px but the tap reaches 44px+ (the inset is
+   measured from the padding box, inside the 1.5px border). Vertical only. */
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
 }
 
 /* Touch-target floor for chips that are the whole job of a sheet (ios-feel). */
@@ -491,6 +507,11 @@ h1.display {
   background: var(--surface);
   border-radius: 12px;
   padding: 10px 12px;
+  transition: background-color 0.12s ease;
+}
+
+.date-field:active {
+  background: color-mix(in srgb, var(--chip) 60%, transparent);
 }
 
 .date-field:focus-within {
@@ -569,6 +590,11 @@ h1.display {
   font-size: 20px;
   display: grid;
   place-items: center;
+  transition: transform 0.06s ease;
+}
+
+.emoji-swatch:active {
+  transform: scale(0.94);
 }
 
 .emoji-swatch[aria-pressed='true'] {
@@ -643,9 +669,17 @@ button {
   font-weight: 700;
   padding: 13px;
   border-radius: 12px;
+  transition: transform 0.06s ease;
+}
+
+.btn-danger:active {
+  transform: translateY(1px);
 }
 
 .btn-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
   border: 0;
   background: none;
   color: var(--ink-2);
@@ -653,6 +687,11 @@ button {
   font-size: 15px;
   font-weight: 700;
   padding: 6px 2px;
+  transition: opacity 0.12s ease;
+}
+
+.btn-text:active {
+  opacity: 0.6;
 }
 
 /* ——— history ——— */
@@ -784,7 +823,13 @@ button {
   border: 0;
   background: none;
   color: var(--ink);
+  min-height: var(--tap-min);
   padding: 2px 0;
+  transition: opacity 0.12s ease;
+}
+
+.month-label-btn:active {
+  opacity: 0.6;
 }
 
 .month-label-btn .display {
@@ -806,8 +851,8 @@ button {
 }
 
 .month-arrow {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border: 1.5px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
@@ -816,6 +861,11 @@ button {
   font-size: 24px;
   line-height: 1;
   padding-bottom: 4px;
+  transition: transform 0.06s ease;
+}
+
+.month-arrow:active {
+  transform: scale(0.94);
 }
 
 .month-arrow:disabled {
@@ -1133,6 +1183,11 @@ button {
   text-underline-offset: 3px;
   padding: 14px 8px;
   margin: -14px -4px -14px 0;
+  transition: opacity 0.12s ease;
+}
+
+.toast-undo:active {
+  opacity: 0.6;
 }
 
 .empty {
@@ -1213,6 +1268,9 @@ button {
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  /* Room for the chips' 5px hit area, which overflow-x would otherwise clip. */
+  padding-top: 5px;
+  margin-top: -5px;
   padding-bottom: 4px;
   scrollbar-width: none;
 }
@@ -1292,7 +1350,6 @@ button {
   position: relative;
   z-index: 1;
   align-self: stretch;
-  min-height: 44px;
   padding: 6px 12px;
 }
 
@@ -1394,7 +1451,9 @@ button {
 /* Stays 34px so this row reads as secondary to the shortcut chips above it —
    but 34px is not a touch target. The hit area grows to 44px via a
    pseudo-element rather than padding, which would inflate the visible pill.
-   Vertical only, so neighbours 8px apart never overlap. */
+   The inset counts from the padding box (inside the 1.5px border), so -7px is
+   what makes 44px+; wrapped rows 8px apart overlap by a few px, which is
+   harmless. */
 .chip-sm {
   position: relative;
   min-height: 34px;
@@ -1405,7 +1464,7 @@ button {
 .chip-sm::after {
   content: '';
   position: absolute;
-  inset: -5px 0;
+  inset: -7px 0;
 }
 
 .cal-scroll {
@@ -1928,7 +1987,6 @@ button {
    "Remove the budget") needs a whole thumb target and a press; the inline
    .btn-text in sheet heads keeps its own size. */
 .btn-text-tap {
-  min-height: var(--tap-min);
   padding: var(--space-6) var(--space-10);
   border-radius: var(--radius-sm);
   transition: background-color 0.12s ease;

@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BudgetAlertSheet } from './components/BudgetAlertSheet'
 import { BudgetSheet } from './components/BudgetSheet'
 import { ChartIcon, MenuIcon, PlusIcon, ReceiptIcon } from './components/icons'
@@ -34,6 +34,26 @@ export default function App() {
   const [budgetSheetFor, setBudgetSheetFor] = useState<string | null>(null)
   const [historyJump, setHistoryJump] = useState<HistoryJump | null>(null)
 
+  // The window is the one scroll container for three mounted screens, so each
+  // tab's position is parked here when it is left. It is saved at the moment of
+  // the tap, never from a scroll listener or an effect: hiding a section
+  // shrinks the document and the browser clamps scrollY before either runs.
+  const scrollByTab = useRef<Record<Tab, number>>({ add: 0, history: 0, summary: 0 })
+  // jumpToHistory must stay referentially stable, so it reads the tab here.
+  const tabRef = useRef(tab)
+  tabRef.current = tab
+  function selectTab(next: Tab) {
+    if (next === tab) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    scrollByTab.current[tab] = window.scrollY
+    setTab(next)
+  }
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollByTab.current[tab])
+  }, [tab])
+
   // A settings row was tapped: close the drawer, land on History, filter to
   // it. A fresh object per tap means re-tapping the same row re-applies even
   // if the user changed filters in between (identity is the event).
@@ -42,7 +62,15 @@ export default function App() {
   // component re-rendered for an unrelated reason.
   const jumpToHistory = useCallback((jump: HistoryJump) => {
     setHistoryJump({ ...jump })
-    setTab('history')
+    // A jump lands on a fresh filter, so start at its top, not where History
+    // was left.
+    if (tabRef.current === 'history') {
+      window.scrollTo(0, 0)
+    } else {
+      scrollByTab.current.history = 0
+      scrollByTab.current[tabRef.current] = window.scrollY
+      setTab('history')
+    }
     setSettingsOpen(false)
   }, [])
   // Remounting AddScreen on this key re-reads the default-currency pref, so a
@@ -143,7 +171,11 @@ export default function App() {
           <SummaryScreen
             budgets={budgets}
             onDrill={jumpToHistory}
-            onAddNew={() => setTab('add')}
+            onAddNew={() => {
+              scrollByTab.current.summary = window.scrollY
+              scrollByTab.current.add = 0
+              setTab('add')
+            }}
             onOpenBudget={(currency) => setBudgetSheetFor(currency)}
           />
         </section>
@@ -154,7 +186,7 @@ export default function App() {
             key={id}
             type="button"
             aria-current={tab === id ? 'page' : undefined}
-            onClick={() => setTab(id)}
+            onClick={() => selectTab(id)}
           >
             <Icon />
             <span>{label}</span>
