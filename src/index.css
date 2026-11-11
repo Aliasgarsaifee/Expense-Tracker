@@ -32,7 +32,11 @@
    (data-tone picks --<tone> on --<tone>-tint). Summary's Fixed costs card
    wears positive ("As usual"), caution ("₹X above usual") and pending ("₹X
    to come", "Not logged yet"); the Everyday budget card wears positive ("On
-   track"), caution ("Close") and negative ("Over by ₹X"). That card's bar
+   track"), caution ("Close") and negative ("Over by ₹X"); the year's
+   Everyday against budget card wears positive ("In hand") and caution ("To
+   make up"). One plain-text use sits outside the pills: the month ledger's
+   "₹X over" cell is --negative on --surface (danger on surface above: 5.4 /
+   4.8), always with the word "over" in it. The month budget card's bar
    fill takes its pill's tone as a non-text fill on a --line track, under the
    word and never instead of it, so it adds no text pair; its even-pace tick
    is --ink. The budget alert sheet wears negative ("Over budget"), the one
@@ -1703,7 +1707,10 @@ button {
 .screen[data-loading] .budget-left,
 .screen[data-loading] .budget-bar,
 .screen[data-loading] .budget-perday,
+.screen[data-loading] .budget-carried,
 .screen[data-loading] .budget-set,
+.screen[data-loading] .year-card .status-pill,
+.screen[data-loading] .year-sentence,
 .screen[data-loading] .trend-ref {
   visibility: hidden;
 }
@@ -2049,6 +2056,70 @@ button {
   font-size: 15px;
 }
 
+/* The year behind the month, under a hairline: it is context, not the month's
+   own figure, so it sits apart and a step quieter. */
+.budget-carried {
+  padding-top: var(--space-10);
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* Summary's year: the month card's surface, but not a button — it has nothing
+   of its own to open. */
+.year-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-bottom: 18px;
+  padding: var(--space-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.year-card .budget-left {
+  margin: 0;
+}
+
+.year-sentence {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* The month ledger reuses the breakdown rows; its right-hand cell is two
+   lines — over or under, then the year's balance — so it stacks, flush right
+   like a ledger column. */
+.ledger-figs {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+
+.ledger-diff {
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* The word "over" is always in the cell; the hue only repeats it. */
+.ledger-diff[data-over] {
+  color: var(--negative);
+}
+
+/* Two-line rows: sit the leader on the first line's baseline, as in a printed
+   ledger, rather than between the lines. */
+.ledger-row .leader {
+  transform: translateY(-7px);
+}
+
+.ledger-go {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
+}
+
 /* ——— Budget sheet ——— */
 
 .budget-intro {
@@ -2209,6 +2280,14 @@ button {
   font-size: 12.5px;
   line-height: 1.35;
   color: var(--ink-3);
+}
+
+/* Whether the month's overrun matters to the year, set apart by a hairline. */
+.alert-year {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-10);
+  border-top: 1px solid var(--line);
+  font-size: 15px;
 }
 
 .alert-actions {

@@ -10,11 +10,21 @@ import {
   budgetReference,
   budgetStatus,
   alertYearLine,
+  carriedBefore,
   carriedInto,
+  carriedIntoMonth,
+  carriedLine,
+  earlierThisYear,
+  ledgerFor,
+  ledgerReads,
   monthTotals,
   readBudgets,
   withBudget,
+  yearBudgetReference,
+  yearCardCopy,
   yearLedger,
+  yearLedgerCopy,
+  yearLineCopy,
   yearSentence,
   yearTally,
 } from './budget'
@@ -139,7 +149,16 @@ describe('budget alert copy', () => {
     month: '2026-11',
     daysLeft: 6,
     entry: { amount: 4200, category: 'Food', note: 'Dinner for six' },
+    carried: 14600,
   }
+
+  it('ties the crossing to the year under a hairline', () => {
+    expect(budgetAlertCopy(crossed).yearLine).toBe(
+      'Earlier months left ₹14,600 in hand, so the year is still ₹13,450 under.')
+    expect(budgetAlertCopy({ ...crossed, carried: -450 }).yearLine)
+      .toBe('The year is now ₹1,600 over.')
+    expect(budgetAlertCopy({ ...crossed, carried: null }).yearLine).toBeNull()
+  })
 
   it('words the heads-up with the real rounded share', () => {
     expect(budgetHeadsUp({ spent: 20140, budget: 25000, currency: 'INR' }))
@@ -317,5 +336,174 @@ describe('year ledger', () => {
       'Earlier months left ₹500 in hand; the year is now ₹650 over.')
     expect(alertYearLine(-450, 1150, 'INR')).toBe('The year is now ₹1,600 over.')
     expect(alertYearLine(null, 1150, 'INR')).toBeNull()
+  })
+
+  // carriedInto answers "after the last complete month", which is the ledger
+  // as of today; a past month needs what had been carried into it.
+  it('says what was carried into a given month', () => {
+    expect(carriedBefore(lines, '2026-11')).toBe(14600)
+    expect(carriedBefore(lines, '2026-06')).toBe(-450)
+    expect(carriedBefore(lines, '2026-10')).toBe(7900)
+    expect(carriedBefore(lines, '2026-01')).toBeNull()
+    // The partial month never carries: December still sees October's balance.
+    expect(carriedBefore(lines, '2026-12')).toBe(14600)
+    expect(carriedBefore([], '2026-11')).toBeNull()
+  })
+})
+
+describe('the year, read from entries', () => {
+  // One entry per month, at the brief's everyday totals.
+  const janToOct = spentJanToNov.slice(0, 10).map((s, i) => entry(`${monthKey('2026', i)}-15`, s))
+
+  it('spans 1 January to the end of the month before', () => {
+    expect(earlierThisYear('2026-11')).toEqual({ from: '2026-01-01', to: '2026-10-31' })
+    expect(earlierThisYear('2026-03')).toEqual({ from: '2026-01-01', to: '2026-02-28' })
+    expect(earlierThisYear('2024-03')).toEqual({ from: '2024-01-01', to: '2024-02-29' })
+  })
+
+  it('reads nothing for January, which has no earlier month', () => {
+    expect(earlierThisYear('2026-01')).toBeNull()
+  })
+
+  it('reads for the ledger only once a budget exists, and only what the period needs', () => {
+    const nov = { kind: 'month', month: '2026-11' } as const
+    const budgets = { INR: 25000, USD: 500 }
+    expect(ledgerReads(nov, {})).toEqual({ earlier: null, currencies: [] })
+    expect(ledgerReads(nov, budgets)).toEqual({
+      earlier: { from: '2026-01-01', to: '2026-10-31' },
+      currencies: ['INR', 'USD'],
+    })
+    // The year view's months are its own window, already read.
+    expect(ledgerReads({ kind: 'year', year: '2026' }, budgets))
+      .toEqual({ earlier: null, currencies: ['INR', 'USD'] })
+    expect(ledgerReads({ kind: 'year', year: '2026' }, {})).toEqual({ earlier: null, currencies: [] })
+    for (const p of [
+      { kind: 'month', month: '2026-01' },
+      { kind: 'day', date: '2026-11-11' },
+      { kind: 'all' },
+      { kind: 'custom', from: '2026-01-01', to: '2026-03-31' },
+    ] as const) {
+      expect(ledgerReads(p, budgets)).toEqual({ earlier: null, currencies: [] })
+    }
+  })
+
+  it('builds the ledger from one currency’s everyday entries', () => {
+    expect(ledgerFor(janToOct, BUDGET, '2026', TODAY, '2026-01'))
+      .toEqual(yearLedger(monthTotals(janToOct), BUDGET, '2026', TODAY, '2026-01'))
+    expect(ledgerFor(janToOct, BUDGET, '2026', TODAY, '2025-03')[9].running).toBe(14600)
+  })
+
+  // No entry in the currency at all: there is no ledger to keep, rather than
+  // ten empty months read as ₹2,50,000 saved.
+  it('keeps no ledger for a currency never used', () => {
+    expect(ledgerFor([], BUDGET, '2026', TODAY, null)).toEqual([])
+  })
+
+  it('carries the earlier months into a month', () => {
+    expect(carriedIntoMonth(janToOct, BUDGET, '2026-11', TODAY, '2026-01')).toBe(14600)
+    expect(carriedIntoMonth(janToOct.slice(0, 5), BUDGET, '2026-06', TODAY, '2026-01')).toBe(-450)
+    expect(carriedIntoMonth([], BUDGET, '2026-11', TODAY, '2026-11')).toBeNull() // first used now
+    expect(carriedIntoMonth([], BUDGET, '2026-11', TODAY, null)).toBeNull()
+    expect(carriedIntoMonth([], BUDGET, '2026-01', '2026-01-20', '2025-04')).toBeNull()
+  })
+})
+
+describe('year copy', () => {
+  const lines = yearLedger(byMonth('2026', spentJanToNov), BUDGET, '2026', TODAY, null)
+
+  it('words the year card in hand', () => {
+    expect(yearCardCopy(lines, 'INR')).toEqual({
+      pill: { tone: 'positive', text: 'In hand' },
+      amount: '₹14,600',
+      after: 'in hand after 10 months',
+      sentence:
+        '3 months ran over, by ₹10,400 in all. The other 7 came in ₹25,000 under and covered it.',
+    })
+  })
+
+  it('words the year card with a balance to make up', () => {
+    const toMay = lines.slice(0, 5)
+    expect(yearCardCopy(toMay, 'INR')).toEqual({
+      pill: { tone: 'caution', text: 'To make up' },
+      amount: '₹450',
+      after: 'to make up after 5 months',
+      sentence: '2 months ran over, by ₹9,100 in all. The other 3 came in ₹8,650 under.',
+    })
+    expect(yearCardCopy(lines.slice(0, 1), 'INR').after).toBe('in hand after 1 month')
+  })
+
+  it('says the first month is still running, with no pill or figure', () => {
+    const jan = yearLedger(byMonth('2026', [8000]), BUDGET, '2026', '2026-01-15', null)
+    expect(yearCardCopy(jan, 'INR')).toEqual({
+      pill: null,
+      amount: null,
+      after: null,
+      sentence: 'The first month is still running.',
+    })
+  })
+
+  it('words a complete month', () => {
+    expect(yearLineCopy(lines[9], 'INR', TODAY)).toEqual({
+      key: '2026-10',
+      month: 'October',
+      spent: '₹18,300 spent',
+      diff: '₹6,700 under',
+      over: false,
+      balance: '₹14,600 in hand',
+      label: 'October: ₹18,300 spent, ₹6,700 under, ₹14,600 in hand',
+    })
+    expect(yearLineCopy(lines[8], 'INR', TODAY)).toMatchObject(
+      { diff: '₹1,300 over', over: true, balance: '₹7,900 in hand' })
+    expect(yearLineCopy(lines[4], 'INR', TODAY)).toMatchObject({
+      month: 'May',
+      diff: '₹6,200 over',
+      over: true,
+      balance: '₹450 to make up',
+      label: 'May: ₹31,200 spent, ₹6,200 over, ₹450 to make up',
+    })
+  })
+
+  it('words a month exactly on budget', () => {
+    const even = yearLedger(byMonth('2025', [25000]), BUDGET, '2025', TODAY, null)[0]
+    expect(yearLineCopy(even, 'INR', TODAY)).toMatchObject(
+      { diff: 'On budget', over: false, balance: '₹0 in hand' })
+  })
+
+  it('words the month still running', () => {
+    expect(yearLineCopy(lines[10], 'INR', TODAY)).toEqual({
+      key: '2026-11',
+      month: 'November',
+      spent: '₹8,730 so far',
+      diff: '₹16,270 left',
+      over: false,
+      balance: '19 days to go',
+      label: 'November: ₹8,730 so far, ₹16,270 left, 19 days to go',
+    })
+    const past = { month: '2026-11', spent: 26150, diff: -1150, running: null, partial: true }
+    expect(yearLineCopy(past, 'INR', TODAY)).toMatchObject(
+      { spent: '₹26,150 so far', diff: '₹1,150 over', over: true })
+    expect(yearLineCopy(lines[10], 'INR', '2026-11-29').balance).toBe('1 day to go')
+    expect(yearLineCopy(lines[10], 'INR', '2026-11-30').balance).toBe('Last day')
+  })
+
+  it('lists the ledger newest first, against the budget', () => {
+    const copy = yearLedgerCopy(lines, BUDGET, 'INR', TODAY)
+    expect(copy.note).toBe('against ₹25,000')
+    expect(copy.rows.map((r) => r.month)).toEqual([
+      'November', 'October', 'September', 'August', 'July', 'June',
+      'May', 'April', 'March', 'February', 'January',
+    ])
+    expect(copy.rows[0]).toEqual(yearLineCopy(lines[10], 'INR', TODAY))
+  })
+
+  it('words the line the month card carries', () => {
+    expect(carriedLine(14600, 'INR')).toBe('₹14,600 in hand from earlier months this year')
+    expect(carriedLine(-450, 'INR')).toBe('₹450 to make up from earlier months this year')
+    expect(carriedLine(null, 'INR')).toBeNull()
+  })
+
+  it('draws the monthly budget as the year chart’s reference', () => {
+    expect(yearBudgetReference(25000, 'INR')).toEqual({ value: 25000, label: 'budget ₹25,000' })
+    expect(yearBudgetReference(600, 'USD').label).toBe('budget $600')
   })
 })

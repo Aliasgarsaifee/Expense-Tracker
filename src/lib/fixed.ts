@@ -39,6 +39,17 @@ export function splitFixed(
   return out
 }
 
+// Whether a span holds any fixed cost. The year view splits on this: it has no
+// usual to judge fixed lines by, so any rent at all is reason to set it apart.
+export function hasFixedSpend(expenses: Expense[], fixed: Set<string>): boolean {
+  return expenses.some((e) => fixed.has(e.category))
+}
+
+// One currency's everyday entries out of a mixed read, for the year ledger.
+export function everydayIn(expenses: Expense[], currency: string, fixed: Set<string>): Expense[] {
+  return expenses.filter((e) => e.currency === currency && !fixed.has(e.category))
+}
+
 // Median: one odd month (a back-paid deposit) shouldn't skew "usual".
 export function usualAmount(monthTotals: number[]): number | null {
   if (monthTotals.length === 0) return null

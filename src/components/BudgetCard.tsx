@@ -1,12 +1,19 @@
 import type { CSSProperties } from 'react'
-import { budgetBadge, budgetCardCopy, type BudgetStatus } from '../lib/budget'
+import {
+  budgetBadge,
+  budgetCardCopy,
+  carriedLine,
+  yearCardCopy,
+  type BudgetStatus,
+  type YearLine,
+} from '../lib/budget'
 
 interface Props {
   status: BudgetStatus
   budget: number
   currency: string
   daysLeft: number
-  /** Accepted now so call sites settle; renders nothing until the year ledger lands. */
+  /** What earlier months of the year left in hand; null when none carries in. */
   carried: number | null
   onEdit: () => void
 }
@@ -15,9 +22,10 @@ interface Props {
 // edit button: it is where the owner looks when the number surprises them.
 // No aria-label — the visible words are the accessible name, so VoiceOver
 // reads the pill and the figures rather than a summary that drops them.
-export function BudgetCard({ status, budget, currency, daysLeft, onEdit }: Props) {
+export function BudgetCard({ status, budget, currency, daysLeft, carried, onEdit }: Props) {
   const badge = budgetBadge(status, currency)
   const copy = budgetCardCopy(status, budget, daysLeft, currency)
+  const year = carriedLine(carried, currency)
   // Shares, not pixels: the bar is fluid, so CSS turns these into the fill's
   // width and the tick's offset.
   const shares = { '--used': status.usedShare, '--even': status.evenShare } as CSSProperties
@@ -52,6 +60,33 @@ export function BudgetCard({ status, budget, currency, daysLeft, onEdit }: Props
         <span className="sr-only">{copy.bar}</span>
       </span>
       {copy.perDay && <span className="budget-perday">{copy.perDay}</span>}
+      {year && <span className="budget-carried">{year}</span>}
     </button>
+  )
+}
+
+// The year's everyday spending against the same monthly budget: what the
+// complete months add up to, and which of them ran over. Not a button — it has
+// nothing of its own to edit; the budget is set from the month card or Settings.
+export function YearBudgetCard({ lines, currency }: { lines: YearLine[]; currency: string }) {
+  const copy = yearCardCopy(lines, currency)
+  return (
+    <section className="year-card" aria-label="Everyday against budget">
+      <div className="budget-head">
+        <h2 className="stat-label">Everyday against budget</h2>
+        {copy.pill && (
+          <span className="status-pill" data-tone={copy.pill.tone}>
+            {copy.pill.text}
+          </span>
+        )}
+      </div>
+      {copy.amount && (
+        <p className="budget-left">
+          <span className="budget-amount money">{copy.amount}</span>
+          <span className="budget-of">{copy.after}</span>
+        </p>
+      )}
+      <p className="year-sentence">{copy.sentence}</p>
+    </section>
   )
 }

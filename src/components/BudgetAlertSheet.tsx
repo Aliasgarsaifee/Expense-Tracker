@@ -74,6 +74,7 @@ function SheetBody({
             <span>{copy.over}</span>
             <span>{copy.daysLeft}</span>
           </p>
+          {copy.yearLine && <p className="alert-year">{copy.yearLine}</p>}
         </div>
 
         <div className="alert-actions">

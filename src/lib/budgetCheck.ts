@@ -1,7 +1,7 @@
-import { listCategories, listExpensesBetween, type Expense } from '../db'
-import { budgetCrossing, budgetFor, type Budgets } from './budget'
+import { firstExpenseMonth, listCategories, listExpensesBetween, type Expense } from '../db'
+import { budgetCrossing, budgetFor, carriedIntoMonth, earlierThisYear, type Budgets } from './budget'
 import { monthOf } from './dates'
-import { fixedLabels } from './fixed'
+import { everydayIn, fixedLabels } from './fixed'
 
 export interface BudgetAlert {
   kind: 'near' | 'over'
@@ -12,6 +12,7 @@ export interface BudgetAlert {
   daysLeft: number
   entry: Expense
   isNew: boolean // false when an edit did it — the sheet then offers no Undo
+  carried: number | null // what earlier months of the year left in hand
 }
 
 // Judges one just-persisted save. The database already holds `saved`, so the
@@ -41,6 +42,21 @@ export async function checkBudgetAfterSave(
 
   const kind = budgetCrossing(before, after, budget)
   if (kind === null) return null
+
+  // The year's earlier months are read only once the month has crossed, so
+  // they can never change which saves alert — only what the sheet says.
+  const earlier = earlierThisYear(month)
+  const carried =
+    earlier === null
+      ? null
+      : carriedIntoMonth(
+          everydayIn(await listExpensesBetween(earlier.from, earlier.to), saved.currency, fixed),
+          budget,
+          month,
+          today,
+          await firstExpenseMonth(saved.currency),
+        )
+
   return {
     kind,
     currency: saved.currency,
@@ -50,5 +66,6 @@ export async function checkBudgetAfterSave(
     daysLeft: new Date(y, m, 0).getDate() - Number(today.slice(8, 10)),
     entry: saved,
     isNew: previous === null,
+    carried,
   }
 }

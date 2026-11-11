@@ -2,6 +2,7 @@ import type { Expense } from '../db'
 import { addMonths, monthName, monthOf } from './dates'
 import { formatMoney } from './money'
 import type { Badge } from './fixed'
+import type { Period } from './period'
 
 // Everything here is single-currency: callers pass amounts for one currency,
 // and a budget is looked up per currency. Nothing is summed or converted.
@@ -157,6 +158,7 @@ export interface AlertFacts {
   month: string // 'YYYY-MM'
   daysLeft: number // after today
   entry: { amount: number; category: string; note?: string }
+  carried: number | null // what earlier months of the year left in hand
 }
 
 // The second line of the save toast at 80%. The share is the real one, so a
@@ -180,13 +182,14 @@ export interface BudgetAlertCopy {
   bar: string // the bar, for VoiceOver
   withinShare: number // the budget's part of the bar, 0..1
   overShare: number // the overshoot's part; the two sum to 1
+  yearLine: string | null // the month's overrun against the year; null in a first month
 }
 
 // The sheet for the save that took the month past its budget. A fact and the
 // room left in the month, nothing more: the owner set the line, and the sheet
 // is there to say it was crossed, not to scold.
 export function budgetAlertCopy(alert: AlertFacts): BudgetAlertCopy {
-  const { currency, budget, spent, month, daysLeft, entry } = alert
+  const { currency, budget, spent, month, daysLeft, entry, carried } = alert
   const name = monthName(month)
   return {
     pill: 'Over budget',
@@ -203,6 +206,7 @@ export function budgetAlertCopy(alert: AlertFacts): BudgetAlertCopy {
     bar: `${percent(spent / budget)} of the budget used`,
     withinShare: budget / spent,
     overShare: (spent - budget) / spent,
+    yearLine: alertYearLine(carried, spent - budget, currency),
   }
 }
 
@@ -259,6 +263,16 @@ export function carriedInto(lines: YearLine[]): number | null {
   return null
 }
 
+// What the complete months before `month` left in hand. carriedInto reads the
+// ledger as of today, which is wrong for a past month on screen: September has
+// to see August's balance, not October's.
+export function carriedBefore(lines: YearLine[], month: string): number | null {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].month < month && !lines[i].partial) return lines[i].running
+  }
+  return null
+}
+
 // Complete months only; a month exactly on budget is neither over nor under.
 export function yearTally(lines: YearLine[]): {
   overCount: number
@@ -309,4 +323,170 @@ export function alertYearLine(
   return net >= 0
     ? `${hand}, so the year is still ${formatMoney(net, currency)} under.`
     : `${hand}; the year is now ${formatMoney(-net, currency)} over.`
+}
+
+function lastDayOf(month: string): number {
+  const [y, m] = month.split('-').map(Number)
+  return new Date(y, m, 0).getDate() // day 0 of the next month
+}
+
+// The span of the year before `month`, which a month's carried line is worked
+// from: 1 January to the last day of the month before. null for January,
+// which has no earlier month and so needs no read.
+export function earlierThisYear(month: string): { from: string; to: string } | null {
+  if (month.endsWith('-01')) return null
+  const prev = addMonths(month, -1)
+  return {
+    from: `${month.slice(0, 4)}-01-01`,
+    to: `${prev}-${String(lastDayOf(prev)).padStart(2, '0')}`,
+  }
+}
+
+// What Summary's read must add for the year ledger, given the period on screen.
+// Nothing until a budget exists. The year view's months are its own window,
+// already read, so it needs only when each budgeted currency was first used; a
+// month needs that and the months of its year before it, for the card's
+// carried line. The viewed currency is only known once the read has landed,
+// so every budgeted currency is covered — in practice one.
+export function ledgerReads(
+  period: Period,
+  budgets: Budgets,
+): { earlier: { from: string; to: string } | null; currencies: string[] } {
+  const currencies = Object.keys(budgets)
+  const none = { earlier: null, currencies: [] }
+  if (currencies.length === 0) return none
+  if (period.kind === 'year') return { earlier: null, currencies }
+  if (period.kind !== 'month') return none
+  const earlier = earlierThisYear(period.month)
+  return earlier === null ? none : { earlier, currencies }
+}
+
+// The year's ledger from one currency's everyday entries. `firstMonth` is the
+// month that currency was first used (firstExpenseMonth); null means never, and
+// a currency never used keeps no ledger — otherwise its empty months would
+// read as a whole budget saved each.
+export function ledgerFor(
+  everyday: Expense[],
+  budget: number,
+  year: string,
+  today: string,
+  firstMonth: string | null,
+): YearLine[] {
+  if (firstMonth === null) return []
+  return yearLedger(monthTotals(everyday), budget, year, today, firstMonth)
+}
+
+// What the year's earlier months carried into `month`, from one currency's
+// everyday entries of those months. Summary's month card and the budget alert
+// both read it this way, so the two can never disagree.
+export function carriedIntoMonth(
+  everyday: Expense[],
+  budget: number,
+  month: string,
+  today: string,
+  firstMonth: string | null,
+): number | null {
+  return carriedBefore(ledgerFor(everyday, budget, month.slice(0, 4), today, firstMonth), month)
+}
+
+// "in hand" for a balance at or above zero, "to make up" below it.
+function balance(amount: number, currency: string): string {
+  return amount >= 0
+    ? `${formatMoney(amount, currency)} in hand`
+    : `${formatMoney(-amount, currency)} to make up`
+}
+
+// The month card's line under the bar; null when no earlier month carries in.
+export function carriedLine(carried: number | null, currency: string): string | null {
+  return carried === null ? null : `${balance(carried, currency)} from earlier months this year`
+}
+
+export interface YearCardCopy {
+  pill: Badge | null // null until a month is complete: nothing is judged yet
+  amount: string | null // the figure, set large: "₹14,600"
+  after: string | null // what follows it: "in hand after 10 months"
+  sentence: string
+}
+
+// The year card: the balance the complete months add up to, and which ran over.
+export function yearCardCopy(lines: YearLine[], currency: string): YearCardCopy {
+  const carried = carriedInto(lines)
+  if (carried === null) {
+    return { pill: null, amount: null, after: null, sentence: 'The first month is still running.' }
+  }
+  const complete = lines.filter((l) => !l.partial).length
+  const months = complete === 1 ? '1 month' : `${complete} months`
+  const inHand = carried >= 0
+  return {
+    pill: inHand ? { tone: 'positive', text: 'In hand' } : { tone: 'caution', text: 'To make up' },
+    amount: formatMoney(Math.abs(carried), currency),
+    after: `${inHand ? 'in hand' : 'to make up'} after ${months}`,
+    sentence: yearSentence(lines, currency),
+  }
+}
+
+export interface YearLineCopy {
+  key: string // 'YYYY-MM', the month a tap opens
+  month: string // "October"
+  spent: string // "₹18,300 spent" | "₹8,730 so far"
+  diff: string // "₹6,700 under" | "₹1,300 over" | "On budget" | "₹16,270 left"
+  over: boolean // the diff is an overrun, which wears --negative beside its word
+  balance: string // "₹14,600 in hand" | "₹450 to make up" | "19 days to go"
+  label: string // the whole row, for VoiceOver
+}
+
+// One row of the month ledger. The month still running has no balance yet
+// (it does not accrue), so it says what is left and how long remains.
+export function yearLineCopy(line: YearLine, currency: string, today: string): YearLineCopy {
+  const over = line.diff < 0
+  const overBy = `${formatMoney(-line.diff, currency)} over`
+  let spent: string
+  let diff: string
+  let after: string
+  if (line.partial) {
+    const daysLeft = lastDayOf(line.month) - Number(today.slice(8, 10))
+    spent = `${formatMoney(line.spent, currency)} so far`
+    diff = over ? overBy : `${formatMoney(line.diff, currency)} left`
+    after =
+      daysLeft === 0 ? 'Last day' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} to go`
+  } else {
+    spent = `${formatMoney(line.spent, currency)} spent`
+    diff = over
+      ? overBy
+      : line.diff === 0
+        ? 'On budget'
+        : `${formatMoney(line.diff, currency)} under`
+    after = balance(line.running ?? 0, currency)
+  }
+  const month = monthName(line.month)
+  return {
+    key: line.month,
+    month,
+    spent,
+    diff,
+    over,
+    balance: after,
+    label: `${month}: ${spent}, ${diff}, ${after}`,
+  }
+}
+
+// The month ledger, newest first: the month still running leads.
+export function yearLedgerCopy(
+  lines: YearLine[],
+  budget: number,
+  currency: string,
+  today: string,
+): { note: string; rows: YearLineCopy[] } {
+  return {
+    note: `against ${formatMoney(budget, currency)}`,
+    rows: [...lines].reverse().map((l) => yearLineCopy(l, currency, today)),
+  }
+}
+
+// The monthly budget drawn across the year chart, where each bar is a month.
+export function yearBudgetReference(
+  budget: number,
+  currency: string,
+): { value: number; label: string } {
+  return { value: budget, label: `budget ${formatMoney(budget, currency)}` }
 }

@@ -141,3 +141,62 @@ describe('checkBudgetAfterSave', () => {
     expect(await edit(over, { category: 'Rent' })).toBeNull()
   })
 })
+
+// January to October at the year ledger's everyday totals, one entry a month.
+const EARLIER = [22400, 19850, 27900, 24100, 31200, 21300, 23650, 20400, 26300, 18300]
+async function seedEarlierMonths(totals = EARLIER, currency = 'INR') {
+  for (const [i, amount] of totals.entries()) {
+    const month = String(i + 1).padStart(2, '0')
+    await addExpense({ amount, currency, category: 'Food', spentOn: `2026-${month}-15` })
+  }
+}
+
+describe('checkBudgetAfterSave, against the year', () => {
+  beforeEach(async () => {
+    await db.expenses.clear()
+    await db.categories.clear()
+    await db.categories.bulkAdd(DEFAULT_CATEGORIES)
+  })
+
+  it('carries what the earlier months left in hand', async () => {
+    await seedEarlierMonths()
+    await seedEveryday(24000)
+    expect(await save({ amount: 2150 })).toMatchObject({ kind: 'over', carried: 14600 })
+  })
+
+  it('carries nothing when no earlier month of the year holds an entry', async () => {
+    await seedEveryday(24000)
+    expect(await save({ amount: 2150 })).toMatchObject({ kind: 'over', carried: null })
+  })
+
+  it('carries nothing in January, whatever last year did', async () => {
+    await addExpense({ amount: 10000, category: 'Food', spentOn: '2025-12-10' })
+    await addExpense({ amount: 24000, category: 'Food', spentOn: '2026-01-05' })
+    const alert = await save({ amount: 2150, spentOn: '2026-01-20' }, '2026-01-20')
+    expect(alert).toMatchObject({ kind: 'over', carried: null })
+  })
+
+  it('leaves fixed costs and other currencies out of the carried balance', async () => {
+    await seedEarlierMonths()
+    await addExpense({ amount: 32000, category: 'Rent', spentOn: '2026-03-01' })
+    await addExpense({ amount: 5000, currency: 'USD', category: 'Food', spentOn: '2026-04-02' })
+    await seedEveryday(24000)
+    expect(await save({ amount: 2150 })).toMatchObject({ carried: 14600 })
+  })
+
+  // Counting from January would credit USD with eight unused months: 4,100.
+  it('starts a second currency’s year at its own first entry', async () => {
+    await seedEarlierMonths()
+    await addExpense({ amount: 600, currency: 'USD', category: 'Food', spentOn: '2026-09-03' })
+    await addExpense({ amount: 300, currency: 'USD', category: 'Food', spentOn: '2026-10-03' })
+    await addExpense({ amount: 450, currency: 'USD', category: 'Food', spentOn: '2026-11-03' })
+    const alert = await save({ amount: 100, currency: 'USD' }, TODAY, { INR: 25000, USD: 500 })
+    expect(alert).toMatchObject({ kind: 'over', currency: 'USD', carried: 100 })
+  })
+
+  it('decides whether to alert on the month alone', async () => {
+    await seedEarlierMonths(EARLIER.map(() => 40000))
+    await seedEveryday(10000)
+    expect(await save({ amount: 500 })).toBeNull()
+  })
+})

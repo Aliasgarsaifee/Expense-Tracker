@@ -1,12 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useMemo, useState } from 'react'
 import { BreakdownList } from '../components/BreakdownList'
-import { BudgetCard } from '../components/BudgetCard'
+import { BudgetCard, YearBudgetCard } from '../components/BudgetCard'
 import { Pager } from '../components/Pager'
 import { PeriodSheet } from '../components/PeriodSheet'
 import { TrendChart } from '../components/TrendChart'
+import { YearLedger } from '../components/YearLedger'
 import {
   db,
+  firstExpenseMonth,
   listCategories,
   listExpenses,
   listExpensesBetween,
@@ -15,14 +17,25 @@ import {
   type Expense,
   type PaymentMethod,
 } from '../db'
-import { budgetFor, budgetReference, budgetStatus, type Budgets } from '../lib/budget'
+import {
+  budgetFor,
+  budgetReference,
+  budgetStatus,
+  carriedIntoMonth,
+  ledgerFor,
+  ledgerReads,
+  yearBudgetReference,
+  type Budgets,
+} from '../lib/budget'
 import { currencySymbol } from '../lib/currencies'
 import { shortDayMonth, shortMonthYear, todayISO } from '../lib/dates'
 import {
+  everydayIn,
   expectedFixed,
   fixedBadge,
   fixedLabels,
   fixedLines,
+  hasFixedSpend,
   paceWithFixed,
   splitFixed,
   usualTotal,
@@ -107,9 +120,14 @@ export function SummaryScreen({
   // with no reload, and the split always lands in one snapshot with the
   // entries it splits. Archived categories included: their label still sits
   // on old entries, so they still decide fixedness and still need a face.
+  // The year ledger's reads ride here for the same reason (see ledgerReads);
+  // `budgets` is a dep because whether to make them depends on it.
   const view = useLiveQuery(async () => {
     const windows = periodWindows(period, today)
     const usual = usualWindow(period)
+    const ledger = ledgerReads(period, budgets)
+    const firstMonths: Record<string, string | null> = {}
+    for (const c of ledger.currencies) firstMonths[c] = await firstExpenseMonth(c)
     return {
       period,
       today,
@@ -123,8 +141,12 @@ export function SummaryScreen({
         ? await listExpensesBetween(usual.from, usual.to)
         : ([] as Expense[]),
       categories: await listCategories({ includeArchived: true }),
+      earlier: ledger.earlier
+        ? await listExpensesBetween(ledger.earlier.from, ledger.earlier.to)
+        : ([] as Expense[]),
+      firstMonths,
     }
-  }, [period, today])
+  }, [period, today, budgets])
 
   // useLiveQuery holds the previous result while the next one is in flight, so
   // without the stamp the old period's figures render under the new heading.
@@ -134,6 +156,7 @@ export function SummaryScreen({
   const prevExpenses = view?.prevExpenses
   const history = view?.history
   const categories = view?.categories
+  const earlier = view?.earlier
   // Everything below the pager is derived from the period the loaded data
   // actually belongs to, never the one just tapped. That keeps a total, its
   // chart and its comparison describing one period at all times, and it leaves
@@ -176,11 +199,15 @@ export function SummaryScreen({
 
   const bucket = buckets.find((b) => b.currency === currency)
   const summary = useMemo(() => summarize(bucket?.expenses ?? []), [bucket])
+  // Missing while a just-set budget's read is in flight: no ledger until it lands.
+  const firstMonth = view?.firstMonths[currency] ?? null
 
-  // Fixed costs (rent, bills) counted apart from everyday spending — month view
-  // only, since "usual" is a monthly idea. lib/fixed is single-currency, so the
-  // history is narrowed to the viewed currency first. No lines means no split:
-  // every figure below is then exactly what it was before the split existed.
+  // Fixed costs (rent, bills) counted apart from everyday spending on the month
+  // and the year. The month judges each fixed line against its usual — a
+  // monthly idea — so lines, the usual and fixed-once pace stay month-only.
+  // lib/fixed is single-currency, so the history is narrowed to the viewed
+  // currency first. No split means every figure below is exactly what it was
+  // before the split existed.
   const fixed = useMemo(() => fixedLabels(categories ?? []), [categories])
   const lines = useMemo(
     () =>
@@ -193,7 +220,12 @@ export function SummaryScreen({
         : [],
     [dataPeriod, bucket, history, currency, fixed],
   )
-  const splitActive = lines.length > 0
+  const monthSplit = lines.length > 0
+  const yearSplit = useMemo(
+    () => dataPeriod.kind === 'year' && hasFixedSpend(bucket?.expenses ?? [], fixed),
+    [dataPeriod, bucket, fixed],
+  )
+  const splitActive = monthSplit || yearSplit
   const split = useMemo(
     () => (splitActive ? splitFixed(bucket?.expenses ?? [], fixed) : null),
     [splitActive, bucket, fixed],
@@ -272,7 +304,7 @@ export function SummaryScreen({
   // by day is what had the pace reading double.
   const projected = !bounds
     ? 0
-    : splitActive
+    : monthSplit
       ? paceWithFixed(expectedFixed(lines), everydaySummary.total, elapsed, spanDays)
       : projectTotal(summary.total, elapsed, spanDays)
 
@@ -281,20 +313,46 @@ export function SummaryScreen({
     [everyday, bounds, trendUnitOf],
   )
 
-  // The budget is a monthly line for everyday spending in one currency, so it
-  // appears on the month view only, for the currency on screen. Everyday is
-  // everything when nothing is fixed, so the card needs no split to work.
+  // The budget is a monthly line for everyday spending in one currency, for
+  // the currency on screen: the month view measures its month against it, the
+  // year view each of its months. Everyday is everything when nothing is
+  // fixed, so neither needs a split to work.
   const budget = dataPeriod.kind === 'month' ? budgetFor(budgets, currency) : null
   const budgetNow =
     budget === null ? null : budgetStatus(everydaySummary.total, budget, elapsed, spanDays)
+  const carried = useMemo(
+    () =>
+      budget !== null && dataPeriod.kind === 'month'
+        ? carriedIntoMonth(
+            everydayIn(earlier ?? [], currency, fixed),
+            budget,
+            dataPeriod.month,
+            today,
+            firstMonth,
+          )
+        : null,
+    [budget, dataPeriod, earlier, currency, fixed, today, firstMonth],
+  )
+  const yearBudget = dataPeriod.kind === 'year' ? budgetFor(budgets, currency) : null
+  // Empty for a year before the ledger began, which then shows no card.
+  const yearLines = useMemo(
+    () =>
+      yearBudget !== null && dataPeriod.kind === 'year'
+        ? ledgerFor(everyday ?? [], yearBudget, dataPeriod.year, today, firstMonth)
+        : [],
+    [yearBudget, dataPeriod, everyday, today, firstMonth],
+  )
+  const hasLedger = yearLines.length > 0
   // Memoized: TrendChart is memo'd, and a fresh object each render would
   // rebuild it every time this screen re-rendered.
   const reference = useMemo(
     () =>
       budget !== null && spanDays > 0
         ? budgetReference(budget, spanDays, currency)
-        : undefined,
-    [budget, spanDays, currency],
+        : yearBudget !== null && hasLedger
+          ? yearBudgetReference(yearBudget, currency)
+          : undefined,
+    [budget, spanDays, currency, yearBudget, hasLedger],
   )
 
   const delta =
@@ -332,9 +390,9 @@ export function SummaryScreen({
     <div className="stat-tile">
       <p className="stat-label">On pace for</p>
       <p className="stat-value money">{formatMoney(projected, currency)}</p>
-      <p className={splitActive ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
+      <p className={monthSplit ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
         by {shortDayMonth(bounds.to)}
-        {splitActive && ' · fixed counted once'}
+        {monthSplit && ' · fixed counted once'}
       </p>
     </div>
   )
@@ -462,7 +520,7 @@ export function SummaryScreen({
           budget={budget}
           currency={currency}
           daysLeft={spanDays - elapsed}
-          carried={null}
+          carried={carried}
           onEdit={() => onOpenBudget(currency)}
         />
       ) : (
@@ -476,6 +534,8 @@ export function SummaryScreen({
           </button>
         )
       )}
+
+      {hasLedger && <YearBudgetCard lines={yearLines} currency={currency} />}
 
       {entryCount > 0 && bounds && (
         <section className="stat-grid" aria-label="Period statistics">
@@ -560,7 +620,9 @@ export function SummaryScreen({
              day of the month to a sliver. */}
           {splitActive ? (
             <div className="card-head">
-              <h2 className="section-title">Everyday, day by day</h2>
+              <h2 className="section-title">
+                {trendUnitOf === 'month' ? 'Everyday, month by month' : 'Everyday, day by day'}
+              </h2>
               <span className="card-note">fixed costs left out</span>
             </div>
           ) : (
@@ -577,7 +639,22 @@ export function SummaryScreen({
         </section>
       )}
 
-      {splitActive && (
+      {hasLedger && yearBudget !== null && (
+        <YearLedger
+          lines={yearLines}
+          budget={yearBudget}
+          currency={currency}
+          today={today}
+          onSelectMonth={(month) => {
+            setPeriod({ kind: 'month', month })
+            // The ledger sits at the foot of a long page; the month it opens
+            // reads from the top, where its heading and budget card are.
+            window.scrollTo(0, 0)
+          }}
+        />
+      )}
+
+      {monthSplit && (
         <section className="chart-card">
           <div className="card-head">
             <h2 className="section-title">Fixed costs</h2>

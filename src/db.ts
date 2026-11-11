@@ -233,6 +233,19 @@ export async function listExpensesBetween(from: string, to: string): Promise<Exp
   return sortNewestFirst(rows)
 }
 
+// The 'YYYY-MM' of the oldest entry in one currency, any year; null when there
+// is none. The year ledger starts here so months before a currency was in use
+// are not counted as savings. Walks the spentOn index from the oldest and stops
+// at the first match. A row with no currency predates multi-currency: INR, as
+// everywhere else.
+export async function firstExpenseMonth(currency: string): Promise<string | null> {
+  const first = await db.expenses
+    .orderBy('spentOn')
+    .filter((e) => (e.currency ?? 'INR') === currency)
+    .first()
+  return first ? first.spentOn.slice(0, 7) : null
+}
+
 export async function updateExpense(
   id: string,
   changes: Partial<NewExpense>,

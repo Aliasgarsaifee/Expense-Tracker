@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, Expense } from '../db'
 import {
+  everydayIn,
   expectedFixed,
   fixedBadge,
   fixedLabels,
   fixedLines,
+  hasFixedSpend,
   paceWithFixed,
   splitFixed,
   usualAmount,
@@ -51,6 +53,25 @@ describe('fixedLabels / splitFixed', () => {
 
   it('keeps a renamed fixed category fixed (id-derived default follows the new label)', () => {
     expect(fixedLabels([cat('cat-rent', 'Housing')])).toEqual(new Set(['Housing']))
+  })
+
+  // The year has no usual to judge by, so any fixed spend at all splits it.
+  it('tells whether any entry is a fixed cost', () => {
+    const labels = new Set(['Rent'])
+    expect(hasFixedSpend([expense('Food', 3), expense('Rent', 1)], labels)).toBe(true)
+    expect(hasFixedSpend([expense('Food', 3)], labels)).toBe(false)
+    expect(hasFixedSpend([], labels)).toBe(false)
+  })
+
+  it('keeps one currency’s everyday entries', () => {
+    const usd = { ...expense('Food', 7), id: 'usd', currency: 'USD' }
+    const kept = everydayIn(
+      [expense('Food', 3), expense('Rent', 1), usd, expense('Deleted', 4)],
+      'INR',
+      new Set(['Rent']),
+    )
+    expect(kept.map((e) => e.category)).toEqual(['Food', 'Deleted'])
+    expect(everydayIn([usd], 'USD', new Set()).map((e) => e.id)).toEqual(['usd'])
   })
 })
 

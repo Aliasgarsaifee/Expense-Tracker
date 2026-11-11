@@ -12,6 +12,7 @@ import {
   deleteCategory,
   deleteExpense,
   deletePaymentMethod,
+  firstExpenseMonth,
   isFixedCategory,
   listCategories,
   listExpenses,
@@ -29,6 +30,7 @@ import {
   unbackedSince,
   UPI_METHOD_ID,
   updateExpense,
+  type Expense,
 } from './db'
 
 // Adds are timestamped with the wall clock; a short pause guarantees
@@ -254,6 +256,42 @@ describe('listExpensesBetween', () => {
 
     const july = await listExpensesBetween('2026-07-01', '2026-07-31')
     expect(july.map((e) => e.id)).toEqual([jul31.id, jul1.id])
+  })
+})
+
+describe('firstExpenseMonth', () => {
+  it('is the month of the oldest entry in that currency, across years', async () => {
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-03-14' })
+    await addExpense({ amount: 2, category: 'Rent', spentOn: '2025-11-02' })
+    await addExpense({ amount: 3, category: 'Food', spentOn: '2026-01-09' })
+    expect(await firstExpenseMonth('INR')).toBe('2025-11')
+  })
+
+  // A second currency first used mid-year must not inherit the first one's start.
+  it('looks only at the currency asked for', async () => {
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2024-02-01' })
+    await addExpense({ amount: 2, category: 'Food', spentOn: '2026-07-20', currency: 'USD' })
+    await addExpense({ amount: 3, category: 'Food', spentOn: '2026-05-04', currency: 'USD' })
+    expect(await firstExpenseMonth('USD')).toBe('2026-05')
+    expect(await firstExpenseMonth('INR')).toBe('2024-02')
+  })
+
+  it('counts a row with no currency as INR', async () => {
+    await db.expenses.add({
+      id: 'legacy',
+      amount: 1,
+      category: 'Food',
+      spentOn: '2023-08-30',
+      createdAt: '2023-08-30T00:00:00.000Z',
+    } as Expense)
+    await addExpense({ amount: 2, category: 'Food', spentOn: '2023-06-01', currency: 'USD' })
+    expect(await firstExpenseMonth('INR')).toBe('2023-08')
+  })
+
+  it('is null when the currency has no entry', async () => {
+    expect(await firstExpenseMonth('INR')).toBeNull()
+    await addExpense({ amount: 1, category: 'Food', spentOn: '2026-01-01' })
+    expect(await firstExpenseMonth('USD')).toBeNull()
   })
 })
 
