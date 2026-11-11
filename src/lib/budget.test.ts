@@ -75,6 +75,14 @@ describe('budget maths', () => {
     expect(budgetStatus(8730, 25000, 15, 30).evenShare).toBe(0.5)
   })
 
+  it('does not call float dust an overshoot', () => {
+    const dusty = 25000.000000001 // what summing paise can leave behind
+    expect(budgetLevel(dusty, 25000)).toBe('near')
+    expect(budgetBadge(budgetStatus(dusty, 25000, 10, 30), 'INR'))
+      .toEqual({ tone: 'caution', text: 'Close' })
+    expect(budgetLevel(25000.01, 25000)).toBe('over')
+  })
+
   it('words the badge', () => {
     expect(budgetBadge(budgetStatus(8730, 25000, 11, 30), 'INR'))
       .toEqual({ tone: 'positive', text: 'On track' })
@@ -111,7 +119,7 @@ describe('budget maths', () => {
     expect(budgetCardCopy(budgetStatus(8730, 25000, 11, 30), 25000, 19, 'INR')).toEqual({
       amount: '₹16,270',
       of: 'left of ₹25,000',
-      perDay: '₹856 a day for the next 19 days',
+      perDay: '₹856 a day for 19 days',
       bar: '35% of the budget used; even pace today is 37%',
     })
   })
@@ -497,8 +505,8 @@ describe('year copy', () => {
   })
 
   it('words the line the month card carries', () => {
-    expect(carriedLine(14600, 'INR')).toBe('₹14,600 in hand from earlier months this year')
-    expect(carriedLine(-450, 'INR')).toBe('₹450 to make up from earlier months this year')
+    expect(carriedLine(14600, 'INR')).toBe('₹14,600 in hand from earlier months')
+    expect(carriedLine(-450, 'INR')).toBe('₹450 to make up from earlier months')
     expect(carriedLine(null, 'INR')).toBeNull()
   })
 

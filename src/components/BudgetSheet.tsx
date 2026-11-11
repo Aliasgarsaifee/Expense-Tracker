@@ -3,6 +3,7 @@ import { isFixedCategory, listCategories, setCategoryFixed } from '../db'
 import { formatMoney, parseAmount } from '../lib/money'
 import { useDialog } from '../lib/useDialog'
 import { Dialog } from './Dialog'
+import { ChevronRightIcon } from './icons'
 
 interface Props {
   open: boolean
@@ -57,8 +58,7 @@ function SheetBody({ onClose, currency, budget, onBudgetChange }: Omit<Props, 'o
           </button>
         </header>
         <p className="budget-intro">
-          One line for the month. You hear about it twice: a heads-up at 80%, and once
-          when an entry takes you past it.
+          You hear about it twice: at 80%, and when an entry takes you past it.
         </p>
 
         <section className="budget-section">
@@ -79,24 +79,14 @@ function SheetBody({ onClose, currency, budget, onBudgetChange }: Omit<Props, 'o
               ) : (
                 <span className="money">{formatMoney(budget, currency)}</span>
               )}
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <ChevronRightIcon />
             </span>
           </button>
           {/* No confirm: setting it again is one tap and a number away. */}
           {budget !== null && (
             <button
               type="button"
-              className="btn-text btn-text-tap"
+              className="btn-text btn-text-tap btn-quiet"
               onClick={() => onBudgetChange(null)}
             >
               Remove the budget

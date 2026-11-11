@@ -387,9 +387,8 @@ export function SummaryScreen({
     <div className="stat-tile">
       <p className="stat-label">On pace for</p>
       <p className="stat-value money">{formatMoney(projected, currency)}</p>
-      <p className={splitActive ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
+      <p className={yearSplit ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
         by {shortDayMonth(bounds.to)}
-        {monthSplit && ' · fixed counted once'}
         {yearSplit && ' · all spending'}
       </p>
     </div>
@@ -413,8 +412,7 @@ export function SummaryScreen({
   )
 
   // A tapped trend bucket drills to its span clipped to the viewed period; a
-  // whole in-period month jumps as a month (History's monthly-pager mode, like
-  // the busiest-month tile), everything else as an inclusive range.
+  // whole in-period month jumps as a month period; everything else as a range.
   // useCallback because TrendChart is memo'd: a fresh handler each render
   // would rebuild its ~213 nodes on every re-render regardless.
   const onBucketSelect = useCallback(
@@ -556,17 +554,16 @@ export function SummaryScreen({
                   ? '—'
                   : `${delta > 0 ? '▲' : delta < 0 ? '▼' : '='} ${Math.abs(delta)}%`}
               </p>
-              <p className={splitActive ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
-                {delta === null ? (
-                  'nothing to compare'
-                ) : (
-                  <>
-                    {splitActive && 'everyday · '}
-                    {cmp?.toDate
+              <p className="stat-sub">
+                {delta === null
+                  ? 'nothing to compare'
+                  : splitActive
+                    ? cmp?.toDate
+                      ? `${formatMoney(prevTotal ?? 0, currency)} everyday by now`
+                      : `was ${formatMoney(prevTotal ?? 0, currency)} everyday`
+                    : cmp?.toDate
                       ? `${formatMoney(prevTotal ?? 0, currency)} by this point`
                       : `was ${formatMoney(prevTotal ?? 0, currency)}`}
-                  </>
-                )}
               </p>
             </div>
           )}

@@ -36,7 +36,10 @@ export function budgetFor(budgets: Budgets, currency: string): number | null {
 }
 
 export function budgetLevel(spent: number, budget: number): BudgetLevel {
-  if (spent > budget) return 'over'
+  // Paise summed as floats can leave dust past the budget; only a real paisa
+  // over counts, and the same rule keeps the save alert from firing on dust.
+  const paise = Math.round(spent * 100) / 100
+  if (paise > budget) return 'over'
   return spent >= NEAR_SHARE * budget ? 'near' : 'under'
 }
 
@@ -133,7 +136,7 @@ export function budgetCardCopy(
   if (status.perDay !== null) {
     const each = formatMoney(status.perDay, currency)
     perDay =
-      daysLeft === 1 ? `${each} for the last day` : `${each} a day for the next ${daysLeft} days`
+      daysLeft === 1 ? `${each} for the last day` : `${each} a day for ${daysLeft} days`
   }
   // usedShare is clamped for the bar's width; the words give the real share,
   // so a month 5% over does not read as exactly spent.
@@ -398,7 +401,7 @@ function balance(amount: number, currency: string): string {
 
 // The month card's line under the bar; null when no earlier month carries in.
 export function carriedLine(carried: number | null, currency: string): string | null {
-  return carried === null ? null : `${balance(carried, currency)} from earlier months this year`
+  return carried === null ? null : `${balance(carried, currency)} from earlier months`
 }
 
 export interface YearCardCopy {

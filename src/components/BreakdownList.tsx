@@ -60,7 +60,9 @@ export function BreakdownList({
               <button
                 type="button"
                 className="pay-row pay-row-btn"
-                aria-label={r.selectLabel}
+                aria-label={
+                  r.selectLabel && r.badge ? `${r.selectLabel}, ${r.badge.text}` : r.selectLabel
+                }
                 onClick={r.onSelect}
               >
                 {inner}

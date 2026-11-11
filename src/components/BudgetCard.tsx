@@ -30,7 +30,7 @@ export function BudgetCard({ status, budget, currency, daysLeft, carried, onEdit
   // width and the tick's offset.
   const shares = { '--used': status.usedShare, '--even': status.evenShare } as CSSProperties
   // With no days left there is no "today" in a past month, and on the last
-  // day a tick at 100% only repeats the bar's end — so no tick, no label.
+  // day a tick at 100% only repeats the bar's end — so no tick.
   const paced = daysLeft > 0
 
   return (
@@ -45,17 +45,12 @@ export function BudgetCard({ status, budget, currency, daysLeft, carried, onEdit
         <span className="budget-amount money">{copy.amount}</span>
         <span className="budget-of">{copy.of}</span>
       </span>
-      <span className="budget-bar" style={shares} data-paced={paced ? '' : undefined}>
+      <span className="budget-bar" style={shares}>
         <span className="budget-track" aria-hidden="true">
           <span className="budget-fill" data-tone={badge.tone} />
         </span>
         {paced && (
-          <>
-            <span className="budget-tick" aria-hidden="true" />
-            <span className="budget-tick-label" aria-hidden="true">
-              even pace today
-            </span>
-          </>
+          <span className="budget-tick" aria-hidden="true" />
         )}
         <span className="sr-only">{copy.bar}</span>
       </span>
