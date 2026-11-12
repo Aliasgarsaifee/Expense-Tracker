@@ -114,10 +114,12 @@ Dependency direction is one-way: `screens/components → db.ts + lib/ → Dexie/
   in the home currency, with a `paid` memo of what was actually paid) or
   **waiting** (a foreign currency, no `paid`: it keeps its own bucket, see
   `splitByCurrency`, until a rate arrives). "Waiting" is derived, never
-  stored. `paid.currency` never equals `currency`. Nothing reads `paid` except
-  through `lib/conversion.ts`. `convertExpense` is the only thing that turns a
-  waiting entry into a converted one outside the form, and the home value of a
-  stored entry is never recomputed from a new rate.
+  stored. `paid.currency` never equals `currency`. Display text and rate
+  arithmetic go through `lib/conversion.ts`; the only other places that touch
+  `paid` are `db.ts` (storage and `convertExpense`), `backup.ts` (parse and
+  CSV), History's search and the form's save path. `convertExpense` is the only
+  thing that turns a waiting entry into a converted one outside the form, and
+  the home value of a stored entry is never recomputed from a new rate.
 - `expenses.category` stores the category **label**, not the id — it is a
   foreign key by label. `renameCategory` relabels history in a transaction;
   anything touching category identity must preserve that.

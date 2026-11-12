@@ -67,4 +67,7 @@ the parsing and the places a request can go.
   and a hand-typed value is never replaced by a fetched one.
 - The provider sees the device's IP address and which currency pair and day
   was asked for. It does not see amounts or anything that identifies an entry.
+  A browser also sends the page's origin with the request (the GitHub Pages
+  hostname for the PWA, `capacitor://localhost` in the installed app), which
+  identifies the app, not the owner or an entry.
 - Tests inject the `fetch` implementation; no test touches the network.
