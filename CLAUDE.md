@@ -25,7 +25,7 @@ expense-tracker/
 │   ├── screens/                # AddScreen, HistoryScreen, SummaryScreen
 │   ├── components/             # shared UI: ExpenseForm, EntryRow, PeriodPager, sheets, pickers, chart, drawer; icons.tsx = every interface glyph
 │   ├── lib/                    # helpers; pure ones have co-located *.test.ts
-│   │   ├── money / dates / period / summarize / history / recent / currencies / fixed / budget / conversion   # pure, fully tested
+│   │   ├── money / dates / period / summarize / history / recent / currencies / fixed / budget / conversion / inUse   # pure, fully tested
 │   │   ├── backup.ts           # JSON backup (v3) + CSV export; imports v1–v3
 │   │   ├── prefs.ts            # localStorage wrapper (et-pref:*), deliberately outside Dexie
 │   │   ├── autoBackup.ts       # daily snapshot → Documents/Backups, keeps last 7

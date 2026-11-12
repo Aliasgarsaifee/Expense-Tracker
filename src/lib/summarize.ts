@@ -1,7 +1,9 @@
 import type { Expense } from '../db'
+import { formatMoney } from './money'
 import {
   bucketKeyOf,
   bucketKeysBetween,
+  bucketLabel,
   elapsedDays,
   type Bounds,
   type TrendUnit,
@@ -195,4 +197,54 @@ export function trendBuckets(
     }
   }
   return [...totals.entries()].map(([key, v]) => ({ key, total: v.total, count: v.count }))
+}
+
+// How many entries fall in each trend bucket, for the buckets that have any.
+export function bucketCounts(expenses: Expense[], unit: TrendUnit): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const e of expenses) {
+    const key = bucketKeyOf(e.spentOn, unit)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
+}
+
+// What the trend chart says about the bar the owner tapped. An empty bucket
+// (zero-filled, or a day still to come) holds nothing rather than "₹0 · 0
+// entries", which would read as spending that came to nothing.
+//
+// `leftOut` is how many of the bucket's entries the series does not draw:
+// under the fixed/everyday split the chart is everyday spending only, so the
+// day the rent was paid is a bare column without being an empty day. `entries`
+// counts both, and is what there is to see in History.
+export function bucketReadout(
+  bucket: TrendBucket,
+  unit: TrendUnit,
+  currency: string,
+  leftOut = 0,
+): { label: string; detail: string; entries: number } {
+  const label = bucketLabel(bucket.key, unit)
+  const entries = bucket.count + leftOut
+  if (bucket.count === 0) {
+    return { label, detail: leftOut > 0 ? 'fixed costs only' : 'nothing logged', entries }
+  }
+  const drawn = bucket.count === 1 ? '1 entry' : `${bucket.count} entries`
+  return { label, detail: `${formatMoney(bucket.total, currency)} · ${drawn}`, entries }
+}
+
+// Which column of the trend chart a tap landed in: x from the chart's left
+// edge, `count` equal columns across `width` less `inset` clear at each side.
+// The chart does not ask Recharts for this. Recharts answers from its hover
+// state, which needs a pointer move before the click — and a tap is not
+// guaranteed to send one, so its first tap could report nothing.
+export function bandIndexAt(
+  x: number,
+  width: number,
+  count: number,
+  inset: number,
+): number | null {
+  const plot = width - 2 * inset
+  if (count <= 0 || plot <= 0) return null
+  const index = Math.floor(((x - inset) / plot) * count)
+  return Math.min(count - 1, Math.max(0, index))
 }

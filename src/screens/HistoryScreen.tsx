@@ -261,8 +261,9 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
         from: bounds?.from,
         to: bounds?.to,
         query,
+        methodLabels: labels,
       }),
-    [expenses, bounds, effectiveMethodIds, catFilters, query],
+    [expenses, bounds, effectiveMethodIds, catFilters, query, labels],
   )
 
   const totals = useMemo(() => {
@@ -413,7 +414,9 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
           <input
             ref={searchRef}
             type="search"
-            placeholder="Search notes, categories, amounts…"
+            // Categories match too; the hint names three because the field
+            // holds 232px of text at 375px wide, and four ran to 299px.
+            placeholder="Search notes, cards, amounts…"
             aria-label="Search entries"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -507,7 +510,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
             ₹
           </p>
           <p className="empty-title">The ledger is empty</p>
-          <p className="empty-sub">Log your first expense from the Add tab.</p>
+          <p className="empty-sub">Log your first entry from the Add tab.</p>
         </div>
       ) : !hasMatches ? (
         <div className="empty">

@@ -9,7 +9,7 @@ on your iPhone with a free Apple ID.
 
 **What it tracks per entry:** amount + currency (every active ISO 4217
 currency, searchable; INR default), payment method (grouped as Cash / UPI /
-Credit card / Debit card, plus custom groups; Cash is the one built-in method
+Credit card / Debit card, plus custom types; Cash is the one built-in method
 — add your own cards and UPI apps), a category (8 built in, add your own with
 an emoji), date, and a free-text note.
 
@@ -20,18 +20,18 @@ an emoji), date, and a free-text note.
   "Paid with" (tap for a picker — recent first, a search field and per-type
   sections once you have more than five methods; last-used remembered) and a
   friendly "Today, 11 Nov" date row, then the note. The button says what it
-  adds ("Add ₹280 · Food"), and "Log again" offers your latest distinct
-  entries to refill the form. New cards can be added from the picker.
+  adds ("Add ₹280 · Food"), and "Repeat a recent entry" offers your latest
+  distinct entries to refill the form. New cards can be added from the picker.
   Each save confirms with a toast (plus a haptic tick on the phone) that
   offers a few seconds of **Undo**.
-  **Foreign currency:** a spend in another currency counts in your default
+  **Foreign currency:** a spend in another currency counts in your home
   currency at the rate of its date, shown right under the amount; tap it to
-  type what your card charged. History keeps what you paid in the small line.
+  type what it actually cost you. History keeps what you paid in the small line.
   With no signal the entry saves anyway and is converted later.
 - **History** — the same period control as Summary (‹ › step, tap the title
   for a day, month, year, all time or a range), with compact search, filter
   and sort buttons; all-time and year views get sticky month sections. The
-  filter sheet slices by any mix of payment methods, whole payment groups and
+  filter sheet slices by any mix of payment methods, whole payment types and
   categories (OR within each dimension, AND across), plus note/amount search
   — every active filter shows as a dismissible chip. Built
   for reconciling against card/UPI statements: pick a month + a card, compare.
@@ -47,9 +47,9 @@ an emoji), date, and a free-text note.
   you mark as fixed) from **everyday** spending, and you can set a monthly everyday
   **budget**: a heads-up at 80%, an alert the moment a save crosses it, and
   a year view showing which months ran over and what is in hand.
-- **Settings drawer** (☰) — a collapsible group tree of payment methods and
-  categories (rename / archive / delete-if-unused, rename your custom groups;
-  tap any row to jump to its History), plus default currency,
+- **Settings drawer** (☰) — a collapsible tree of payment methods by type, and
+  categories (rename / archive / delete-if-unused, rename your custom types;
+  tap any row to jump to its History), plus the home currency,
   exports/imports, auto-backup.
 
 ## Development
@@ -77,12 +77,12 @@ exchange rate (two currency codes and a date).
 **Backup discipline (non-negotiable):** a lost or reset phone = lost data
 unless you exported. From the Settings drawer (☰):
 
-- **Export JSON** after any big batch of edits — this is the real backup
+- **Export full backup (JSON)** after any big batch of edits — this is the real backup
   (expenses, payment methods **and** categories) and can be re-imported
   losslessly (imports merge by id, and same-named methods/categories from a
   different install merge by label, so re-importing never duplicates). Old
   v1/v2 backups import fine.
-- **Export CSV** monthly — doubles as your spreadsheet archive
+- **Export for spreadsheets (CSV)** monthly — a copy to read, not one to restore from
   (`spentOn,amount,currency,category,paymentMethod,note,id,createdAt`).
 
 Both use the iOS share sheet (Files, AirDrop, Mail…) on the phone, or a plain
@@ -102,7 +102,7 @@ reversible.
 
 True iCloud sync (CloudKit / an iCloud Drive container) requires a **paid**
 Apple Developer account — it is not available to free personal teams. The $0
-alternatives: share-sheet an Export JSON into **Files → iCloud Drive**, or
+alternatives: share-sheet a full backup into **Files → iCloud Drive**, or
 copy a snapshot out of the Backups folder now and then. Snapshots live inside
 the app's sandbox, so deleting the app still deletes them — an exported copy
 elsewhere is the only backup that survives that.

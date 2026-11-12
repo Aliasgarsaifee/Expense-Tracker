@@ -73,9 +73,7 @@ export default function App() {
   // A settings row was tapped: close the drawer, land on History, filter to
   // it. A fresh object per tap means re-tapping the same row re-applies even
   // if the user changed filters in between (identity is the event).
-  // The handler itself is stable (setState functions are): Summary passes it
-  // into a memoized chart, which would otherwise rebuild whenever this
-  // component re-rendered for an unrelated reason.
+  // The handler itself is stable (setState functions are).
   const jumpToHistory = useCallback(
     (jump: HistoryJump) => {
       setHistoryJump({ ...jump })

@@ -83,7 +83,7 @@ describe('budget maths', () => {
     const dusty = 25000.000000001 // what summing paise can leave behind
     expect(budgetLevel(dusty, 25000)).toBe('near')
     expect(budgetBadge(budgetStatus(dusty, 25000, 10, 30), 'INR'))
-      .toEqual({ tone: 'caution', text: 'Close' })
+      .toEqual({ tone: 'caution', text: '100% used' })
     expect(budgetLevel(25000.01, 25000)).toBe('over')
   })
 
@@ -96,14 +96,29 @@ describe('budget maths', () => {
 
   it('still words a real paisa over as over', () => {
     const copy = budgetCardCopy(budgetStatus(25000.01, 25000, 10, 30), 25000, 20, 'INR')
-    expect(copy.of).toBe('over ₹25,000')
+    expect(copy.amount).toBe('₹25,000.01')
+    expect(copy.of).toBe('spent of ₹25,000')
   })
 
   it('words the badge', () => {
     expect(budgetBadge(budgetStatus(8730, 25000, 11, 30), 'INR'))
       .toEqual({ tone: 'positive', text: 'On track' })
+    // The real share, not a word: in capitals at the card's corner, "Close"
+    // read as a button that closes it.
+    expect(budgetBadge(budgetStatus(20000, 25000, 11, 30), 'INR'))
+      .toEqual({ tone: 'caution', text: '80% used' })
     expect(budgetBadge(budgetStatus(21000, 25000, 11, 30), 'INR'))
-      .toEqual({ tone: 'caution', text: 'Close' })
+      .toEqual({ tone: 'caution', text: '84% used' })
+    // Rounded down: beside "₹100 left", a rounded-up "100% used" contradicts
+    // the figure it sits next to.
+    expect(budgetBadge(budgetStatus(24900, 25000, 11, 30), 'INR'))
+      .toEqual({ tone: 'caution', text: '99% used' })
+    expect(budgetBadge(budgetStatus(24999.99, 25000, 11, 30), 'INR'))
+      .toEqual({ tone: 'caution', text: '99% used' })
+    expect(budgetBadge(budgetStatus(85.5, 100, 11, 30), 'INR'))
+      .toEqual({ tone: 'caution', text: '85% used' })
+    expect(budgetBadge(budgetStatus(82, 100, 11, 30), 'INR'))
+      .toEqual({ tone: 'caution', text: '82% used' })
     expect(budgetBadge(budgetStatus(26150, 25000, 24, 30), 'INR'))
       .toEqual({ tone: 'negative', text: 'Over by ₹1,150' })
   })
@@ -120,14 +135,14 @@ describe('budget maths', () => {
 
   it('draws the daily allowance as a chart reference', () => {
     expect(budgetReference(25000, 30, 'INR'))
-      .toEqual({ value: 25000 / 30, label: '₹833 a day keeps the budget' })
-    expect(budgetReference(25000, 31, 'INR').label).toBe('₹806 a day keeps the budget')
-    expect(budgetReference(600, 30, 'USD').label).toBe('$20 a day keeps the budget')
+      .toEqual({ value: 25000 / 30, label: '₹833 a day stays within budget' })
+    expect(budgetReference(25000, 31, 'INR').label).toBe('₹806 a day stays within budget')
+    expect(budgetReference(600, 30, 'USD').label).toBe('$20 a day stays within budget')
   })
 
   // Rounding up would claim a day's figure that overshoots the budget over the month.
   it('rounds the daily label down so the figure really keeps the budget', () => {
-    expect(budgetReference(25000, 28, 'INR').label).toBe('₹892 a day keeps the budget')
+    expect(budgetReference(25000, 28, 'INR').label).toBe('₹892 a day stays within budget')
     expect(budgetReference(25000, 28, 'INR').value).toBe(25000 / 28)
   })
 
@@ -142,8 +157,10 @@ describe('budget maths', () => {
 
   it('words the card once over, with the real share rather than a full bar', () => {
     expect(budgetCardCopy(budgetStatus(26150, 25000, 24, 30), 25000, 6, 'INR')).toEqual({
-      amount: '₹1,150',
-      of: 'over ₹25,000',
+      // What was spent, not the overshoot: the pill already says "Over by
+      // ₹1,150", and "₹1,150 over ₹25,000" read like a fraction.
+      amount: '₹26,150',
+      of: 'spent of ₹25,000',
       perDay: null,
       bar: '105% of the budget used; even pace today is 80%',
     })
@@ -193,6 +210,10 @@ describe('budget alert copy', () => {
       .toBe('100% of ₹25,000 used this month') // at the line is still near
     expect(budgetHeadsUp({ spent: 450, budget: 500, currency: 'USD' }))
       .toBe('90% of $500 used this month')
+  })
+
+  it('names the month on the button that leads to its entries', () => {
+    expect(budgetAlertCopy(crossed).seeEntries).toBe('See November’s entries')
   })
 
   it('words the crossing sheet, naming the entry by its note', () => {
@@ -458,7 +479,7 @@ describe('year copy', () => {
     expect(yearCardCopy(lines, 'INR')).toEqual({
       pill: { tone: 'positive', text: 'In hand' },
       amount: '₹14,600',
-      after: 'in hand after 10 months',
+      after: 'under budget across 10 months',
       sentence:
         '3 months ran over, by ₹10,400 in all. The other 7 came in ₹25,000 under and covered it.',
     })
@@ -469,10 +490,10 @@ describe('year copy', () => {
     expect(yearCardCopy(toMay, 'INR')).toEqual({
       pill: { tone: 'caution', text: 'To make up' },
       amount: '₹450',
-      after: 'to make up after 5 months',
+      after: 'over budget across 5 months',
       sentence: '2 months ran over, by ₹9,100 in all. The other 3 came in ₹8,650 under.',
     })
-    expect(yearCardCopy(lines.slice(0, 1), 'INR').after).toBe('in hand after 1 month')
+    expect(yearCardCopy(lines.slice(0, 1), 'INR').after).toBe('under budget across 1 month')
   })
 
   it('says the first month is still running, with no pill or figure', () => {

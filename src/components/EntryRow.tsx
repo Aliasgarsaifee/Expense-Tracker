@@ -8,7 +8,7 @@ interface Props {
 }
 
 // One ledger line: mark, text, dotted leader, amount. History and the Add
-// screen's "Log again" list share it, so it knows nothing about either.
+// screen's recent-entry list share it, so it knows nothing about either.
 export function EntryRow({ emoji, primary, sub, amount, onClick, ariaLabel }: Props) {
   return (
     <li>

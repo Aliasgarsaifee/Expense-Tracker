@@ -1,4 +1,4 @@
-import { daysSince, localISO } from './dates'
+import { daysSince, localISO, shortDayMonthYear } from './dates'
 
 // A week of unsaved entries is the point where losing the phone stops being
 // an inconvenience. Exported so tests and callers share one number.
@@ -49,4 +49,17 @@ export function assessBackupHealth({
     localISO(new Date(now)),
   )
   return { unbackedCount, atRiskDays, stale: atRiskDays >= staleAfterDays }
+}
+
+// The line under the daily-snapshot switch. autoBackup stores the day as a
+// local 'YYYY-MM-DD'; anything else came from a hand-edited or corrupt pref.
+// Text that is not a day is shown as it is, and a value that is not text at
+// all (getPref hands back whatever JSON the key holds, hence `unknown`) reads
+// as no snapshot — a date formatter throws on junk, and that would take the
+// whole Settings drawer down with it.
+export function snapshotLine(lastSnapshot: unknown): string {
+  if (typeof lastSnapshot !== 'string' || lastSnapshot === '') return 'no snapshot yet'
+  const [, m, d] = lastSnapshot.split('-').map(Number)
+  const isDay = /^\d{4}-\d{2}-\d{2}$/.test(lastSnapshot) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+  return `last snapshot ${isDay ? shortDayMonthYear(lastSnapshot) : lastSnapshot}`
 }

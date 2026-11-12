@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assessBackupHealth } from './backupHealth'
+import { assessBackupHealth, snapshotLine } from './backupHealth'
 
 const NOW = '2026-08-16T10:00:00.000Z'
 
@@ -79,5 +79,30 @@ describe('assessBackupHealth', () => {
         now: NOW,
       }),
     ).toEqual({ unbackedCount: 0, atRiskDays: null, stale: false })
+  })
+})
+
+describe('snapshotLine', () => {
+  it('says so when there has been none', () => {
+    expect(snapshotLine('')).toBe('no snapshot yet')
+  })
+
+  it('writes the date the way the rest of the app does', () => {
+    expect(snapshotLine('2026-11-12')).toBe('last snapshot 12 Nov 2026')
+  })
+
+  // The value comes from localStorage; a date formatter throws on junk, and
+  // that would take the whole Settings drawer down with it.
+  it('shows a stored value it cannot read as a date as it is', () => {
+    expect(snapshotLine('garbage')).toBe('last snapshot garbage')
+    expect(snapshotLine('2026-13-45')).toBe('last snapshot 2026-13-45')
+  })
+
+  // getPref hands back whatever JSON the key holds, so a hand-edited pref can
+  // be a number, null or an object where a string was written.
+  it('treats a stored value that is not text as no snapshot', () => {
+    for (const junk of [null, 20261112, {}, ['2026-11-12']]) {
+      expect(snapshotLine(junk)).toBe('no snapshot yet')
+    }
   })
 })

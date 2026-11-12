@@ -486,14 +486,26 @@ describe('addPaymentMethod', () => {
   })
 
   it('rejects an empty label or group', async () => {
-    await expect(addPaymentMethod({ label: '  ', group: 'Cash' })).rejects.toThrow(/label/i)
-    await expect(addPaymentMethod({ label: 'GPay', group: '  ' })).rejects.toThrow(/group/i)
+    await expect(addPaymentMethod({ label: '  ', group: 'Cash' })).rejects.toThrow(/name/i)
+    await expect(addPaymentMethod({ label: 'GPay', group: '  ' })).rejects.toThrow(/type/i)
+  })
+
+  // An archived method is hidden from the Add screen, so "already exists"
+  // alone points at something the owner cannot see.
+  it('says where to find a duplicate that is archived', async () => {
+    const amex = await addPaymentMethod({ label: 'Amex', group: 'Credit card' })
+    await setPaymentMethodArchived(amex.id, true)
+    await expect(addPaymentMethod({ label: 'amex', group: 'Credit card' })).rejects.toThrow(
+      '“Amex” already exists but is archived — restore it in Settings',
+    )
   })
 
   it('rejects a duplicate label, case-insensitively', async () => {
     await addPaymentMethod({ label: 'Amex', group: 'Credit card' })
+    // The whole sentence: toThrow(string) matches a part, and the archived
+    // wording begins with these same words.
     await expect(addPaymentMethod({ label: 'amex', group: 'Credit card' })).rejects.toThrow(
-      /already/i,
+      /^“Amex” already exists$/,
     )
   })
 })
@@ -542,7 +554,7 @@ describe('renamePaymentMethod', () => {
     expect(
       (await listPaymentMethods()).find((m) => m.id === card.id)?.label,
     ).toBe('HDFC Regalia')
-    await expect(renamePaymentMethod(card.id, '  ')).rejects.toThrow(/label/i)
+    await expect(renamePaymentMethod(card.id, '  ')).rejects.toThrow(/name/i)
   })
 })
 
@@ -566,7 +578,7 @@ describe('renameGroup', () => {
     expect(
       (await listPaymentMethods()).find((m) => m.id === gpay.id)?.group,
     ).toBe('Wallets')
-    await expect(renameGroup('Wallets', '   ')).rejects.toThrow(/group/i)
+    await expect(renameGroup('Wallets', '   ')).rejects.toThrow(/type/i)
   })
 
   it('refuses to rename the built-in groups', async () => {
@@ -652,8 +664,8 @@ describe('categories', () => {
     expect(created.label).toBe('Pets')
     expect(created.emoji).toBeTruthy()
     expect((await listCategories()).map((c) => c.label)).toContain('Pets')
-    await expect(addCategory({ label: 'pets' })).rejects.toThrow(/already/i)
-    await expect(addCategory({ label: '  ' })).rejects.toThrow(/label/i)
+    await expect(addCategory({ label: 'pets' })).rejects.toThrow(/^“Pets” already exists$/)
+    await expect(addCategory({ label: '  ' })).rejects.toThrow(/name/i)
   })
 
   it('stores a custom emoji when given', async () => {
@@ -692,7 +704,16 @@ describe('categories', () => {
   it('rejects renaming to an existing label or an empty one', async () => {
     const created = await addCategory({ label: 'Pets' })
     await expect(renameCategory(created.id, 'food')).rejects.toThrow(/already/i)
-    await expect(renameCategory(created.id, ' ')).rejects.toThrow(/label/i)
+    await expect(renameCategory(created.id, ' ')).rejects.toThrow(/name/i)
+  })
+
+  it('says where to find an archived category whose name is taken', async () => {
+    const pets = await addCategory({ label: 'Pets' })
+    await setCategoryArchived(pets.id, true)
+    const message = '“Pets” already exists but is archived — restore it in Settings'
+    await expect(addCategory({ label: 'pets' })).rejects.toThrow(message)
+    const other = await addCategory({ label: 'Hobbies' })
+    await expect(renameCategory(other.id, 'Pets')).rejects.toThrow(message)
   })
 
   it('deletes an unused custom category but refuses used or built-in ones', async () => {

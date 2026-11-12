@@ -26,6 +26,9 @@ export interface HistoryFilter {
   from?: string | null // inclusive ISO date bound
   to?: string | null   // inclusive ISO date bound
   query?: string
+  // Method id → its name, for the query: a row shows it, so a search for
+  // "hdfc" must find it. Absent means method names are not searched.
+  methodLabels?: ReadonlyMap<string, string>
 }
 
 // A cross-screen jump into History. An absent period means all time, so a
@@ -87,6 +90,8 @@ export function filterExpenses(expenses: Expense[], f: HistoryFilter): Expense[]
     if (q) {
       const haystacks = [e.note ?? '', e.category, String(e.amount)]
       if (e.paid) haystacks.push(e.paid.currency, String(e.paid.amount))
+      const method = e.paymentMethodId && f.methodLabels?.get(e.paymentMethodId)
+      if (method) haystacks.push(method)
       if (!haystacks.some((h) => h.toLowerCase().includes(q))) return false
     }
     return true

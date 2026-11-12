@@ -113,7 +113,7 @@ function SheetBody({
 
           {groupChip === CUSTOM && (
             <label className="field">
-              <span>Group name</span>
+              <span>Type name</span>
               <input
                 type="text"
                 placeholder="e.g. Wallet, Netbanking"
@@ -146,7 +146,7 @@ function SheetBody({
             type="submit"
             disabled={label.trim() === '' || group.trim() === '' || saving}
           >
-            Add method
+            Add payment method
           </button>
         </form>
       </div>

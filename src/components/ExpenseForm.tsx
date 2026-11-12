@@ -14,7 +14,6 @@ import {
 import { chooseRate, entryValues, paidLabel, paidOf, rateLine, seedRate } from '../lib/conversion'
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
-import { tapFeedback } from '../lib/haptics'
 import { formatMoney, parseAmount, roundHome } from '../lib/money'
 import { logAgainChoices } from '../lib/recent'
 import { useDialog } from '../lib/useDialog'
@@ -55,7 +54,7 @@ interface Props {
   onSubmit: (values: ExpenseFormValues) => Promise<void> | void
   /** Add screen: clear amount + note after submit, keep category and date. */
   autoReset?: boolean
-  /** Add screen: newest entries, offered below the button as "Log again". */
+  /** Add screen: newest entries, offered below the button to fill the form from. */
   recent?: Expense[]
 }
 
@@ -189,11 +188,12 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
     const text = await askPrompt({
       title: `Value in ${home}`,
       message: byHand
-        ? "Type what your card charged, or leave empty to use the day's rate."
+        ? `Type what it actually cost you in ${home}, or leave empty to use the day’s rate.`
         : rate !== null
-          ? `The day's rate gives ${formatMoney(roundHome(typed * rate), home)}. Type what your card charged.`
-          : `Type what your card charged in ${home}.`,
-      label: 'What your card charged',
+          ? `The day’s rate gives ${formatMoney(roundHome(typed * rate), home)}. If it cost you something else, type that.`
+          : `Type what it cost you in ${home}.`,
+      // Not "what your card charged": the entry may have been paid in cash.
+      label: `What it cost in ${home}`,
       initialValue: byHand && current !== null ? String(current) : '',
       placeholder: current === null ? undefined : String(current),
       inputMode: 'decimal',
@@ -231,7 +231,8 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
 
   // Fills the form's own state and saves nothing; the date is left as it is.
   // It fills what was paid, so the rate is the one for the form's date, never
-  // the old entry's.
+  // the old entry's. No haptic: the tick means an entry landed in the ledger,
+  // and here nothing has.
   function fillFrom(x: Expense) {
     const paid = paidOf(x)
     setAmountText(String(paid.amount))
@@ -240,7 +241,6 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
     setCategory(x.category)
     setNote(x.note ?? '')
     if (x.paymentMethodId) setPaymentMethodId(x.paymentMethodId)
-    void tapFeedback()
     window.scrollTo(0, 0)
   }
 
@@ -397,9 +397,11 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
             : submitLabel}
         </button>
 
+        {/* The label says what a tap does. As "Log again" it promised a save,
+            and a tap only fills the form above. */}
         {logAgain.length > 0 && (
-          <section className="log-again" aria-label="Log again">
-            <p className="field-label">Log again</p>
+          <section className="log-again" aria-label="Repeat a recent entry">
+            <p className="field-label">Repeat a recent entry · tap to fill</p>
             <ul className="entries">
               {logAgain.map((x) => {
                 const primary = x.note || x.category

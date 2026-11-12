@@ -192,6 +192,26 @@ describe('filterExpenses', () => {
       expect(filterExpenses([trip, home], { query: '120.5' }).map((x) => x.id)).toEqual(['t'])
     })
   })
+
+  // Every row shows the method's name, so a search has to find it there.
+  describe('the payment method', () => {
+    const methodLabels = new Map([['m1', 'HDFC Regalia']])
+    const card = exp({ id: 'card', paymentMethodId: 'm1' })
+    const gone = exp({ id: 'gone', paymentMethodId: 'deleted-method' })
+    const none = exp({ id: 'none' })
+
+    it('finds an entry by the name of the method it was paid with', () => {
+      expect(
+        filterExpenses([card, gone, none], { query: 'hdfc', methodLabels }).map((x) => x.id),
+      ).toEqual(['card'])
+    })
+    it('passes over entries whose method is unknown or absent', () => {
+      expect(filterExpenses([gone, none], { query: 'hdfc', methodLabels })).toEqual([])
+    })
+    it('does not search method names it was not given', () => {
+      expect(filterExpenses([card], { query: 'hdfc' })).toEqual([])
+    })
+  })
 })
 
 describe('groupByDay', () => {

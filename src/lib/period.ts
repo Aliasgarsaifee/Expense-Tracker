@@ -6,6 +6,7 @@ import {
   monthOf,
   shortDayMonth,
   shortDayMonthYear,
+  shortMonthYear,
 } from './dates'
 
 // The unit a Summary view aggregates over. A day is the finest grain: a single
@@ -73,6 +74,16 @@ export function periodBounds(p: Period): Bounds | null {
 export function elapsedDays(b: Bounds, today: string): number {
   if (today < b.from || today > b.to) return daysBetween(b.from, b.to)
   return daysBetween(b.from, today)
+}
+
+// The part of a period the ledger was in use for: the period itself, starting
+// no earlier than the first entry ever logged. A ledger begun in October has
+// no January to average over — dividing the year's spending by the days since
+// 1 January made a ₹10,000 month read as "≈ ₹2,058 a month".
+export function inUseBounds(b: Bounds, firstEntry: string | undefined): Bounds {
+  return firstEntry !== undefined && firstEntry > b.from && firstEntry <= b.to
+    ? { from: firstEntry, to: b.to }
+    : b
 }
 
 export function shiftPeriod(p: Period, dir: 1 | -1): Period {
@@ -270,6 +281,21 @@ export function bucketBounds(key: string, unit: TrendUnit): Bounds {
       return periodBounds({ kind: 'month', month: key })!
     case 'year':
       return { from: `${key}-01-01`, to: `${key}-12-31` }
+  }
+}
+
+// A bucket's name in words, for the line that reads a tapped bar: "7 Jul" /
+// "Week of 6 Jul" / "Jun 2025" / "2024".
+export function bucketLabel(key: string, unit: TrendUnit): string {
+  switch (unit) {
+    case 'day':
+      return shortDayMonth(key)
+    case 'week':
+      return `Week of ${shortDayMonth(key)}`
+    case 'month':
+      return shortMonthYear(key)
+    case 'year':
+      return key
   }
 }
 

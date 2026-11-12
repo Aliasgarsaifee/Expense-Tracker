@@ -19,7 +19,7 @@ const DEFAULT_MS = 4200
 
 // A toast whose time is up holds its place this long, faded and inert, before
 // it is removed. Undo floats over whatever the screen shows there — on Add, a
-// Log again row — so a tap already on its way when the toast ran out used to
+// recent-entry row — so a tap already on its way when the toast ran out used to
 // land on that row and refill the form. Long enough for a finger in flight,
 // too short to get in the way of a deliberate tap on the row.
 const LINGER_MS = 500

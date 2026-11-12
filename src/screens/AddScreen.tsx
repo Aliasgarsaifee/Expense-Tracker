@@ -53,7 +53,7 @@ export function AddScreen({ budgets, onBudgetAlert }: Props) {
     } catch (err) {
       await showAlert(
         'Could not save',
-        err instanceof Error ? err.message : 'Could not save the expense.',
+        err instanceof Error ? err.message : 'Could not save the entry.',
       )
       throw err // tell the form not to clear the entered values
     }

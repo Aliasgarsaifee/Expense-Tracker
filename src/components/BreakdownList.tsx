@@ -10,7 +10,7 @@ export interface BreakdownRow {
   count: number
   /** Present → a status pill in place of the share/count sub-line. */
   badge?: Badge
-  /** Absent → a static row: the "Unrecorded" bucket has nothing to drill into. */
+  /** Absent → a static row: the "Not recorded" bucket has nothing to drill into. */
   onSelect?: () => void
   selectLabel?: string // accessible name when the row is a button
 }

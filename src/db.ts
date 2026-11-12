@@ -395,17 +395,27 @@ export async function listPaymentMethods(opts?: {
   )
 }
 
+// The name is taken. An archived holder is hidden from the Add screen, so the
+// message says where it is: "already exists" alone points at nothing visible.
+function nameTaken(clash: { label: string; archived?: boolean }): Error {
+  return new Error(
+    clash.archived
+      ? `“${clash.label}” already exists but is archived — restore it in Settings`
+      : `“${clash.label}” already exists`,
+  )
+}
+
 export async function addPaymentMethod(
   input: NewPaymentMethod,
 ): Promise<PaymentMethod> {
   const label = input.label.trim()
   const group = input.group.trim()
-  if (label === '') throw new Error('The label cannot be empty')
-  if (group === '') throw new Error('The group cannot be empty')
+  if (label === '') throw new Error('The name cannot be empty')
+  if (group === '') throw new Error('The type cannot be empty')
   const clash = (await db.paymentMethods.toArray()).find(
     (m) => m.label.toLowerCase() === label.toLowerCase(),
   )
-  if (clash) throw new Error(`"${clash.label}" already exists`)
+  if (clash) throw nameTaken(clash)
   const method: PaymentMethod = {
     label,
     group,
@@ -418,7 +428,7 @@ export async function addPaymentMethod(
 
 export async function renamePaymentMethod(id: string, label: string): Promise<void> {
   const trimmed = label.trim()
-  if (trimmed === '') throw new Error('The label cannot be empty')
+  if (trimmed === '') throw new Error('The name cannot be empty')
   await db.paymentMethods.update(id, { label: trimmed })
 }
 
@@ -430,9 +440,9 @@ export async function renamePaymentMethod(id: string, label: string): Promise<vo
 // the vocabulary offering the old name next to the new bucket.
 export async function renameGroup(from: string, to: string): Promise<void> {
   const trimmed = to.trim()
-  if (trimmed === '') throw new Error('The group cannot be empty')
+  if (trimmed === '') throw new Error('The type cannot be empty')
   if ((PAYMENT_GROUPS as readonly string[]).includes(from)) {
-    throw new Error(`${from} is a built-in group and cannot be renamed`)
+    throw new Error(`${from} is a built-in type and cannot be renamed`)
   }
   if (trimmed === from) return
   await db.paymentMethods
@@ -489,12 +499,12 @@ async function assertCategoryLabelFree(label: string, exceptId?: string) {
   const clash = (await db.categories.toArray()).find(
     (c) => c.id !== exceptId && c.label.toLowerCase() === label.toLowerCase(),
   )
-  if (clash) throw new Error(`"${clash.label}" already exists`)
+  if (clash) throw nameTaken(clash)
 }
 
 export async function addCategory(input: NewCategory): Promise<Category> {
   const label = input.label.trim()
-  if (label === '') throw new Error('The label cannot be empty')
+  if (label === '') throw new Error('The name cannot be empty')
   await assertCategoryLabelFree(label)
   const category: Category = {
     label,
@@ -510,7 +520,7 @@ export async function addCategory(input: NewCategory): Promise<Category> {
 // otherwise old entries silently detach into a phantom category.
 export async function renameCategory(id: string, label: string): Promise<void> {
   const trimmed = label.trim()
-  if (trimmed === '') throw new Error('The label cannot be empty')
+  if (trimmed === '') throw new Error('The name cannot be empty')
   await assertCategoryLabelFree(trimmed, id)
   await db.transaction('rw', db.categories, db.expenses, async () => {
     const current = await db.categories.get(id)

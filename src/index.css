@@ -13,7 +13,8 @@
    light ink-2 #5e5e50 on #ebebe0 (5.5) · dark ink-2 #a6a890 on #191a14 (7.2)
    light ink-3 #63644f on #ebebe0 (5.0) · dark ink-3 #8c8c79 on #191a14 (5.1)
    ink-3 on the #f5f4ec / #21231a card surface (.pay-sub, .card-note, the
-   trend chart's axis ticks and its .trend-ref key): 5.5 / 4.6
+   trend chart's axis ticks, its .trend-ref key and its .trend-pick hint):
+   5.5 / 4.6
    light danger #b3372b on #ebebe0 (5.0) · dark danger #e06a5e on #191a14 (5.3)
    light danger on #f5f4ec surface (5.4) · dark danger on #21231a (4.8)
    danger on the .backup-warning tint (danger 4% + surface): 5.1 / 4.6 dark —
@@ -33,7 +34,7 @@
    (data-tone picks --<tone> on --<tone>-tint). Summary's Fixed costs card
    wears positive ("As usual"), caution ("₹X above usual") and pending ("₹X
    to come", "Not logged yet"); the Everyday budget card wears positive ("On
-   track"), caution ("Close") and negative ("Over by ₹X"); the year's
+   track"), caution ("84% used") and negative ("Over by ₹X"); the year's
    Everyday against budget card wears positive ("In hand") and caution ("To
    make up"). One plain-text use sits outside the pills: the month ledger's
    "₹X over" cell is --negative on --surface (danger on surface above: 5.4 /
@@ -1033,10 +1034,6 @@ button {
 
 /* Recharts wears the theme via CSS: single validated hue, muted ticks,
    ink value labels (text tokens, never the series color). */
-.trend-chart .recharts-tooltip-cursor {
-  fill: color-mix(in srgb, var(--chip) 70%, transparent);
-}
-
 .trend-chart .recharts-bar-rectangle path {
   fill: var(--accent);
 }
@@ -1048,6 +1045,15 @@ button {
 .trend-chart .recharts-bar-rectangle path.bar-now,
 .trend-chart .recharts-bar-rectangle.bar-now path {
   fill: var(--now);
+}
+
+/* The bar that was tapped. Ink rather than a third hue: it is the strongest
+   mark in both themes, so the pick stands apart from sage and clay alike and
+   adds no colour pair to validate. A picked current-period bar gives up its
+   clay for as long as it is picked. */
+.trend-chart .recharts-bar-rectangle path.bar-picked,
+.trend-chart .recharts-bar-rectangle.bar-picked path {
+  fill: var(--ink);
 }
 
 /* Aimed at the label's own class, not at a path through Recharts' groups:
@@ -1090,13 +1096,34 @@ button {
   stroke-dasharray: 4 3;
 }
 
-.chart-tip {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 7px 10px;
+/* The line that reads a tapped bar (see TrendChart). One thumb-high row in
+   both states — the hint, or the reading and its button — so a tap moves
+   nothing below it. A long reading wraps beside the button, never under it. */
+.trend-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  min-height: var(--tap-min);
+  margin-top: var(--space-2);
   font-size: 13px;
-  box-shadow: 0 4px 14px rgba(15, 10, 2, 0.14);
+  line-height: 1.3;
+  color: var(--ink-3);
+}
+
+.trend-pick-text {
+  min-width: 0;
+  color: var(--ink-2);
+}
+
+.trend-pick-text strong {
+  color: var(--ink);
+}
+
+.trend-pick-go {
+  flex-shrink: 0;
+  gap: var(--space-2);
+  font-size: 13px;
 }
 
 .backup-actions {
@@ -1541,20 +1568,19 @@ button {
   margin-bottom: 12px;
 }
 
-/* Heat-scale selector — worded Global/Month/Year (not the shortcut row's
-   Today/This month/This year) so the two rows never read alike. */
+/* What the day bars are measured against: a caption in plain words on its
+   own line, the three choices under it. As one row behind the label "Heat"
+   it took less room and said nothing. Its chips are worded so they never
+   read like the shortcut row's (Today / This month / This year / All time). */
 .cal-heat-scale {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: grid;
+  gap: var(--space-6);
   margin-top: 4px;
 }
 
 .cal-heat-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  line-height: 1.3;
   color: var(--ink-3);
 }
 
@@ -1885,7 +1911,8 @@ button {
 .screen[data-loading] .budget-set,
 .screen[data-loading] .year-card .status-pill,
 .screen[data-loading] .year-sentence,
-.screen[data-loading] .trend-ref {
+.screen[data-loading] .trend-ref,
+.screen[data-loading] .trend-pick {
   visibility: hidden;
 }
 
@@ -1931,7 +1958,7 @@ button {
   text-overflow: ellipsis;
 }
 
-/* A sub-line that qualifies its figure ("₹26,147.40 everyday by now",
+/* A sub-line that qualifies its figure ("₹26,147.40 everyday by this point",
    "by 31 Dec · all spending") is wrong cut short, and is often wider than its
    tile on a 375px screen — it wraps, balanced so neither line is a lone
    word. */
@@ -2633,7 +2660,7 @@ button {
   margin-bottom: 28px;
 }
 
-/* Two rows stacked in one section (Budget over Default currency) keep the
+/* Two rows stacked in one section (Budget over Home currency) keep the
    9px that .backup-actions gives its own stack; without it their borders
    touch and read as one split control. */
 .drawer-section > .btn-ghost + .btn-ghost {

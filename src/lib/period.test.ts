@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   bucketBounds,
   bucketKeyOf,
+  bucketLabel,
   bucketKeysBetween,
   canStepForward,
   comparisonLabel,
@@ -10,6 +11,7 @@ import {
   elapsedDays,
   emptyPeriodPhrase,
   initialPeriod,
+  inUseBounds,
   periodBounds,
   periodLabel,
   periodWindows,
@@ -373,5 +375,31 @@ describe('rangePeriod', () => {
   it('is a custom range otherwise', () => {
     expect(rangePeriod('2026-11-02', '2026-11-08'))
       .toEqual({ kind: 'custom', from: '2026-11-02', to: '2026-11-08' })
+  })
+})
+
+describe('bucketLabel', () => {
+  it('names a bucket the way its grain reads', () => {
+    expect(bucketLabel('2026-07-07', 'day')).toBe('7 Jul')
+    expect(bucketLabel('2026-07-06', 'week')).toBe('Week of 6 Jul')
+    expect(bucketLabel('2025-06', 'month')).toBe('Jun 2025')
+    expect(bucketLabel('2024', 'year')).toBe('2024')
+  })
+})
+
+describe('inUseBounds', () => {
+  const year = { from: '2026-01-01', to: '2026-12-31' }
+
+  // A ledger begun in October has no January to average over.
+  it('starts a period at the first entry when that falls inside it', () => {
+    expect(inUseBounds(year, '2026-10-03')).toEqual({ from: '2026-10-03', to: '2026-12-31' })
+    expect(inUseBounds(year, '2026-12-31')).toEqual({ from: '2026-12-31', to: '2026-12-31' })
+  })
+
+  it('leaves alone a period the ledger was in use for throughout, or not at all', () => {
+    expect(inUseBounds(year, '2023-04-11')).toEqual(year)
+    expect(inUseBounds(year, '2026-01-01')).toEqual(year)
+    expect(inUseBounds(year, '2027-02-01')).toEqual(year)
+    expect(inUseBounds(year, undefined)).toEqual(year)
   })
 })

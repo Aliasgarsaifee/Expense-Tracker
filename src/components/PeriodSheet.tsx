@@ -23,7 +23,16 @@ function readHeatBasis(): HeatBasis {
   const v = getPref(PREFS.calendarHeatBasis, 'all')
   return HEAT_BASES.includes(v as HeatBasis) ? (v as HeatBasis) : 'all'
 }
-const HEAT_LABEL: Record<HeatBasis, string> = { all: 'Global', month: 'Month', year: 'Year' }
+// What a day's bar is measured against. Each label finishes the caption above
+// the chips ("…with the biggest day"): ever, of its month, of its year. "Its
+// month", not "this month": every month on the calendar is measured against
+// its own biggest day. And never "All time" — the shortcut row above already
+// has a chip by that name, which does something else.
+const HEAT_LABEL: Record<HeatBasis, string> = {
+  all: 'Ever',
+  month: 'Of its month',
+  year: 'Of its year',
+}
 
 interface Props {
   period: Period
@@ -40,8 +49,9 @@ interface Props {
 export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: Props) {
   const today = todayISO()
   // A day tap opens a pending selection; a second tap on another day closes
-  // it into a range; any further tap restarts at that day. Apply commits;
-  // the ✕ or closing the sheet discards.
+  // it into a range; any further tap restarts at that day. Apply and Done both
+  // commit it — Done used to discard, and it is the button a finished pick
+  // reaches for. The ✕ and a tap on the scrim discard.
   const [sel, setSel] = useState<{ a: string; b: string | null } | null>(null)
 
   // Persisted (PREFS.calendarHeatBasis); the sheet mounts only while open, so
@@ -82,9 +92,12 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
     scrolled.current = true
     const from = periodBounds(period)?.from
     const target = monthOf(from ?? maxAnchor)
-    document
-      .getElementById(`cal-${target < newestMonth ? target : newestMonth}`)
-      ?.scrollIntoView({ block: 'center' })
+    // The newest month heads the list and is in view as it stands. Centring
+    // it too slid the year heading above it half out of sight on a short
+    // screen, so only an older month is scrolled to.
+    if (target < newestMonth) {
+      document.getElementById(`cal-${target}`)?.scrollIntoView({ block: 'center' })
+    }
   }, [rows, period, maxAnchor, newestMonth])
 
   // The pending selection outranks the viewed period for day-cell paint; a
@@ -138,7 +151,11 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
         <div className="sheet-handle" aria-hidden="true" />
         <header className="sheet-head">
           <h2 className="display">Jump to</h2>
-          <button className="btn-text" type="button" onClick={onClose}>
+          <button
+            className="btn-text"
+            type="button"
+            onClick={() => (pendingPeriod ? onApply(pendingPeriod) : onClose())}
+          >
             Done
           </button>
         </header>
@@ -158,8 +175,8 @@ export function PeriodSheet({ period, maxAnchor, currency, onApply, onClose }: P
         </div>
 
         <div className="cal-heat-scale">
-          <span className="cal-heat-label">Heat</span>
-          <div className="chip-row" role="group" aria-label="Heat scale">
+          <span className="cal-heat-label">Bars compare each day with the biggest day</span>
+          <div className="chip-row" role="group" aria-label="What the bars compare with">
             {HEAT_BASES.map((b) => (
               <button
                 key={b}

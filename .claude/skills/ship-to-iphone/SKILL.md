@@ -46,7 +46,7 @@ These are the paths a browser cannot verify — walk them after every install:
       the keyboard drops and the toast is in view (it sits where the keys were),
       and the page is back at the top with today's total showing.
 - [ ] Add an expense, then tap **Undo** just as the toast fades → nothing
-      happens; the form is not refilled from the Log again row beneath it.
+      happens; the form is not refilled from the recent-entry row beneath it.
 - [ ] Type an amount, then tap **⌄** on the keyboard's bar → the date picker
       opens and the page does not zoom (the hidden date input is 16px).
 - [ ] Paid with → search → the results run down to just above the keyboard,
@@ -57,7 +57,7 @@ These are the paths a browser cannot verify — walk them after every install:
       simulator session, never reproduced since; the phone is the judge.)
 - [ ] Save a foreign entry in airplane mode, then turn the signal back on and
       reopen the app → it converts, and the form's line shows the rate again.
-- [ ] Settings → Export JSON → the iOS share sheet opens (not a download).
+- [ ] Settings → Export full backup (JSON) → the iOS share sheet opens (not a download).
 - [ ] Files app → On My iPhone → Expense Tracker → `Backups/` is visible and
       today's `auto-backup-*.json` appears after a fresh launch.
 - [ ] Open the Add form → keyboard does not cover the inputs (the `--kb`

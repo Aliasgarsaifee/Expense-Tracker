@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { listCategories, listExpenses, listPaymentMethods, unbackedSince } from '../db'
 import { runAutoBackupIfDue, writePreImportSnapshot } from '../lib/autoBackup'
 import { backupToJson, expensesToCsv, importBackup, parseBackupJson } from '../lib/backup'
-import { assessBackupHealth } from '../lib/backupHealth'
+import { assessBackupHealth, snapshotLine } from '../lib/backupHealth'
 import { todayISO } from '../lib/dates'
 import { exportTextFile } from '../lib/exportFile'
 import { getPref, PREFS, setPref } from '../lib/prefs'
@@ -133,7 +133,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
       }
       const ok = await askConfirm({
         title: 'Import this backup?',
-        message: `${data.expenses.length} expenses, ${data.paymentMethods.length} payment methods, and ${data.categories.length} categories. Entries with matching ids will be overwritten.`,
+        message: `${data.expenses.length} entries, ${data.paymentMethods.length} payment methods and ${data.categories.length} categories. Entries already here are updated to match the file. Nothing else is removed.`,
         confirmLabel: 'Import',
       })
       if (!ok) return
@@ -147,7 +147,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
       const counts = await importBackup(data)
       await showAlert(
         'Import complete',
-        `Merged ${counts.expenses} expenses, ${counts.paymentMethods} payment methods, and ${counts.categories} categories.`,
+        `Merged ${counts.expenses} entries, ${counts.paymentMethods} payment methods and ${counts.categories} categories.`,
       )
     } catch (err) {
       await showAlert('Import failed', err instanceof Error ? err.message : undefined)
@@ -172,8 +172,8 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
       <h3 className="drawer-title">Backup</h3>
       <p className="drawer-note">
         {native
-          ? 'No cloud, no account — if the phone goes, the ledger goes with it. Daily snapshots land in Files → On My iPhone → Expense Tracker. For an iCloud copy, export JSON and pick “Save to Files → iCloud Drive”.'
-          : 'No cloud, no account — if the phone goes, the ledger goes with it. Nothing is backed up automatically here: export JSON and pick “Save to Files → iCloud Drive” to keep a copy that survives this device.'}
+          ? 'No cloud, no account — if the phone goes, the ledger goes with it. Daily snapshots land in Files → On My iPhone → Expense Tracker. For an iCloud copy, export a full backup and pick “Save to Files → iCloud Drive”.'
+          : 'No cloud, no account — if the phone goes, the ledger goes with it. Nothing is backed up automatically here: export a full backup and pick “Save to Files → iCloud Drive” to keep a copy that survives this device.'}
       </p>
       {health.stale && (
         <div className="backup-warning" role="status">
@@ -185,7 +185,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
             {health.atRiskDays === 1 ? '1 day' : `${health.atRiskDays} days`} old.
           </p>
           <button type="button" className="btn-ghost" disabled={exporting} onClick={exportJson}>
-            <span>Save backup</span>
+            <span>Export full backup (JSON)</span>
             <ArrowUpRightIcon size={18} />
           </button>
         </div>
@@ -195,7 +195,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           <span className="switch-text">
             <span>Daily snapshot on launch</span>
             <span className="switch-sub">
-              {lastSnapshot ? `last snapshot ${lastSnapshot}` : 'no snapshot yet'}
+              {snapshotLine(lastSnapshot)}
             </span>
           </span>
           <input
@@ -213,7 +213,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           disabled={exporting}
           onClick={exportCsv}
         >
-          <span>Export CSV · spreadsheet archive</span>
+          <span>Export for spreadsheets (CSV)</span>
           <ArrowUpRightIcon size={18} />
         </button>
         <button
@@ -222,7 +222,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           disabled={exporting}
           onClick={exportJson}
         >
-          <span>Export JSON · full backup</span>
+          <span>Export full backup (JSON)</span>
           <ArrowUpRightIcon size={18} />
         </button>
         <button
@@ -230,7 +230,7 @@ export function BackupSection({ showAlert, askConfirm, onExported }: Props) {
           className="btn-ghost"
           onClick={() => fileInput.current?.click()}
         >
-          <span>Import JSON backup</span>
+          <span>Import a backup (JSON)</span>
           <ArrowDownIcon size={18} />
         </button>
         <input

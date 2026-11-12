@@ -73,7 +73,7 @@ function SheetBody({
     // The confirm stays — this ledger is the only copy — but it can no longer
     // claim the delete is final: the screen offers Undo once the sheet closes.
     const ok = await askConfirm({
-      title: 'Delete this expense?',
+      title: 'Delete this entry?',
       confirmLabel: 'Delete',
       destructive: true,
     })
@@ -83,7 +83,7 @@ function SheetBody({
     } catch (err) {
       await showAlert(
         'Could not delete',
-        err instanceof Error ? err.message : 'Could not delete the expense.',
+        err instanceof Error ? err.message : 'Could not delete the entry.',
       )
       return
     }
@@ -97,7 +97,7 @@ function SheetBody({
         className="sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Edit expense"
+        aria-label="Edit entry"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-handle" aria-hidden="true" />
@@ -115,7 +115,7 @@ function SheetBody({
           onSubmit={save}
         />
         <button className="btn-danger" type="button" onClick={remove}>
-          Delete expense
+          Delete entry
         </button>
       </div>
       {/* Sibling of the sheet body, not a child of it: the dialog owns the

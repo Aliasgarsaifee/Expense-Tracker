@@ -85,7 +85,11 @@ export function budgetBadge(status: BudgetStatus, currency: string): Badge {
     case 'under':
       return { tone: 'positive', text: 'On track' }
     case 'near':
-      return { tone: 'caution', text: 'Close' }
+      // The share itself, never a word like "Close": the pill sits in capitals
+      // at the card's top corner, where that reads as a button. Rounded down,
+      // so it cannot say "100% used" beside a figure that says money is left.
+      // usedShare is at most 1 here, so its clamp never shows.
+      return { tone: 'caution', text: `${Math.floor(status.usedShare * 100)}% used` }
     case 'over':
       return { tone: 'negative', text: `Over by ${formatMoney(-status.left, currency)}` }
   }
@@ -114,12 +118,12 @@ export function budgetReference(
 ): { value: number; label: string } {
   const value = budget / totalDays
   // Floor, not round: a rounded-up figure times the month's days overshoots the budget.
-  return { value, label: `${formatMoney(Math.floor(value), currency)} a day keeps the budget` }
+  return { value, label: `${formatMoney(Math.floor(value), currency)} a day stays within budget` }
 }
 
 export interface BudgetCardCopy {
-  amount: string // the figure, set large: "₹16,270"
-  of: string // what follows it: "left of ₹25,000" | "over ₹25,000"
+  amount: string // the figure, set large: what is left, or what was spent once over
+  of: string // what follows it: "left of ₹25,000" | "spent of ₹25,000"
   perDay: string | null
   bar: string // the bar and its even-pace tick, for VoiceOver
 }
@@ -144,8 +148,10 @@ export function budgetCardCopy(
   // so a month 5% over does not read as exactly spent.
   const used = `${percent((budget - status.left) / budget)} of the budget used`
   return {
-    amount: formatMoney(Math.abs(left), currency),
-    of: `${over ? 'over' : 'left of'} ${formatMoney(budget, currency)}`,
+    // Once over, the large figure is what was spent. The pill beside it
+    // already says by how much, and "₹1,150 over ₹25,000" read as a fraction.
+    amount: formatMoney(over ? toMinorUnits(budget - status.left) : Math.abs(left), currency),
+    of: `${over ? 'spent of' : 'left of'} ${formatMoney(budget, currency)}`,
     perDay,
     // The card shows no even-pace tick once no days are left, so neither do
     // the words.
@@ -188,6 +194,7 @@ export interface BudgetAlertCopy {
   withinShare: number // the budget's part of the bar, 0..1
   overShare: number // the overshoot's part; the two sum to 1
   yearLine: string | null // the month's overrun against the year; null in a first month
+  seeEntries: string // the button that leads to the month's entries
 }
 
 // The sheet for the save that took the month past its budget. A fact and the
@@ -212,6 +219,7 @@ export function budgetAlertCopy(alert: AlertFacts): BudgetAlertCopy {
     withinShare: budget / spent,
     overShare: (spent - budget) / spent,
     yearLine: alertYearLine(carried, spent - budget, currency),
+    seeEntries: `See ${name}’s entries`,
   }
 }
 
@@ -409,7 +417,7 @@ export function carriedLine(carried: number | null, currency: string): string | 
 export interface YearCardCopy {
   pill: Badge | null // null until a month is complete: nothing is judged yet
   amount: string | null // the figure, set large: "₹14,600"
-  after: string | null // what follows it: "in hand after 10 months"
+  after: string | null // what follows it: "under budget across 10 months"
   sentence: string
 }
 
@@ -425,7 +433,8 @@ export function yearCardCopy(lines: YearLine[], currency: string): YearCardCopy 
   return {
     pill: inHand ? { tone: 'positive', text: 'In hand' } : { tone: 'caution', text: 'To make up' },
     amount: formatMoney(Math.abs(carried), currency),
-    after: `${inHand ? 'in hand' : 'to make up'} after ${months}`,
+    // "to make up after 1 month" read as a deadline.
+    after: `${inHand ? 'under' : 'over'} budget across ${months}`,
     sentence: yearSentence(lines, currency),
   }
 }

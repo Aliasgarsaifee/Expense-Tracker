@@ -90,7 +90,7 @@ function SheetBody({
               onClose()
             }}
           >
-            <span>See what made it up</span>
+            <span>{copy.seeEntries}</span>
             <ChevronRightIcon size={18} />
           </button>
           {onUndo && (

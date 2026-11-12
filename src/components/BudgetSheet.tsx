@@ -54,11 +54,11 @@ function SheetBody({ onClose, currency, budget, onBudgetChange }: Omit<Props, 'o
         <header className="sheet-head">
           <h2 className="display">Budget</h2>
           <button className="btn-text" type="button" onClick={onClose}>
-            Close
+            Done
           </button>
         </header>
         <p className="budget-intro">
-          You hear about it twice: at 80%, and when an entry takes you past it.
+          You get two alerts: at 80% of the budget, and when an entry takes you past it.
         </p>
 
         <section className="budget-section">
@@ -96,7 +96,10 @@ function SheetBody({ onClose, currency, budget, onBudgetChange }: Omit<Props, 'o
 
         <section className="budget-section">
           <h3 className="drawer-title">Fixed costs</h3>
-          <p className="drawer-note">Counted once a month and kept out of everyday spending.</p>
+          <p className="drawer-note">
+            Tap what you pay once a month, like rent. These stay out of the budget and the everyday
+            average, and the pace counts them once.
+          </p>
           <div className="chip-grid" role="group" aria-label="Fixed cost categories">
             {(categories ?? []).map((c) => {
               const fixed = isFixedCategory(c)

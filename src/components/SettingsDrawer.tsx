@@ -19,6 +19,7 @@ import {
 } from '../db'
 import { currencySymbol } from '../lib/currencies'
 import type { HistoryJump } from '../lib/history'
+import { inUseNotice } from '../lib/inUse'
 import { formatMoney } from '../lib/money'
 import { bucketize, groupEmoji } from '../lib/paymentMeta'
 import { getPref, PREFS, setPref } from '../lib/prefs'
@@ -92,7 +93,7 @@ function GroupToggle({
         <button
           type="button"
           className="icon-btn"
-          aria-label={`Rename the ${label} group`}
+          aria-label={`Rename the ${label} type`}
           onClick={onRename}
         >
           <PencilIcon size={16} />
@@ -251,8 +252,8 @@ function DrawerBody({
 
   async function renameGroupPrompt(group: string) {
     const name = await askPrompt({
-      title: 'Rename group',
-      label: 'Group name',
+      title: 'Rename type',
+      label: 'Type name',
       initialValue: group,
     })
     if (name === null) return
@@ -280,9 +281,35 @@ function DrawerBody({
     }
   }
 
+  // What entries still use cannot be deleted, and its row knows the count: say
+  // so first and offer the archive that does work, instead of confirming a
+  // delete db.ts is about to refuse. Resolves true when it dealt with the tap.
+  async function blockedByUse(
+    label: string,
+    used: number,
+    archived: boolean,
+    archive: () => Promise<void>,
+  ): Promise<boolean> {
+    const notice = inUseNotice(label, used, archived)
+    if (!notice) return false
+    if (!notice.offerArchive) {
+      await showAlert(notice.title, notice.message)
+    } else if (
+      await askConfirm({ title: notice.title, message: notice.message, confirmLabel: 'Archive' })
+    ) {
+      await archive()
+    }
+    return true
+  }
+
   async function removeMethod(method: PaymentMethod) {
+    const used = methodUsage.get(method.id) ?? 0
+    const blocked = await blockedByUse(method.label, used, !!method.archived, () =>
+      toggleMethodArchived(method),
+    )
+    if (blocked) return
     const ok = await askConfirm({
-      title: `Delete "${method.label}"?`,
+      title: `Delete “${method.label}”?`,
       confirmLabel: 'Delete',
       destructive: true,
     })
@@ -317,8 +344,13 @@ function DrawerBody({
   }
 
   async function removeCat(category: Category) {
+    const used = categoryUsage.get(category.label) ?? 0
+    const blocked = await blockedByUse(category.label, used, !!category.archived, () =>
+      toggleCatArchived(category),
+    )
+    if (blocked) return
     const ok = await askConfirm({
-      title: `Delete "${category.label}"?`,
+      title: `Delete “${category.label}”?`,
       confirmLabel: 'Delete',
       destructive: true,
     })
@@ -328,6 +360,21 @@ function DrawerBody({
     } catch (err) {
       await showAlert('Could not delete', err instanceof Error ? err.message : undefined)
     }
+  }
+
+  // Every total and the budget count in this currency, so a change is asked
+  // about first: it used to take one stray tap in a long list.
+  async function changeHomeCurrency(code: string) {
+    if (code === defaultCurrency) return // re-picking it is not a change
+    const ok = await askConfirm({
+      title: `Make ${code} your home currency?`,
+      message: `Totals and the budget count in the home currency. New entries will count in ${code}; what is already in the ledger stays as it is. Each currency has its own budget.`,
+      confirmLabel: `Use ${code}`,
+    })
+    if (!ok) return
+    setDefaultCurrency(code)
+    setPref(PREFS.defaultCurrency, code)
+    onDefaultCurrencyChange?.(code)
   }
 
   const entryCount = expenses?.length ?? 0
@@ -393,7 +440,7 @@ function DrawerBody({
             })}
           </ul>
           <button type="button" className="btn-ghost" onClick={() => setAddingMethod(true)}>
-            <span>Add card or method</span>
+            <span>Add a payment method</span>
             <AddIcon size={18} />
           </button>
         </section>
@@ -434,7 +481,9 @@ function DrawerBody({
         <section className="drawer-section">
           <h3 className="drawer-title">Preferences</h3>
           <button type="button" className="btn-ghost" onClick={onOpenBudget}>
-            <span>Budget</span>
+            {/* Named for both things the sheet holds: fixed costs change Summary
+                with or without a budget, and "Budget" alone hid them. */}
+            <span>Budget & fixed costs</span>
             {budget === null ? (
               <span>Not set</span>
             ) : (
@@ -446,7 +495,7 @@ function DrawerBody({
             className="btn-ghost"
             onClick={() => setPickingCurrency(true)}
           >
-            <span>Default currency</span>
+            <span>Home currency</span>
             <span className="money">
               {currencySymbol(defaultCurrency)} {defaultCurrency}
             </span>
@@ -461,6 +510,13 @@ function DrawerBody({
             {entryCount === 1 ? '1 entry' : `${entryCount} entries`} on record. Data
             lives only on this phone — in the app’s own database — and never leaves
             it unless you export.
+          </p>
+          {/* The one request the app makes (lib/rates.ts, ADR 0002), said where
+              the page promises that nothing leaves the phone. */}
+          <p className="drawer-note">
+            The one thing it ever fetches is an exchange rate, when an entry is in
+            another currency. That request carries the two currencies and the date
+            — never an amount, a note or anything else from the ledger.
           </p>
           <p className="drawer-note">v{__APP_VERSION__}</p>
         </section>
@@ -480,11 +536,7 @@ function DrawerBody({
         <CurrencySheet
           open={pickingCurrency}
           selected={defaultCurrency}
-          onSelect={(code) => {
-            setDefaultCurrency(code)
-            setPref(PREFS.defaultCurrency, code)
-            onDefaultCurrencyChange?.(code)
-          }}
+          onSelect={(code) => void changeHomeCurrency(code)}
           onClose={() => setPickingCurrency(false)}
         />
       </aside>

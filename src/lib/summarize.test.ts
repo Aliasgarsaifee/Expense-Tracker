@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { Expense } from '../db'
 import {
   averagePerDay,
+  bandIndexAt,
   biggestExpense,
+  bucketCounts,
+  bucketReadout,
   busiestDay,
   busiestMonth,
   noSpendDays,
@@ -296,5 +299,67 @@ describe('trendBuckets', () => {
       { key: '2025', total: 0, count: 0 },
       { key: '2026', total: 30, count: 2 },
     ])
+  })
+})
+
+describe('bucketReadout', () => {
+  it('reads a tapped bar as its label, total and entry count', () => {
+    expect(bucketReadout({ key: '2026-11-07', total: 3200, count: 1 }, 'day', 'INR'))
+      .toEqual({ label: '7 Nov', detail: '₹3,200 · 1 entry', entries: 1 })
+    expect(bucketReadout({ key: '2026-11', total: 460.5, count: 2 }, 'month', 'INR'))
+      .toEqual({ label: 'Nov 2026', detail: '₹460.50 · 2 entries', entries: 2 })
+  })
+
+  // A zero-filled bucket, or a day that has not come yet: "₹0 · 0 entries"
+  // would read as spending that came to nothing.
+  it('says an empty bar holds nothing', () => {
+    expect(bucketReadout({ key: '2026-11-30', total: 0, count: 0 }, 'day', 'INR'))
+      .toEqual({ label: '30 Nov', detail: 'nothing logged', entries: 0 })
+  })
+
+  // Under the fixed/everyday split the chart draws everyday spending only, so
+  // the day the rent was paid is a bare column. It is not an empty day.
+  it('does not call a day empty when the series only leaves its entries out', () => {
+    expect(bucketReadout({ key: '2026-11-01', total: 0, count: 0 }, 'day', 'INR', 1))
+      .toEqual({ label: '1 Nov', detail: 'fixed costs only', entries: 1 })
+  })
+
+  it('counts the entries left out among those there are to see', () => {
+    expect(bucketReadout({ key: '2026-11-05', total: 450, count: 2 }, 'day', 'INR', 1))
+      .toEqual({ label: '5 Nov', detail: '₹450 · 2 entries', entries: 3 })
+  })
+})
+
+describe('bucketCounts', () => {
+  it('counts entries by the bucket their date falls in', () => {
+    const rent = expense('Rent', 32000, { spentOn: '2026-11-01' })
+    const power = expense('Utilities', 2499, { spentOn: '2026-11-05' })
+    const water = expense('Utilities', 300, { spentOn: '2026-11-05' })
+    expect([...bucketCounts([rent, power, water], 'day')])
+      .toEqual([['2026-11-01', 1], ['2026-11-05', 2]])
+    expect([...bucketCounts([rent, power, water], 'month')]).toEqual([['2026-11', 3]])
+    expect(bucketCounts([], 'day').size).toBe(0)
+  })
+})
+
+describe('bandIndexAt', () => {
+  // The chart at 375px: a 301px plot, 2px clear each side, a 30-day month.
+  // Each day's column is 9.9px wide and the first starts at x = 2.
+  it('finds the column a tap landed in', () => {
+    expect(bandIndexAt(2, 301, 30, 2)).toBe(0)
+    expect(bandIndexAt(11.8, 301, 30, 2)).toBe(0)
+    expect(bandIndexAt(12, 301, 30, 2)).toBe(1)
+    expect(bandIndexAt(66, 301, 30, 2)).toBe(6)
+    expect(bandIndexAt(298.9, 301, 30, 2)).toBe(29)
+  })
+
+  it('gives a tap in the clear strip at either side to the nearest column', () => {
+    expect(bandIndexAt(0, 301, 30, 2)).toBe(0)
+    expect(bandIndexAt(300.5, 301, 30, 2)).toBe(29)
+  })
+
+  it('has no column to give when there is no plot', () => {
+    expect(bandIndexAt(10, 301, 0, 2)).toBeNull()
+    expect(bandIndexAt(1, 4, 30, 2)).toBeNull()
   })
 })

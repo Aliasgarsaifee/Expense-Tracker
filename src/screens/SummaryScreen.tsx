@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { BreakdownList, type BreakdownRow } from '../components/BreakdownList'
 import { BudgetCard, YearBudgetCard } from '../components/BudgetCard'
 import { PeriodPager } from '../components/PeriodPager'
@@ -52,6 +52,7 @@ import {
   elapsedDays,
   emptyPeriodPhrase,
   initialPeriod,
+  inUseBounds,
   periodBounds,
   periodWindows,
   rangePeriod,
@@ -62,6 +63,7 @@ import { getPref, PREFS, setPref } from '../lib/prefs'
 import {
   averagePerDay,
   biggestExpense,
+  bucketCounts,
   busiestDay,
   busiestMonth,
   noSpendDays,
@@ -297,8 +299,15 @@ export function SummaryScreen({
     [bucket, dayScale],
   )
 
-  const avg = bounds ? averagePerDay(everydaySummary.total, bounds, today) : 0
-  const noSpend = bounds ? noSpendDays(bucket?.expenses ?? [], bounds, today) : 0
+  // What the average, the no-spend count and the pace are measured over: the
+  // period from the first entry ever logged, when that falls inside it (see
+  // inUseBounds). `elapsed` and `spanDays` stay the calendar's, for the budget:
+  // a budget is for the whole month, whenever the logging began.
+  const used = useMemo(() => bounds && inUseBounds(bounds, oldestDate), [bounds, oldestDate])
+  const usedSpan = used ? daysBetween(used.from, used.to) : 0
+  const usedElapsed = used ? elapsedDays(used, today) : 0
+  const avg = used ? averagePerDay(everydaySummary.total, used, today) : 0
+  const noSpend = used ? noSpendDays(bucket?.expenses ?? [], used, today) : 0
   const elapsed = bounds ? elapsedDays(bounds, today) : 0
   // Under the split, fixed costs count once at what they are expected to come
   // to and only everyday spending is extrapolated — extrapolating the rent day
@@ -306,8 +315,8 @@ export function SummaryScreen({
   const projected = !bounds
     ? 0
     : monthSplit
-      ? paceWithFixed(expectedFixed(lines), everydaySummary.total, elapsed, spanDays)
-      : projectTotal(summary.total, elapsed, spanDays)
+      ? paceWithFixed(expectedFixed(lines), everydaySummary.total, usedElapsed, usedSpan)
+      : projectTotal(summary.total, usedElapsed, usedSpan)
 
   const trend = useMemo(
     () => (bounds ? trendBuckets(everyday ?? [], bounds, trendUnitOf) : []),
@@ -366,7 +375,7 @@ export function SummaryScreen({
   const avgSub = ((): string => {
     if (isAggregateSpan)
       return `≈ ${formatMoney(Math.round(avg * DAYS_PER_MONTH), currency)} a month`
-    if (!containsToday) return `across ${spanDays} days`
+    if (!containsToday) return `across ${usedSpan === 1 ? '1 day' : `${usedSpan} days`}`
     if (dayScale && noSpend > 0)
       return `so far · ${noSpend} no-spend ${noSpend === 1 ? 'day' : 'days'}`
     return 'so far'
@@ -378,22 +387,50 @@ export function SummaryScreen({
   // has fully elapsed (a custom range ending today, a week on its Sunday) it
   // just equals the total — suppress both degenerate ends.
   const showPace =
-    containsToday && dataPeriod.kind !== 'all' && elapsed >= 2 && elapsed < spanDays
+    containsToday && dataPeriod.kind !== 'all' && usedElapsed >= 2 && usedElapsed < usedSpan
   // Without the split, pace is the second tile and Busiest day comes after
   // Biggest. With it the grid is always four, led by pace — or by Busiest day
   // in the same slot when there is no pace to show. The year's pace takes no
   // usual (month-only), so it projects all spending, and says so beside its
   // everyday neighbours.
-  const paceTile = showPace && bounds && (
-    <div className="stat-tile">
-      <p className="stat-label">On pace for</p>
-      <p className="stat-value money">{formatMoney(projected, currency)}</p>
-      <p className={yearSplit ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
-        by {shortDayMonth(bounds.to)}
-        {yearSplit && ' · all spending'}
-      </p>
-    </div>
-  )
+  // With nothing marked fixed, a month's pace spreads the rent over every day
+  // and reads far too high, and the switch that fixes it sits inside the
+  // Budget sheet where nobody without a budget would look. So the tile itself
+  // offers it. Month only: the year's pace takes no usual either way.
+  const offerFixed = dataPeriod.kind === 'month' && fixed.size === 0
+  const paceTile =
+    showPace &&
+    bounds &&
+    (offerFixed ? (
+      <button
+        type="button"
+        className="stat-tile stat-tile-btn"
+        aria-label={`On pace for ${formatMoney(projected, currency)} by ${shortDayMonth(bounds.to)}. Mark fixed costs so they count once`}
+        onClick={() => onOpenBudget(currency)}
+      >
+        <p className="stat-label">On pace for</p>
+        <p className="stat-value money">{formatMoney(projected, currency)}</p>
+        {/* Two whole lines: left to wrap, the tile broke it as "· mark / fixed
+           costs" at 375px. */}
+        <p className="stat-sub stat-sub-wrap">
+          by {shortDayMonth(bounds.to)}
+          <br />
+          mark fixed costs
+          <span className="stat-go" aria-hidden="true">
+            <ChevronRightIcon size={14} />
+          </span>
+        </p>
+      </button>
+    ) : (
+      <div className="stat-tile">
+        <p className="stat-label">On pace for</p>
+        <p className="stat-value money">{formatMoney(projected, currency)}</p>
+        <p className={yearSplit ? 'stat-sub stat-sub-wrap' : 'stat-sub'}>
+          by {shortDayMonth(bounds.to)}
+          {yearSplit && ' · all spending'}
+        </p>
+      </div>
+    ))
   const busiestTile = !singleDay && busiest && (
     <button
       type="button"
@@ -412,29 +449,34 @@ export function SummaryScreen({
     </button>
   )
 
-  // A tapped trend bucket drills to its span clipped to the viewed period; a
-  // whole in-period month jumps as a month period; everything else as a range.
-  // useCallback because TrendChart is memo'd: a fresh handler each render
-  // would rebuild its ~213 nodes on every re-render regardless.
-  const onBucketSelect = useCallback(
-    (key: string) => {
-      if (!bounds) {
-        onDrill({ period: rangePeriod(key, key) })
-        return
-      }
-      const b = bucketBounds(key, trendUnitOf)
-      if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
-        onDrill({ period: { kind: 'month', month: key } })
-        return
-      }
-      onDrill({
-        period: rangePeriod(
-          b.from < bounds.from ? bounds.from : b.from,
-          b.to > bounds.to ? bounds.to : b.to,
-        ),
-      })
-    },
-    [bounds, trendUnitOf, onDrill],
+  // "See entries" for a tapped trend bucket: its span clipped to the viewed
+  // period; a whole in-period month jumps as a month period; everything else
+  // as a range. A plain function: the chart's memo'd half takes no handlers.
+  function onBucketSelect(key: string) {
+    if (!bounds) {
+      onDrill({ period: rangePeriod(key, key) })
+      return
+    }
+    const b = bucketBounds(key, trendUnitOf)
+    if (trendUnitOf === 'month' && b.from >= bounds.from && b.to <= bounds.to) {
+      onDrill({ period: { kind: 'month', month: key } })
+      return
+    }
+    onDrill({
+      period: rangePeriod(
+        b.from < bounds.from ? bounds.from : b.from,
+        b.to > bounds.to ? bounds.to : b.to,
+      ),
+    })
+  }
+
+  // Under the split the chart draws everyday spending only, so the day the
+  // rent was paid is a bare column. The chart is told how many entries each
+  // column leaves out, so a tap there reads "fixed costs only" and still leads
+  // to them, rather than "nothing logged".
+  const leftOut = useMemo(
+    () => (split ? bucketCounts(split.fixed, trendUnitOf) : undefined),
+    [split, trendUnitOf],
   )
 
   // Custom ranges are never persisted (a stale range would be a trap on the
@@ -504,7 +546,7 @@ export function SummaryScreen({
            the Add form defaults to today, so a CTA on a past month would lie. */}
         {entryCount === 0 && containsToday && (
           <button type="button" className="btn-text hero-add" onClick={onAddNew}>
-            Add an expense
+            Add an entry
           </button>
         )}
       </section>
@@ -563,7 +605,7 @@ export function SummaryScreen({
                   ? 'nothing to compare'
                   : splitActive
                     ? cmp?.toDate
-                      ? `${formatMoney(prevTotal ?? 0, currency)} everyday by now`
+                      ? `${formatMoney(prevTotal ?? 0, currency)} everyday by this point`
                       : `was ${formatMoney(prevTotal ?? 0, currency)} everyday`
                     : cmp?.toDate
                       ? `${formatMoney(prevTotal ?? 0, currency)} by this point`
@@ -635,6 +677,7 @@ export function SummaryScreen({
             currentKey={currentBucketKey}
             onSelect={onBucketSelect}
             reference={reference}
+            leftOut={leftOut}
           />
         </section>
       )}
@@ -725,11 +768,11 @@ export function SummaryScreen({
               return {
                 key: p.paymentMethodId ?? 'none',
                 emoji: method ? groupEmoji(method.group) : '🧾',
-                label: method?.label ?? 'Unrecorded',
+                label: method?.label ?? 'Not recorded',
                 total: p.total,
                 count: p.count,
                 selectLabel: `See ${method?.label ?? 'method'} entries in History`,
-                // The null-method "Unrecorded" row stays static: History has no
+                // The null-method "Not recorded" row stays static: History has no
                 // "no payment method" filter to drill into.
                 onSelect: p.paymentMethodId
                   ? () =>

@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="btn-primary"
                   onClick={() => void this.exportBackup()}
                 >
-                  Export JSON backup
+                  Export full backup (JSON)
                 </button>
                 <button
                   type="button"

@@ -5,10 +5,11 @@ export type HeatBasis = 'all' | 'month' | 'year'
 const LEVELS = 4
 const GAMMA = 0.5 // sqrt curve, so a mid day still shows
 
-// The normalization bucket a day belongs to: one global bucket, its month, or
-// its year. Global lets heavy periods read as heavy across the whole scroll;
-// Month/Year restore local contrast when one outlier day would otherwise flatten
-// everything — the configurable basis is the outlier fix.
+// The normalization bucket a day belongs to: one bucket for everything (the
+// "Ever" chip), its month, or its year. Ever lets heavy periods read as heavy
+// across the whole scroll; month and year restore local contrast when one
+// outlier day would otherwise flatten everything — the configurable basis is
+// the outlier fix.
 function bucketKey(iso: string, basis: HeatBasis): string {
   if (basis === 'month') return iso.slice(0, 7)
   if (basis === 'year') return iso.slice(0, 4)
