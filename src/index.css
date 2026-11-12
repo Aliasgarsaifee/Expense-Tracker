@@ -591,7 +591,9 @@ h1.display {
 }
 
 /* The real control sits invisibly over the whole row so the native wheel
-   still opens. */
+   still opens. Its text never shows, but its size still counts: under 16px,
+   iOS zooms the page when the keyboard's next-field arrow lands here from the
+   amount, and leaves it zoomed after the picker closes. */
 .detail-date input[type='date'] {
   position: absolute;
   inset: 0;
@@ -600,6 +602,7 @@ h1.display {
   margin: 0;
   border: 0;
   padding: 0;
+  font-size: 16px;
   opacity: 0;
   -webkit-appearance: none;
   appearance: none;
@@ -1100,8 +1103,12 @@ button {
   max-width: 560px;
   background: var(--bg);
   border-radius: 22px 22px 0 0;
-  /* --kb = height the iOS keyboard occludes (set by useKeyboardInset). */
-  padding: 10px 20px calc(env(safe-area-inset-bottom) + 20px + var(--kb, 0px));
+  /* --kb = height the iOS keyboard occludes (set by useKeyboardInset). It is
+     measured from the screen's bottom edge, so it already contains the home
+     indicator's strip: the two are alternatives, never a sum. Adding them
+     left 34px of dead sheet above the keys, which the search sheets paid for
+     in list rows. */
+  padding: 10px 20px calc(max(env(safe-area-inset-bottom), var(--kb, 0px)) + 20px);
   box-shadow: 0 -12px 40px rgba(10, 6, 0, 0.25);
   animation: sheet-up 0.28s cubic-bezier(0.32, 0.72, 0.3, 1);
   max-height: 88dvh;
@@ -1196,6 +1203,14 @@ button {
    heads-up toast takes the sheet-corner radius instead. */
 .toast[data-detail] {
   border-radius: var(--radius-xl);
+}
+
+/* Its time is up: the toast fades where it stands and is removed a moment
+   later (LINGER_MS in useToast). Undo keeps taking taps meanwhile, to no
+   effect, so a finger already on its way does not reach the row underneath. */
+.toast[data-leaving] {
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 /* min-width: 0 lets the lines shrink inside the flex row, or neither could
@@ -1865,9 +1880,10 @@ button {
   text-overflow: ellipsis;
 }
 
-/* A sub-line that qualifies its figure ("everyday · ₹7,500 by this point",
-   "· fixed counted once") is wrong cut short, and is ~30px wider than a 375px
-   tile — it wraps, balanced so neither line is a lone word. */
+/* A sub-line that qualifies its figure ("₹26,147.40 everyday by now",
+   "by 31 Dec · all spending") is wrong cut short, and is often wider than its
+   tile on a 375px screen — it wraps, balanced so neither line is a lone
+   word. */
 .stat-sub-wrap {
   white-space: normal;
   text-wrap: balance;
@@ -2410,14 +2426,13 @@ button {
 
 /* A sheet with a search field pins handle/head/search and scrolls only the
    list. Fixed height (not max-) so it doesn't jump as matches shrink.
-   --kb is the height the iOS keyboard occludes (set from visualViewport);
-   padding by it keeps the list's scrollport above the keyboard. */
+   .sheet's bottom padding already clears the keyboard (--kb), which keeps
+   the list's scrollport above the keys. */
 .sheet-search {
   height: 88dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 20px + var(--kb, 0px));
 }
 
 /* The pinned rows are no scroll container, so without this a drag on them
@@ -2804,10 +2819,13 @@ button {
 
 /* ——— a11y & motion ——— */
 
+/* The ring only draws; it never reshapes. An outline follows its element's own
+   corners, and this rule sits last in the file at class-level specificity, so
+   a radius here beat every single-class radius above it: it squared a focused
+   chip, and the budget alert sheet's top corners when that sheet took focus. */
 :focus-visible {
   outline: 2.5px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 @keyframes sheet-up {

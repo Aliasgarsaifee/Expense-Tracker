@@ -5,6 +5,7 @@ import {
   monthName,
   monthOf,
   shortDayMonth,
+  shortDayMonthYear,
 } from './dates'
 
 // The unit a Summary view aggregates over. A day is the finest grain: a single
@@ -98,17 +99,8 @@ export function shiftPeriod(p: Period, dir: 1 | -1): Period {
 }
 
 // "12 Jun 2026" / "12 Jun" (year suppressed when it is redundant with a range).
-// Both formatters are built once — see the note in dates.ts.
-const DAY_MONTH_YEAR = new Intl.DateTimeFormat('en-IN', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-})
-
 function shortDay(iso: string, withYear: boolean): string {
-  if (!withYear) return shortDayMonth(iso)
-  const [y, m, d] = iso.split('-').map(Number)
-  return DAY_MONTH_YEAR.format(new Date(y, m - 1, d))
+  return withYear ? shortDayMonthYear(iso) : shortDayMonth(iso)
 }
 
 // A single day reads as one date; a same-year range carries the year once at

@@ -43,7 +43,14 @@ These are the paths a browser cannot verify — walk them after every install:
 
 - [ ] Add an expense → haptic tick fires, toast with **Undo** appears, Undo works.
 - [ ] Add an expense by typing a note and pressing **Done** on the keyboard →
-      the keyboard drops and the toast is in view (it sits where the keys were).
+      the keyboard drops and the toast is in view (it sits where the keys were),
+      and the page is back at the top with today's total showing.
+- [ ] Add an expense, then tap **Undo** just as the toast fades → nothing
+      happens; the form is not refilled from the Log again row beneath it.
+- [ ] Type an amount, then tap **⌄** on the keyboard's bar → the date picker
+      opens and the page does not zoom (the hidden date input is 16px).
+- [ ] Paid with → search → the results run down to just above the keyboard,
+      with no empty band (more than five payment methods needed for search).
 - [ ] Settings → Export JSON → the iOS share sheet opens (not a download).
 - [ ] Files app → On My iPhone → Expense Tracker → `Backups/` is visible and
       today's `auto-backup-*.json` appears after a fresh launch.

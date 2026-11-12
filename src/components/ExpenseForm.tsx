@@ -186,6 +186,10 @@ export function ExpenseForm({ initial, submitLabel, onSubmit, autoReset, recent 
       if (autoReset) {
         setAmountText('')
         setNote('')
+        // Back to the amount for the next entry. The note is the last field,
+        // so typing it leaves the page panned up, and iOS keeps it there
+        // after the keyboard closes.
+        window.scrollTo(0, 0)
       }
     } catch {
       // onSubmit already alerted; keep the values so nothing is lost.

@@ -9,6 +9,11 @@ const DAY_MONTH_YEAR = new Intl.DateTimeFormat(LOCALE, {
   year: 'numeric',
 })
 const DAY_MONTH = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' })
+const DAY_MONTH_YEAR_SHORT = new Intl.DateTimeFormat(LOCALE, {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
 const MONTH_YEAR_LONG = new Intl.DateTimeFormat(LOCALE, {
   month: 'long',
   year: 'numeric',
@@ -61,6 +66,12 @@ export function formatDateLong(iso: string): string {
 // tiles and the day-grain trend axis/tooltip.
 export function shortDayMonth(iso: string): string {
   return DAY_MONTH.format(dateOfDay(iso))
+}
+
+// "12 Jul 2026" — shortDayMonth with its year, for a date that no heading or
+// neighbour places in one.
+export function shortDayMonthYear(iso: string): string {
+  return DAY_MONTH_YEAR_SHORT.format(dateOfDay(iso))
 }
 
 // "Jul 2026" — short month + year, from a 'YYYY-MM' key.

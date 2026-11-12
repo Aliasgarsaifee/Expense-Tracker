@@ -34,25 +34,36 @@ export default function App() {
   const [budgetSheetFor, setBudgetSheetFor] = useState<string | null>(null)
   const [historyJump, setHistoryJump] = useState<HistoryJump | null>(null)
 
-  // The window is the one scroll container for three mounted screens, so each
-  // tab's position is parked here when it is left. It is saved at the moment of
-  // the tap, never from a scroll listener or an effect: hiding a section
-  // shrinks the document and the browser clamps scrollY before either runs.
+  // The window is the one scroll container for three mounted screens, so a
+  // screen's position is parked here when it is left. It is saved at the
+  // moment of the tap, never from a scroll listener or an effect: hiding a
+  // section shrinks the document and the browser clamps scrollY before either
+  // runs.
   const scrollByTab = useRef<Record<Tab, number>>({ add: 0, history: 0, summary: 0 })
-  // jumpToHistory must stay referentially stable, so it reads the tab here.
+  // switchTo and jumpToHistory must stay referentially stable, so they read
+  // the tab on screen from here instead of closing over it.
   const tabRef = useRef(tab)
-  tabRef.current = tab
-  function selectTab(next: Tab) {
-    if (next === tab) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      return
-    }
-    scrollByTab.current[tab] = window.scrollY
-    setTab(next)
-  }
   useLayoutEffect(() => {
+    tabRef.current = tab
     window.scrollTo(0, scrollByTab.current[tab])
   }, [tab])
+
+  // Every change of screen goes through here, so the rule is written once:
+  // park where the leaving screen was, then show the next — from its top when
+  // the arrival is a fresh start rather than a return. Add is never parked:
+  // it is where an entry starts, so it always opens on the amount.
+  const switchTo = useCallback((next: Tab, fromTop = false) => {
+    const from = tabRef.current
+    if (from !== 'add') scrollByTab.current[from] = window.scrollY
+    if (fromTop) scrollByTab.current[next] = 0
+    setTab(next)
+  }, [])
+
+  function selectTab(next: Tab) {
+    // Tapping the tab you are already on is the way back to its top.
+    if (next === tab) window.scrollTo({ top: 0, behavior: 'smooth' })
+    else switchTo(next)
+  }
 
   // A settings row was tapped: close the drawer, land on History, filter to
   // it. A fresh object per tap means re-tapping the same row re-applies even
@@ -60,19 +71,17 @@ export default function App() {
   // The handler itself is stable (setState functions are): Summary passes it
   // into a memoized chart, which would otherwise rebuild whenever this
   // component re-rendered for an unrelated reason.
-  const jumpToHistory = useCallback((jump: HistoryJump) => {
-    setHistoryJump({ ...jump })
-    // A jump lands on a fresh filter, so start at its top, not where History
-    // was left.
-    if (tabRef.current === 'history') {
-      window.scrollTo(0, 0)
-    } else {
-      scrollByTab.current.history = 0
-      scrollByTab.current[tabRef.current] = window.scrollY
-      setTab('history')
-    }
-    setSettingsOpen(false)
-  }, [])
+  const jumpToHistory = useCallback(
+    (jump: HistoryJump) => {
+      setHistoryJump({ ...jump })
+      // A jump lands on a fresh filter, so start at its top, not where
+      // History was left.
+      if (tabRef.current === 'history') window.scrollTo(0, 0)
+      else switchTo('history', true)
+      setSettingsOpen(false)
+    },
+    [switchTo],
+  )
   // Remounting AddScreen on this key re-reads the default-currency pref, so a
   // change in Settings takes effect immediately (not just next cold start).
   const [defaultCurrency, setDefaultCurrency] = useState(() =>
@@ -172,11 +181,7 @@ export default function App() {
           <SummaryScreen
             budgets={budgets}
             onDrill={jumpToHistory}
-            onAddNew={() => {
-              scrollByTab.current.summary = window.scrollY
-              scrollByTab.current.add = 0
-              setTab('add')
-            }}
+            onAddNew={() => switchTo('add')}
             onOpenBudget={(currency) => setBudgetSheetFor(currency)}
           />
         </section>

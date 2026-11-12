@@ -11,6 +11,7 @@ import {
   narrowMonth,
   narrowWeekday,
   shortDayMonth,
+  shortDayMonthYear,
   shortMonthYear,
   todayISO,
   yesterdayISO,
@@ -111,6 +112,7 @@ describe('date labellers under repeated interleaved use', () => {
     for (let i = 0; i < 3; i++) {
       expect(formatDateLong('2026-07-12')).toBe('12 July 2026')
       expect(shortDayMonth('2026-07-12')).toBe('12 Jul')
+      expect(shortDayMonthYear('2026-07-12')).toBe('12 Jul 2026')
       expect(shortMonthYear('2026-07')).toBe('Jul 2026')
       expect(monthLabel('2026-07')).toBe('July 2026')
       expect(monthName('2026-07')).toBe('July')
@@ -121,6 +123,11 @@ describe('date labellers under repeated interleaved use', () => {
     expect(shortDayMonth('2026-01-01')).toBe('1 Jan')
     expect(shortDayMonth('2024-02-29')).toBe('29 Feb')
     expect(shortDayMonth('2026-12-31')).toBe('31 Dec')
+  })
+
+  it('carries the year where no heading does', () => {
+    expect(shortDayMonthYear('2023-01-01')).toBe('1 Jan 2023')
+    expect(shortDayMonthYear('2024-02-29')).toBe('29 Feb 2024')
   })
 })
 

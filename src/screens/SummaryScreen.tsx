@@ -555,7 +555,10 @@ export function SummaryScreen({
                   ? '—'
                   : `${delta > 0 ? '▲' : delta < 0 ? '▼' : '='} ${Math.abs(delta)}%`}
               </p>
-              <p className="stat-sub">
+              {/* The figure it compares against can carry paise or run to
+                 lakhs, and then outgrows the tile: it wraps rather than end
+                 in an ellipsis. */}
+              <p className="stat-sub stat-sub-wrap">
                 {delta === null
                   ? 'nothing to compare'
                   : splitActive

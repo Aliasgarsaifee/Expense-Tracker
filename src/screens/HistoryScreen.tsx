@@ -18,7 +18,14 @@ import {
 } from '../db'
 import { budgetHeadsUp, type Budgets } from '../lib/budget'
 import { checkBudgetAfterSave, type BudgetAlert } from '../lib/budgetCheck'
-import { monthLabel, monthOf, todayISO, yesterdayISO } from '../lib/dates'
+import {
+  monthLabel,
+  monthOf,
+  shortDayMonth,
+  shortDayMonthYear,
+  todayISO,
+  yesterdayISO,
+} from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
 import {
   filterExpenses,
@@ -54,15 +61,11 @@ function dayLabel(iso: string): string {
   })
 }
 
-// Compact chip date ("12 Jun"), plus the year once it isn't the current one —
-// the ledger reaches back to 2023.
-function shortDate(iso: string): string {
-  const sameYear = iso.slice(0, 4) === todayISO().slice(0, 4)
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  })
+// A row's own date in the amount-sorted list, which has no day headings to
+// carry it: "12 Jun", plus the year once it isn't the current one — the ledger
+// reaches back to 2023.
+function shortDate(iso: string, today: string): string {
+  return iso.slice(0, 4) === today.slice(0, 4) ? shortDayMonth(iso) : shortDayMonthYear(iso)
 }
 
 const SORTS: HistorySort[] = ['newest', 'oldest', 'largest', 'smallest']
@@ -345,11 +348,16 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
               aria-label="Search"
               aria-expanded={searchShown}
               onClick={() => {
-                if (searchShown && query === '') {
-                  setSearchOpen(false)
-                } else {
+                if (!searchShown) {
                   focusSearch.current = true
                   setSearchOpen(true)
+                } else if (query === '') {
+                  setSearchOpen(false)
+                } else {
+                  // The field is already up with a query in it, so no state
+                  // changes and the effect above has nothing to run on: put
+                  // the cursor back directly.
+                  searchRef.current?.focus()
                 }
               }}
             >
@@ -532,7 +540,7 @@ export function HistoryScreen({ jump, budgets, onBudgetAlert, defaultCurrency }:
               expense={e}
               emoji={emojiFor(e.category)}
               methodLabel={e.paymentMethodId ? labels.get(e.paymentMethodId) : undefined}
-              date={shortDate(e.spentOn)}
+              date={shortDate(e.spentOn, today)}
               onEdit={setEditing}
             />
           ))}
