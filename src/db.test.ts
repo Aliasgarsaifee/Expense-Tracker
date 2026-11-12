@@ -962,9 +962,18 @@ describe('converted entries', () => {
     expect((await listWaiting('INR', '2026-11-11')).map((e) => e.id)).toEqual([waiting.id])
   })
 
+  it('stores no paid key for a home or waiting save', async () => {
+    const home = await addExpense({ amount: 400, category: 'Food', spentOn: '2026-11-06', paid: undefined })
+    const waiting = await addExpense({ ...aed, paid: undefined })
+    expect('paid' in (await db.expenses.get(home.id))!).toBe(false)
+    expect('paid' in (await db.expenses.get(waiting.id))!).toBe(false)
+  })
+
+  const pair = { base: 'AED', date: '2026-11-06' }
+
   it('converts a waiting entry and keeps everything else about it', async () => {
     const e = await addExpense({ ...aed, note: 'dinner', paymentMethodId: CASH_METHOD_ID })
-    expect(await convertExpense(e.id, 25.635, 'INR')).toBe(true)
+    expect(await convertExpense(e.id, 25.635, 'INR', pair)).toBe(true)
     expect(await db.expenses.get(e.id)).toEqual({
       ...e, amount: 3076, currency: 'INR', paid: { amount: 120, currency: 'AED' },
     })
@@ -972,20 +981,40 @@ describe('converted entries', () => {
 
   it('keeps two decimals on a small converted value', async () => {
     const e = await addExpense({ ...aed, amount: 2 })
-    await convertExpense(e.id, 25.635, 'INR')
+    await convertExpense(e.id, 25.635, 'INR', pair)
     expect((await db.expenses.get(e.id))!.amount).toBe(51.27)
+  })
+
+  it('leaves an entry waiting when its value would round to zero', async () => {
+    const e = await addExpense({ ...aed, amount: 0.01 })
+    expect(await convertExpense(e.id, 0.1, 'INR', pair)).toBe(false)
+    expect(await db.expenses.get(e.id)).toEqual(e)
   })
 
   it('refuses rows that are not waiting, and bad rates', async () => {
     const home = await addExpense({ amount: 400, category: 'Food', spentOn: '2026-11-06' })
     const waiting = await addExpense(aed)
-    expect(await convertExpense(home.id, 25.635, 'INR')).toBe(false)
-    expect(await convertExpense('no-such-id', 25.635, 'INR')).toBe(false)
-    expect(await convertExpense(waiting.id, 0, 'INR')).toBe(false)
-    expect(await convertExpense(waiting.id, NaN, 'INR')).toBe(false)
-    expect(await convertExpense(waiting.id, 25.635, 'INR')).toBe(true)
-    expect(await convertExpense(waiting.id, 30, 'INR')).toBe(false) // already converted
+    expect(await convertExpense(home.id, 25.635, 'INR', { base: 'INR', date: '2026-11-06' })).toBe(false)
+    expect(await convertExpense('no-such-id', 25.635, 'INR', pair)).toBe(false)
+    expect(await convertExpense(waiting.id, 0, 'INR', pair)).toBe(false)
+    expect(await convertExpense(waiting.id, NaN, 'INR', pair)).toBe(false)
+    expect(await convertExpense(waiting.id, 25.635, 'INR', pair)).toBe(true)
+    expect(await convertExpense(waiting.id, 30, 'INR', pair)).toBe(false) // already converted
     expect((await db.expenses.get(waiting.id))!.amount).toBe(3076)
     expect(await db.expenses.get(home.id)).toEqual(home)
+  })
+
+  it('refuses a rate for a pair the entry no longer has', async () => {
+    // A fill-in pass fetched for AED on the 6th; the owner then moved one entry
+    // to the 7th and switched another to SAR, both saved still waiting.
+    const moved = await addExpense(aed)
+    const switched = await addExpense(aed)
+    await updateExpense(moved.id, { spentOn: '2026-11-07' })
+    await updateExpense(switched.id, { currency: 'SAR' })
+    expect(await convertExpense(moved.id, 25.635, 'INR', pair)).toBe(false)
+    expect(await convertExpense(switched.id, 25.635, 'INR', pair)).toBe(false)
+    expect((await db.expenses.get(switched.id))!.currency).toBe('SAR')
+    expect(await convertExpense(moved.id, 25.7, 'INR', { base: 'AED', date: '2026-11-07' })).toBe(true)
+    expect((await db.expenses.get(moved.id))!.amount).toBe(3084)
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Expense } from '../db'
 import {
-  convertedMessage, entryValues, formatRate, paidLabel, paidOf, rateLine,
+  chooseRate, convertedMessage, entryValues, formatRate, paidLabel, paidOf, rateLine,
   savedMessage, seedRate, waitingPairs,
 } from './conversion'
 import { formatMoney } from './money'
@@ -51,6 +51,11 @@ describe('entryValues', () => {
       amount: 3101.45, currency: 'INR', paid: { amount: 120, currency: 'AED', byHand: true },
     })
   })
+  it('a value that rounds to zero stays waiting, computed or by hand', () => {
+    const tiny = { amount: 0.01, currency: 'AED' }
+    expect(entryValues(tiny, 'INR', 0.1, false)).toEqual({ amount: 0.01, currency: 'AED', paid: undefined })
+    expect(entryValues(tiny, 'INR', 0.1, true)).toEqual({ amount: 0.01, currency: 'AED', paid: undefined })
+  })
   it.each([
     [3076, 120, false], [51.27, 2, false], [3101.45, 120, true],
     [1.85, 0.07, true], [33.33, 1.3, true], [100, 3.9, false],
@@ -58,6 +63,46 @@ describe('entryValues', () => {
     const e = { amount, currency: 'INR', paid: { amount: paid, currency: 'AED', ...(byHand ? { byHand: true as const } : {}) } }
     const seed = seedRate(e, 'INR')!
     expect(entryValues(paidOf(e), 'INR', seed.rate, seed.byHand).amount).toBe(amount)
+  })
+})
+
+describe('chooseRate', () => {
+  const form = {
+    currency: 'AED', home: 'INR', spentOn: '2026-11-06', today: '2026-11-11',
+    handRate: null, seed: null,
+  }
+  // Edit of an entry booked at AED on the 6th, at the day's rate.
+  const stored = { rate: 3076 / 120, byHand: false, currency: 'AED', spentOn: '2026-11-06' }
+
+  it('home currency: no rate and nothing to look up', () => {
+    expect(chooseRate({ ...form, currency: 'INR' }, 25.6)).toEqual({ rate: null, lookup: false })
+  })
+  it('a hand rate wins and needs no lookup', () => {
+    expect(chooseRate({ ...form, handRate: 25.8, seed: stored }, 25.6))
+      .toEqual({ rate: 25.8, lookup: false })
+  })
+  it('the stored rate stands while currency and date are unchanged', () => {
+    expect(chooseRate({ ...form, seed: stored }, null)).toEqual({ rate: stored.rate, lookup: false })
+  })
+  it('a changed currency looks the rate up', () => {
+    expect(chooseRate({ ...form, currency: 'SAR', seed: stored }, 22.1))
+      .toEqual({ rate: 22.1, lookup: true })
+  })
+  it('a changed date looks the rate up', () => {
+    expect(chooseRate({ ...form, spentOn: '2026-11-07', seed: stored }, 25.7))
+      .toEqual({ rate: 25.7, lookup: true })
+  })
+  it('a stored value typed by hand, since cleared, looks the rate up', () => {
+    expect(chooseRate({ ...form, seed: { ...stored, byHand: true } }, 25.6))
+      .toEqual({ rate: 25.6, lookup: true })
+  })
+  it('after a change of home currency there is no stored rate, so it looks up', () => {
+    const seed = seedRate(converted, 'USD')
+    expect(chooseRate({ ...form, home: 'USD', seed }, 0.27)).toEqual({ rate: 0.27, lookup: true })
+  })
+  it('a future date waits: nothing to look up and no rate', () => {
+    expect(chooseRate({ ...form, spentOn: '2026-11-12' }, 25.6)).toEqual({ rate: null, lookup: false })
+    expect(chooseRate({ ...form, spentOn: '2026-11-11' }, 25.6)).toEqual({ rate: 25.6, lookup: true })
   })
 })
 

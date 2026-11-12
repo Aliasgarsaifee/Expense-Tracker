@@ -52,12 +52,19 @@ async function request(
   }
 }
 
+// An imported backup's currency can be any string, and it goes straight into
+// the URL: only a plain three-letter code and an ISO day are worth asking
+// about, and nothing else is ever sent.
+const CODE = /^[A-Z]{3}$/
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+
 export function fetchRate(
   base: string,
   quote: string,
   date: string,
   deps: RateDeps = {},
 ): Promise<number | null> {
+  if (!CODE.test(base) || !CODE.test(quote) || !DAY.test(date)) return Promise.resolve(null)
   const key = `${base}|${quote}|${date}`
   const known = cache.get(key)
   if (known !== undefined) return Promise.resolve(known)

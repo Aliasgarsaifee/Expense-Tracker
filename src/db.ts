@@ -233,6 +233,10 @@ export async function addExpense(input: NewExpense): Promise<Expense> {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   }
+  // The form always hands `paid` over, undefined for a home or waiting save,
+  // because an update needs the key to delete a stale memo. A new row has none
+  // to delete, and a home or waiting entry is one with no `paid` at all.
+  if (expense.paid === undefined) delete expense.paid
   await db.expenses.add(expense)
   return expense
 }
@@ -308,21 +312,31 @@ export async function listWaiting(home: string, upTo: string): Promise<Expense[]
 
 // Turns a waiting entry into a home-currency one, keeping what was paid. The
 // row is re-read inside the transaction so a stale list (or a double tap)
-// cannot convert twice or overwrite an entry edited in the meantime.
+// cannot convert twice or overwrite an entry edited in the meantime. `pair` is
+// the currency and day the rate was fetched for: an entry whose date or
+// currency was changed after the list was read, and saved still waiting, is
+// left for the next pass rather than booked at another day's rate.
 export async function convertExpense(
   id: string,
   rate: number,
   home: string,
+  pair: { base: string; date: string },
 ): Promise<boolean> {
   if (!Number.isFinite(rate) || rate <= 0) return false
   return db.transaction('rw', db.expenses, async () => {
     const row = await db.expenses.get(id)
     if (!row || !isWaiting(row, home)) return false
+    const currency = row.currency ?? 'INR'
+    if (currency !== pair.base || row.spentOn !== pair.date) return false
+    const amount = roundHome(row.amount * rate)
+    // A tiny amount at a small rate rounds to nothing, and a zero amount is a
+    // row every later backup import would reject. It stays waiting instead.
+    if (!(amount > 0)) return false
     await db.expenses.put({
       ...row,
-      amount: roundHome(row.amount * rate),
+      amount,
       currency: home,
-      paid: { amount: row.amount, currency: row.currency ?? 'INR' },
+      paid: { amount: row.amount, currency },
     })
     return true
   })

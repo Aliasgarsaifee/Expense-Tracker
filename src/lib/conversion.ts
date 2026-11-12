@@ -33,18 +33,51 @@ export function seedRate(
   return { rate: initial.amount / initial.paid.amount, byHand: initial.paid.byHand === true }
 }
 
+export interface RateInputs {
+  currency: string
+  home: string
+  spentOn: string
+  today: string
+  handRate: number | null
+  /** Edit of a converted entry: the rate it was booked at, and the currency
+   *  and day that rate stands for. */
+  seed: { rate: number; byHand: boolean; currency?: string; spentOn?: string } | null
+}
+
+// Which rate the form saves with, and whether it must ask the service for one.
+// The lookup decision never reads `fetched`, so a caller can ask it first and
+// pass the answer in afterwards. A stored rate is reused only for the currency
+// and day it was booked at, which is what lets Edit open with no request.
+export function chooseRate(
+  a: RateInputs, fetched: number | null,
+): { rate: number | null; lookup: boolean } {
+  if (a.currency === a.home) return { rate: null, lookup: false }
+  if (a.handRate !== null) return { rate: a.handRate, lookup: false }
+  const { seed } = a
+  if (seed && !seed.byHand && seed.currency === a.currency && seed.spentOn === a.spentOn) {
+    return { rate: seed.rate, lookup: false }
+  }
+  // A day that has not happened has no rate: the entry saves waiting, and the
+  // fill-in converts it once the day arrives.
+  if (a.spentOn > a.today) return { rate: null, lookup: false }
+  return { rate: fetched, lookup: true }
+}
+
 // What a save writes. `paid` is always present as a key (undefined when there
 // is no memo) because updateExpense needs it to delete a stale one.
 export function entryValues(
   typed: Typed, home: string, rate: number | null, byHand: boolean,
 ): { amount: number; currency: string; paid: Paid | undefined } {
-  if (typed.currency === home || rate === null) {
-    return { amount: typed.amount, currency: typed.currency, paid: undefined }
-  }
+  const asTyped = { amount: typed.amount, currency: typed.currency, paid: undefined }
+  if (typed.currency === home || rate === null) return asTyped
+  const value = typed.amount * rate
+  const amount = byHand ? toMinorUnits(value) : roundHome(value)
+  // A tiny amount at a small rate rounds to nothing; a zero amount would be
+  // refused by every later backup import, so the entry waits instead.
+  if (!(amount > 0)) return asTyped
   const paid: Paid = { amount: typed.amount, currency: typed.currency }
   if (byHand) paid.byHand = true
-  const value = typed.amount * rate
-  return { amount: byHand ? toMinorUnits(value) : roundHome(value), currency: home, paid }
+  return { amount, currency: home, paid }
 }
 
 export function formatRate(rate: number, base: string, home: string): string {

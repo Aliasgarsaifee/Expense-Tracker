@@ -28,7 +28,8 @@ export async function fillMissingRates(
     if (pairs.length === 0 || pairs.length > PAIR_CAP) return 0
 
     let converted = 0
-    for (const { base, date } of pairs) {
+    for (const pair of pairs) {
+      const { base, date } = pair
       let rate: number | null
       try {
         rate = await getRate(base, home, date)
@@ -38,7 +39,9 @@ export async function fillMissingRates(
       if (rate === null) continue
       for (const e of waiting) {
         if ((e.currency ?? 'INR') !== base || e.spentOn !== date) continue
-        if (await convertExpense(e.id, rate, home)) converted++
+        // The list is a snapshot; convertExpense re-checks the pair against
+        // the row as it is now, since the owner may have edited it meanwhile.
+        if (await convertExpense(e.id, rate, home, pair)) converted++
       }
     }
     return converted

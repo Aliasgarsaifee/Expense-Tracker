@@ -10,6 +10,9 @@ export interface ConfirmOptions {
 
 export interface PromptOptions {
   title: string
+  /** A sentence of explanation above the field, in body text. The label stays
+   *  a short field name; most prompts need nothing more than that. */
+  message?: string
   label: string
   initialValue?: string
   placeholder?: string
@@ -95,6 +98,7 @@ export function useDialog() {
     return open({
       kind: 'prompt',
       title: o.title,
+      message: o.message,
       confirmLabel: o.confirmLabel ?? 'Save',
       destructive: false,
       field: {

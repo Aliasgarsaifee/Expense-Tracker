@@ -11,7 +11,7 @@ import {
   type Paid,
   type PaymentMethod,
 } from '../db'
-import { entryValues, paidLabel, paidOf, rateLine, seedRate } from '../lib/conversion'
+import { chooseRate, entryValues, paidLabel, paidOf, rateLine, seedRate } from '../lib/conversion'
 import { currencySymbol } from '../lib/currencies'
 import { todayISO } from '../lib/dates'
 import { tapFeedback } from '../lib/haptics'
@@ -19,6 +19,7 @@ import { formatMoney, parseAmount, roundHome } from '../lib/money'
 import { logAgainChoices } from '../lib/recent'
 import { useDialog } from '../lib/useDialog'
 import { useRate } from '../lib/useRate'
+import { useToday } from '../lib/useToday'
 import { AddCategorySheet } from './AddCategorySheet'
 import { AddMethodSheet } from './AddMethodSheet'
 import { CurrencySheet } from './CurrencySheet'
@@ -162,10 +163,12 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
 
   const amount = parseAmount(amountText)
 
-  const seedApplies =
-    seed !== null && !seed.byHand && currency === seed.currency && spentOn === seed.spentOn
-  const fetched = useRate(currency, home, spentOn, handRate !== null || seedApplies)
-  const rate = handRate ?? (seedApplies ? seed.rate : fetched.rate)
+  const today = useToday()
+  // Whether to look up never depends on the fetched rate, so it is asked
+  // before the lookup and the answer passed back in after it.
+  const known = { currency, home, spentOn, today, handRate, seed }
+  const fetched = useRate(currency, home, spentOn, !chooseRate(known, null).lookup)
+  const { rate } = chooseRate(known, fetched.rate)
   const byHand = handRate !== null
   const line = rateLine({ typed: amount, currency, home, rate, loading: fetched.loading, byHand })
 
@@ -176,17 +179,19 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
   }
 
   async function editValue(typed: number) {
-    // Prefilled with the value the line shows, which is what Save would write.
-    const shown =
-      rate === null ? '' : String(entryValues({ amount: typed, currency }, home, rate, byHand).amount)
+    // Prefilled with the home value Save would write; empty when Save would
+    // leave the entry waiting.
+    const saved = entryValues({ amount: typed, currency }, home, rate, byHand)
+    const prefilled = saved.paid ? saved.amount : null
     const text = await askPrompt({
       title: `Value in ${home}`,
-      label: byHand
+      message: byHand
         ? "Type what your card charged, or leave empty to use the day's rate."
         : rate !== null
           ? `The day's rate gives ${formatMoney(roundHome(typed * rate), home)}. Type what your card charged.`
           : `Type what your card charged in ${home}.`,
-      initialValue: shown,
+      label: 'What your card charged',
+      initialValue: prefilled === null ? '' : String(prefilled),
       inputMode: 'decimal',
       allowEmpty: byHand,
     })
@@ -200,6 +205,9 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
       await showAlert('Enter an amount above zero')
       return
     }
+    // Saving the day's value untouched is looking, not typing: it stays the
+    // day's rate, so a later change of date still fetches that day's.
+    if (!byHand && value === prefilled) return
     setHandRate(value / typed)
   }
 

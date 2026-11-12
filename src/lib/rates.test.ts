@@ -29,6 +29,15 @@ it('asks once, privately, and remembers the answer', async () => {
   expect(init.signal).toBeInstanceOf(AbortSignal)
 })
 
+it.each([
+  ['AED&x=1', 'INR', '2026-11-06'], ['aed', 'INR', '2026-11-06'],
+  ['AED', 'INR?', '2026-11-06'], ['AED', 'INR', '2026-11-6'],
+])('asks nothing for %j to %j on %j', async (base, quote, date) => {
+  const fetchImpl = vi.fn(async () => ok(body))
+  expect(await fetchRate(base, quote, date, { fetchImpl })).toBeNull()
+  expect(fetchImpl).not.toHaveBeenCalled()
+})
+
 it('shares one request between callers in flight', async () => {
   const fetchImpl = vi.fn(async () => ok(body))
   const [a, b] = await Promise.all([
