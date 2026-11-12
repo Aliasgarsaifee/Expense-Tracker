@@ -119,7 +119,9 @@ Dependency direction is one-way: `screens/components → db.ts + lib/ → Dexie/
   `paid` are `db.ts` (storage and `convertExpense`), `backup.ts` (parse and
   CSV), History's search and the form's save path. `convertExpense` is the only
   thing that turns a waiting entry into a converted one outside the form, and
-  the home value of a stored entry is never recomputed from a new rate.
+  the home value of a stored entry is never recomputed from a new rate. A
+  change of default currency never rewrites the ledger either: the fill-in
+  skips entries made before `PREFS.homeSince` (see `listWaiting`).
 - `expenses.category` stores the category **label**, not the id — it is a
   foreign key by label. `renameCategory` relabels history in a transaction;
   anything touching category identity must preserve that.
@@ -158,7 +160,9 @@ archive-if-referenced) — migrations may simplify, never just accrete.
   absent on parse and export (absent means everyday — see `isFixedCategory`),
   and an import never clears a local `fixed` the file does not mention.
 - v3 expense rows may carry an optional `paid`. Absent stays absent on parse
-  and export; files without it import as they always did.
+  and export; files without it import as they always did, except that an
+  import never undoes a local conversion the file predates (same id, the
+  file's amount is the very payment the local memo records).
 - CSV export: fixed column order, formula-injection escaping, BOM for Excel.
   The last two columns are `paidAmount,paidCurrency`.
 - `autoBackup.ts` prunes only files matching the exact `auto-backup-` prefix

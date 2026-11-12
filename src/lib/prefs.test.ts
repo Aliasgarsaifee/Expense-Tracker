@@ -33,6 +33,7 @@ describe('prefs without localStorage (in-module Map fallback)', () => {
       lastPaymentMethod: 'lastPaymentMethodId',
       lastCategory: 'lastCategory',
       defaultCurrency: 'defaultCurrency',
+      homeSince: 'homeSince',
       autoBackup: 'autoBackupEnabled',
       lastAutoBackup: 'lastAutoBackupDate',
       summaryPeriod: 'summaryPeriodKind',

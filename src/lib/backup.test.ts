@@ -495,6 +495,35 @@ describe('importBackup', () => {
     expect(cats.filter((c) => c.label.toLowerCase() === 'pets')).toHaveLength(1)
   })
 
+  it('keeps a local conversion the file predates', async () => {
+    // Yesterday's backup holds the entry as it was paid; since then it was
+    // converted, here at a value typed from the card statement.
+    const local = await addExpense({
+      amount: 3101.45, currency: 'INR', category: 'Food', spentOn: '2026-11-06',
+      paid: { amount: 120, currency: 'AED', byHand: true },
+    })
+    const { paid: _paid, ...rest } = local
+    const older: Expense = { ...rest, amount: 120, currency: 'AED', note: 'dinner' }
+
+    await importBackup({ expenses: [older], paymentMethods: [], categories: [] })
+
+    // Everything else in the file still wins.
+    expect(await db.expenses.get(local.id)).toEqual({ ...local, note: 'dinner' })
+  })
+
+  it('lets the file win when it holds a different payment', async () => {
+    const local = await addExpense({
+      amount: 3076, currency: 'INR', category: 'Food', spentOn: '2026-11-06',
+      paid: { amount: 120, currency: 'AED' },
+    })
+    const { paid: _paid, ...rest } = local
+    const edited: Expense = { ...rest, amount: 150, currency: 'AED' }
+
+    await importBackup({ expenses: [edited], paymentMethods: [], categories: [] })
+
+    expect(await db.expenses.get(local.id)).toEqual(edited)
+  })
+
   it('returns zero counts for an empty backup', async () => {
     expect(
       await importBackup({ expenses: [], paymentMethods: [], categories: [] }),

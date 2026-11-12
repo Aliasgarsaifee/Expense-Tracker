@@ -4,6 +4,7 @@ export const PREFS = {
   lastPaymentMethod: 'lastPaymentMethodId',
   lastCategory: 'lastCategory',
   defaultCurrency: 'defaultCurrency',
+  homeSince: 'homeSince', // ISO timestamp of the last default-currency change; absent = never. Older entries are not converted into the new default
   autoBackup: 'autoBackupEnabled',
   lastAutoBackup: 'lastAutoBackupDate',
   summaryPeriod: 'summaryPeriodKind', // day|month|year|all ('week' from ≤ v1.3.0 restores as month); custom is never persisted

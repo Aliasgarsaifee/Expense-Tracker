@@ -3,6 +3,7 @@ import * as dbModule from '../db'
 import {
   addCategory,
   addExpense,
+  convertExpense,
   db,
   DEFAULT_CATEGORIES,
   DEFAULT_PAYMENT_METHODS,
@@ -189,6 +190,16 @@ describe('checkBudgetAfterSave', () => {
   it('leaves an entry still waiting for a rate out of the home budget', async () => {
     await seedEveryday(24000)
     expect(await save({ amount: 5000, currency: 'AED' })).toBeNull()
+  })
+
+  // What the background fill-in relies on: the waiting entry is the "previous"
+  // one, so the conversion is judged as the home spending it has just become.
+  it('alerts when a background conversion takes the month over', async () => {
+    await seedEveryday(24000)
+    const waiting = await addExpense({ amount: 500, currency: 'AED', category: 'Food', spentOn: '2026-11-24' })
+    const converted = await convertExpense(waiting.id, 25.52, 'INR', { base: 'AED', date: '2026-11-24' })
+    const alert = await checkBudgetAfterSave(converted!, waiting, BUDGETS, TODAY)
+    expect(alert).toMatchObject({ kind: 'over', currency: 'INR', spent: 36760 })
   })
 
   it('says nothing when an edit lowers or re-files the entry', async () => {

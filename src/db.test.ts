@@ -962,6 +962,35 @@ describe('converted entries', () => {
     expect((await listWaiting('INR', '2026-11-11')).map((e) => e.id)).toEqual([waiting.id])
   })
 
+  it('leaves out entries made before the default currency last changed', async () => {
+    // Until that change these were home entries. Counting them as waiting
+    // would convert the whole ledger into the new default, with no way back.
+    const row = (id: string, createdAt: string) =>
+      ({ id, amount: 400, currency: 'INR', category: 'Food', spentOn: '2026-11-06', createdAt })
+    await db.expenses.bulkPut([
+      row('before', '2026-11-01T10:00:00.000Z'),
+      row('after', '2026-11-08T10:00:00.000Z'),
+    ])
+    const changed = '2026-11-05T00:00:00.000Z'
+    expect((await listWaiting('USD', '2026-11-11', changed)).map((e) => e.id)).toEqual(['after'])
+    // Never changed: everything foreign is waiting, as on a first launch.
+    expect((await listWaiting('USD', '2026-11-11')).map((e) => e.id).sort()).toEqual(['after', 'before'])
+  })
+
+  it("rejects a memo in the entry's own currency, on add and on edit", async () => {
+    const message = 'What was paid must be in a different currency from the entry'
+    await expect(addExpense({ ...aed, paid: { amount: 120, currency: 'AED' } })).rejects.toThrow(message)
+    const e = await addExpense({ amount: 3076, currency: 'INR', category: 'Food',
+      spentOn: '2026-11-06', paid: { amount: 120, currency: 'AED' } })
+    // Either half of the pair can break it on its own.
+    await expect(updateExpense(e.id, { currency: 'AED' })).rejects.toThrow(message)
+    await expect(updateExpense(e.id, { paid: { amount: 120, currency: 'INR' } })).rejects.toThrow(message)
+    expect(await db.expenses.get(e.id)).toEqual(e)
+    // Changing both together, as the form does, is an ordinary edit.
+    await updateExpense(e.id, { amount: 2900, paid: { amount: 110, currency: 'SAR' } })
+    expect((await db.expenses.get(e.id))!.paid).toEqual({ amount: 110, currency: 'SAR' })
+  })
+
   it('stores no paid key for a home or waiting save', async () => {
     const home = await addExpense({ amount: 400, category: 'Food', spentOn: '2026-11-06', paid: undefined })
     const waiting = await addExpense({ ...aed, paid: undefined })
@@ -973,10 +1002,10 @@ describe('converted entries', () => {
 
   it('converts a waiting entry and keeps everything else about it', async () => {
     const e = await addExpense({ ...aed, note: 'dinner', paymentMethodId: CASH_METHOD_ID })
-    expect(await convertExpense(e.id, 25.635, 'INR', pair)).toBe(true)
-    expect(await db.expenses.get(e.id)).toEqual({
-      ...e, amount: 3076, currency: 'INR', paid: { amount: 120, currency: 'AED' },
-    })
+    // The stored row comes back, so the caller can judge it without a re-read.
+    const stored = { ...e, amount: 3076, currency: 'INR', paid: { amount: 120, currency: 'AED' } }
+    expect(await convertExpense(e.id, 25.635, 'INR', pair)).toEqual(stored)
+    expect(await db.expenses.get(e.id)).toEqual(stored)
   })
 
   it('keeps two decimals on a small converted value', async () => {
@@ -987,19 +1016,19 @@ describe('converted entries', () => {
 
   it('leaves an entry waiting when its value would round to zero', async () => {
     const e = await addExpense({ ...aed, amount: 0.01 })
-    expect(await convertExpense(e.id, 0.1, 'INR', pair)).toBe(false)
+    expect(await convertExpense(e.id, 0.1, 'INR', pair)).toBeNull()
     expect(await db.expenses.get(e.id)).toEqual(e)
   })
 
   it('refuses rows that are not waiting, and bad rates', async () => {
     const home = await addExpense({ amount: 400, category: 'Food', spentOn: '2026-11-06' })
     const waiting = await addExpense(aed)
-    expect(await convertExpense(home.id, 25.635, 'INR', { base: 'INR', date: '2026-11-06' })).toBe(false)
-    expect(await convertExpense('no-such-id', 25.635, 'INR', pair)).toBe(false)
-    expect(await convertExpense(waiting.id, 0, 'INR', pair)).toBe(false)
-    expect(await convertExpense(waiting.id, NaN, 'INR', pair)).toBe(false)
-    expect(await convertExpense(waiting.id, 25.635, 'INR', pair)).toBe(true)
-    expect(await convertExpense(waiting.id, 30, 'INR', pair)).toBe(false) // already converted
+    expect(await convertExpense(home.id, 25.635, 'INR', { base: 'INR', date: '2026-11-06' })).toBeNull()
+    expect(await convertExpense('no-such-id', 25.635, 'INR', pair)).toBeNull()
+    expect(await convertExpense(waiting.id, 0, 'INR', pair)).toBeNull()
+    expect(await convertExpense(waiting.id, NaN, 'INR', pair)).toBeNull()
+    expect(await convertExpense(waiting.id, 25.635, 'INR', pair)).not.toBeNull()
+    expect(await convertExpense(waiting.id, 30, 'INR', pair)).toBeNull() // already converted
     expect((await db.expenses.get(waiting.id))!.amount).toBe(3076)
     expect(await db.expenses.get(home.id)).toEqual(home)
   })
@@ -1011,10 +1040,10 @@ describe('converted entries', () => {
     const switched = await addExpense(aed)
     await updateExpense(moved.id, { spentOn: '2026-11-07' })
     await updateExpense(switched.id, { currency: 'SAR' })
-    expect(await convertExpense(moved.id, 25.635, 'INR', pair)).toBe(false)
-    expect(await convertExpense(switched.id, 25.635, 'INR', pair)).toBe(false)
+    expect(await convertExpense(moved.id, 25.635, 'INR', pair)).toBeNull()
+    expect(await convertExpense(switched.id, 25.635, 'INR', pair)).toBeNull()
     expect((await db.expenses.get(switched.id))!.currency).toBe('SAR')
-    expect(await convertExpense(moved.id, 25.7, 'INR', { base: 'AED', date: '2026-11-07' })).toBe(true)
+    expect(await convertExpense(moved.id, 25.7, 'INR', { base: 'AED', date: '2026-11-07' })).not.toBeNull()
     expect((await db.expenses.get(moved.id))!.amount).toBe(3084)
   })
 })

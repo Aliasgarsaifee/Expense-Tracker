@@ -13,6 +13,23 @@ export function useRate(
 ): { rate: number | null; loading: boolean } {
   const wanted = skip || base === quote ? null : `${base}|${quote}|${date}`
   const [answer, setAnswer] = useState<{ key: string; rate: number | null } | null>(null)
+  // A lookup that failed is asked again when the connection or the app comes
+  // back: nothing else would ever re-run it for the same currency and day, and
+  // the form would sit on "No rate yet" with the network long since returned.
+  // A rate already held comes straight from fetchRate's cache, so asking again
+  // when nothing failed costs no request.
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const again = () => {
+      if (document.visibilityState === 'visible') setAttempt((n) => n + 1)
+    }
+    window.addEventListener('online', again)
+    document.addEventListener('visibilitychange', again)
+    return () => {
+      window.removeEventListener('online', again)
+      document.removeEventListener('visibilitychange', again)
+    }
+  }, [])
 
   useEffect(() => {
     if (wanted === null) return
@@ -24,7 +41,7 @@ export function useRate(
     return () => {
       cancelled = true
     }
-  }, [wanted, base, quote, date])
+  }, [wanted, base, quote, date, attempt])
 
   if (wanted === null) return { rate: null, loading: false }
   if (answer?.key !== wanted) return { rate: null, loading: true }

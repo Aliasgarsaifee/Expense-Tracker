@@ -306,13 +306,27 @@ export async function importBackup(
       if (from !== undefined && to !== undefined && from !== to) relabel.set(from, to)
     }
 
-    const expenses = data.expenses.map((e) => {
+    // A file from before an entry was converted holds it as it was paid, with
+    // no memo. Like `fixed` above, it says nothing about the conversion, so
+    // the local home value stays (it may have been typed from a card
+    // statement) rather than being worked out again from a reference rate.
+    // Only when the file's amount is the very payment the memo records: a file
+    // holding anything else is an edit, and edits win.
+    const local = await db.expenses.bulkGet(data.expenses.map((e) => e.id))
+    const expenses = data.expenses.map((e, i) => {
       const remapped =
         e.paymentMethodId && methodRemap.has(e.paymentMethodId)
           ? { ...e, paymentMethodId: methodRemap.get(e.paymentMethodId) }
           : e
       const label = relabel.get(remapped.category)
-      return label ? { ...remapped, category: label } : remapped
+      const merged = label ? { ...remapped, category: label } : remapped
+      const mine = local[i]
+      return !merged.paid &&
+        mine?.paid &&
+        mine.paid.amount === merged.amount &&
+        mine.paid.currency === merged.currency
+        ? { ...merged, amount: mine.amount, currency: mine.currency, paid: mine.paid }
+        : merged
     })
 
     await db.paymentMethods.bulkPut(methods)

@@ -8,8 +8,8 @@ import { Toast } from './components/Toast'
 import { listWaiting, unbackedSince } from './db'
 import { runAutoBackupIfDue } from './lib/autoBackup'
 import { assessBackupHealth } from './lib/backupHealth'
-import { budgetFor, readBudgets, withBudget } from './lib/budget'
-import type { BudgetAlert } from './lib/budgetCheck'
+import { budgetFor, budgetHeadsUp, readBudgets, withBudget } from './lib/budget'
+import { checkBudgetAfterSave, type BudgetAlert } from './lib/budgetCheck'
 import { convertedMessage } from './lib/conversion'
 import { fillMissingRates } from './lib/fillRates'
 import { warnFeedback } from './lib/haptics'
@@ -92,6 +92,17 @@ export default function App() {
   const [defaultCurrency, setDefaultCurrency] = useState(() =>
     getPref(PREFS.defaultCurrency, 'INR'),
   )
+  // When that default last changed. What was already in the ledger then is
+  // never converted into the new default (see listWaiting); the drawer has
+  // stored the currency itself by the time it reports here.
+  const [homeSince, setHomeSince] = useState(() => getPref(PREFS.homeSince, ''))
+  function changeDefaultCurrency(code: string) {
+    if (code === defaultCurrency) return // re-picking it is not a change
+    const now = new Date().toISOString()
+    setPref(PREFS.homeSince, now)
+    setHomeSince(now)
+    setDefaultCurrency(code)
+  }
 
   // Prefs are not reactive, so the budgets live here like the default
   // currency, and the sheet reports every change back. setPref is best-effort:
@@ -167,8 +178,8 @@ export default function App() {
   // rows, so the effect below re-runs only when it changes.
   const today = useToday()
   const waiting = useLiveQuery(
-    () => listWaiting(defaultCurrency, today).then((rows) => rows.length),
-    [defaultCurrency, today],
+    () => listWaiting(defaultCurrency, today, homeSince).then((rows) => rows.length),
+    [defaultCurrency, today, homeSince],
   )
   const { toast, show } = useToast()
   // The effect below must not re-run just because `show` is a new function on
@@ -183,10 +194,32 @@ export default function App() {
     // No cancel flag: each conversion lowers `waiting` and so supersedes this
     // effect mid-pass, while the pass itself (guarded against overlap) is the
     // one that knows the count. A finished pass always says so.
-    void fillMissingRates(defaultCurrency, today).then((n) => {
-      if (n > 0) showRef.current({ message: convertedMessage(n, defaultCurrency) })
+    //
+    // A conversion turns an entry the budget left out into home spending, so
+    // each one is judged as it lands, like the save it completes. The worst
+    // verdict of the pass is the one shown, the way a save shows it.
+    let verdict: BudgetAlert | null = null
+    void fillMissingRates(defaultCurrency, today, undefined, {
+      since: homeSince,
+      onConverted: async (before, after) => {
+        const found = await checkBudgetAfterSave(after, before, budgets, today)
+        if (found && verdict?.kind !== 'over') verdict = found
+      },
+    }).then((n) => {
+      if (n === 0) return
+      // Over the line, the sheet is the notice, as it is for a save: it names
+      // the entry and what it now counts as, and this toast sits above sheets,
+      // so it would only lie across the sheet's words.
+      if (verdict?.kind === 'over') {
+        raiseBudgetAlert(verdict)
+        return
+      }
+      showRef.current({
+        message: convertedMessage(n, defaultCurrency),
+        detail: verdict?.kind === 'near' ? budgetHeadsUp(verdict) : undefined,
+      })
     })
-  }, [waiting, defaultCurrency, today, resumeTick])
+  }, [waiting, defaultCurrency, today, resumeTick, homeSince, budgets])
 
   return (
     <div className="app">
@@ -240,7 +273,7 @@ export default function App() {
       <SettingsDrawer
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        onDefaultCurrencyChange={setDefaultCurrency}
+        onDefaultCurrencyChange={changeDefaultCurrency}
         onJumpToHistory={jumpToHistory}
         budget={budgetFor(budgets, defaultCurrency)}
         // Close the drawer first: a sheet sits under the drawer's z-index.

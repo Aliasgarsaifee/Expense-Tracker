@@ -48,14 +48,44 @@ describe('fillMissingRates', () => {
     expect(getRate).not.toHaveBeenCalled()
   })
 
-  it('does nothing when more than 60 days are waiting', async () => {
+  it('works through a long backlog 60 days a pass, newest first', async () => {
+    const days: string[] = []
     for (let d = 0; d < 61; d++) {
       const day = new Date(Date.UTC(2026, 7, 1 + d)).toISOString().slice(0, 10)
+      days.push(day)
       await aed(day)
     }
     const getRate = vi.fn(async () => 25.635)
-    expect(await fillMissingRates('INR', TODAY, getRate)).toBe(0)
+    expect(await fillMissingRates('INR', TODAY, getRate)).toBe(60)
+    expect(getRate).toHaveBeenCalledTimes(60)
+    // The oldest day is the one left for the next pass.
+    const left = (await db.expenses.toArray()).filter((e) => e.currency === 'AED')
+    expect(left.map((e) => e.spentOn)).toEqual([days[0]])
+    expect(await fillMissingRates('INR', TODAY, getRate)).toBe(1)
+  })
+
+  it('leaves alone what was entered before the default currency last changed', async () => {
+    await aed('2026-11-06')
+    const getRate = vi.fn(async () => 25.635)
+    expect(await fillMissingRates('INR', TODAY, getRate, { since: '2999-01-01T00:00:00.000Z' })).toBe(0)
     expect(getRate).not.toHaveBeenCalled()
+    expect(await fillMissingRates('INR', TODAY, getRate, { since: '2000-01-01T00:00:00.000Z' })).toBe(1)
+  })
+
+  it('hands each conversion over as it lands, and survives a caller that throws', async () => {
+    const a = await aed('2026-11-06')
+    const b = await aed('2026-11-05', 2)
+    const seen: [string, number, string, number][] = []
+    const converted = await fillMissingRates('INR', TODAY, async () => 25.635, {
+      onConverted: (before, after) => {
+        seen.push([before.currency, before.amount, after.currency, after.amount])
+        throw new Error('boom')
+      },
+    })
+    expect(converted).toBe(2)
+    expect(seen).toEqual([['AED', 120, 'INR', 3076], ['AED', 2, 'INR', 51.27]])
+    expect((await db.expenses.get(a.id))!.currency).toBe('INR')
+    expect((await db.expenses.get(b.id))!.currency).toBe('INR')
   })
 
   it('never runs two passes at once', async () => {

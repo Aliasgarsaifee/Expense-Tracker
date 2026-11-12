@@ -1240,9 +1240,14 @@ button {
 
 /* The app-level notice sits above where screen toasts appear, so it can never
    cover a save toast's Undo. The offset is a two-line screen toast's height
-   (the budget heads-up, measured 57.2px at 375 wide) plus an 8px gap, rounded up. */
+   (the budget heads-up, measured 57.2px at 375 wide) plus an 8px gap, rounded up.
+   It reports something done in the background, which can finish while a sheet
+   or the drawer is open, and it is said only once: it goes above their scrims
+   (40, 50) so it is not lost behind them, and stays below a dialog (60), which
+   is asking a question. */
 .toast-raised {
   bottom: calc(env(safe-area-inset-bottom) + 92px + 66px);
+  z-index: 55;
 }
 
 /* At two lines a full pill's half-round ends crowd the text's corners, so the

@@ -179,10 +179,13 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
   }
 
   async function editValue(typed: number) {
-    // Prefilled with the home value Save would write; empty when Save would
-    // leave the entry waiting.
+    // The home value Save would write; null when Save would leave the entry
+    // waiting. A value the owner typed goes back in the field, theirs to
+    // correct. The day's value is only the hint: the field is for a different
+    // number, and one already in it would have to be deleted first (a prompt
+    // cannot open with its text selected, see Dialog).
     const saved = entryValues({ amount: typed, currency }, home, rate, byHand)
-    const prefilled = saved.paid ? saved.amount : null
+    const current = saved.paid ? saved.amount : null
     const text = await askPrompt({
       title: `Value in ${home}`,
       message: byHand
@@ -191,7 +194,8 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
           ? `The day's rate gives ${formatMoney(roundHome(typed * rate), home)}. Type what your card charged.`
           : `Type what your card charged in ${home}.`,
       label: 'What your card charged',
-      initialValue: prefilled === null ? '' : String(prefilled),
+      initialValue: byHand && current !== null ? String(current) : '',
+      placeholder: current === null ? undefined : String(current),
       inputMode: 'decimal',
       allowEmpty: byHand,
     })
@@ -205,9 +209,9 @@ export function ExpenseForm({ initial, home, submitLabel, onSubmit, autoReset, r
       await showAlert('Enter an amount above zero')
       return
     }
-    // Saving the day's value untouched is looking, not typing: it stays the
-    // day's rate, so a later change of date still fetches that day's.
-    if (!byHand && value === prefilled) return
+    // Typing the day's own value changes nothing: it stays the day's rate, so
+    // a later change of date still fetches that day's.
+    if (!byHand && value === current) return
     setHandRate(value / typed)
   }
 

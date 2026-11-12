@@ -216,9 +216,16 @@ function sortNewestFirst(expenses: Expense[]): Expense[] {
   )
 }
 
-function assertPaid(paid: Paid | undefined): void {
-  if (paid && !(Number.isFinite(paid.amount) && paid.amount > 0)) {
+// The same two rules the backup parser holds a file to. A stored row that
+// broke either would make every later export refuse to import, which the
+// owner would only learn on the day they needed the restore.
+function assertPaid(paid: Paid | undefined, currency: string): void {
+  if (!paid) return
+  if (!(Number.isFinite(paid.amount) && paid.amount > 0)) {
     throw new Error('Paid amount must be a positive number')
+  }
+  if (paid.currency === currency) {
+    throw new Error('What was paid must be in a different currency from the entry')
   }
 }
 
@@ -226,7 +233,7 @@ export async function addExpense(input: NewExpense): Promise<Expense> {
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     throw new Error('Amount must be a positive number')
   }
-  assertPaid(input.paid)
+  assertPaid(input.paid, input.currency ?? 'INR')
   const expense: Expense = {
     ...input,
     currency: input.currency ?? 'INR',
@@ -289,8 +296,13 @@ export async function updateExpense(
   ) {
     throw new Error('Amount must be a positive number')
   }
-  assertPaid(changes.paid)
-  await db.expenses.update(id, changes)
+  // The memo is judged against the row as it will be stored: an edit can
+  // change either half of the pair on its own.
+  await db.transaction('rw', db.expenses, async () => {
+    const next = { ...(await db.expenses.get(id)), ...changes }
+    assertPaid(next.paid, next.currency ?? 'INR')
+    await db.expenses.update(id, changes)
+  })
 }
 
 // A foreign entry whose home value is not known yet. Derived, never stored:
@@ -300,12 +312,15 @@ function isWaiting(e: Expense, home: string): boolean {
 }
 
 // Newest first, up to and including `upTo` (today), so a future-dated entry
-// is not asked for a rate that does not exist yet.
-export async function listWaiting(home: string, upTo: string): Promise<Expense[]> {
+// is not asked for a rate that does not exist yet. `since` is when the default
+// currency last changed (empty: never). An entry made before that was a home
+// entry when it was saved, so it keeps its own currency: a change of default
+// must never rewrite the ledger that is already there.
+export async function listWaiting(home: string, upTo: string, since = ''): Promise<Expense[]> {
   const rows = await db.expenses
     .where('spentOn')
     .belowOrEqual(upTo)
-    .filter((e) => isWaiting(e, home))
+    .filter((e) => isWaiting(e, home) && e.createdAt >= since)
     .toArray()
   return sortNewestFirst(rows)
 }
@@ -315,30 +330,32 @@ export async function listWaiting(home: string, upTo: string): Promise<Expense[]
 // cannot convert twice or overwrite an entry edited in the meantime. `pair` is
 // the currency and day the rate was fetched for: an entry whose date or
 // currency was changed after the list was read, and saved still waiting, is
-// left for the next pass rather than booked at another day's rate.
+// left for the next pass rather than booked at another day's rate. Returns the
+// row as stored, or null when nothing was converted.
 export async function convertExpense(
   id: string,
   rate: number,
   home: string,
   pair: { base: string; date: string },
-): Promise<boolean> {
-  if (!Number.isFinite(rate) || rate <= 0) return false
+): Promise<Expense | null> {
+  if (!Number.isFinite(rate) || rate <= 0) return null
   return db.transaction('rw', db.expenses, async () => {
     const row = await db.expenses.get(id)
-    if (!row || !isWaiting(row, home)) return false
+    if (!row || !isWaiting(row, home)) return null
     const currency = row.currency ?? 'INR'
-    if (currency !== pair.base || row.spentOn !== pair.date) return false
+    if (currency !== pair.base || row.spentOn !== pair.date) return null
     const amount = roundHome(row.amount * rate)
     // A tiny amount at a small rate rounds to nothing, and a zero amount is a
     // row every later backup import would reject. It stays waiting instead.
-    if (!(amount > 0)) return false
-    await db.expenses.put({
+    if (!(amount > 0)) return null
+    const converted: Expense = {
       ...row,
       amount,
       currency: home,
       paid: { amount: row.amount, currency },
-    })
-    return true
+    }
+    await db.expenses.put(converted)
+    return converted
   })
 }
 

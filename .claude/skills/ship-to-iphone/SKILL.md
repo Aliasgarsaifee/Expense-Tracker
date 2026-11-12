@@ -51,6 +51,12 @@ These are the paths a browser cannot verify — walk them after every install:
       opens and the page does not zoom (the hidden date input is 16px).
 - [ ] Paid with → search → the results run down to just above the keyboard,
       with no empty band (more than five payment methods needed for search).
+- [ ] Pick a foreign currency, type an amount, and with the keyboard still up
+      tap the **Counts as** line → the prompt's Cancel and Save both sit above
+      the keyboard, and the page behind has not jumped. (Seen broken in one
+      simulator session, never reproduced since; the phone is the judge.)
+- [ ] Save a foreign entry in airplane mode, then turn the signal back on and
+      reopen the app → it converts, and the form's line shows the rate again.
 - [ ] Settings → Export JSON → the iOS share sheet opens (not a download).
 - [ ] Files app → On My iPhone → Expense Tracker → `Backups/` is visible and
       today's `auto-backup-*.json` appears after a fresh launch.
